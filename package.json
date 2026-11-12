@@ -1,0 +1,7 @@
+{
+  "name": "mi-hamitchaze-local",
+  "private": true,
+  "description": "שרת בית: המשחק + שרת הכוונה מקומי, לשחק באותו Wi-Fi בלי אינטרנט",
+  "scripts": { "start": "node server.js", "test": "node tests/run.js" },
+  "dependencies": { "express": "^4.21.2", "peer": "^1.0.2", "peerjs": "1.5.4" }
+}

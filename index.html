@@ -373,6 +373,11 @@
   <div class="card" style="max-width:420px">
     <h1>מי <span>המתחזה</span>?</h1>
     <p class="sub">משחק חשיפה חברתי עם חברים – תחנת החלל נוגה</p>
+    <div id="netPick" class="row" style="gap:8px;margin-bottom:6px">
+      <button id="netOnline" class="netBtn" style="flex:1">🌐 אונליין</button>
+      <button id="netLocal" class="netBtn" style="flex:1">🏠 מקומי</button>
+    </div>
+    <p id="netHint" class="sub" style="font-size:13px;margin:0 0 12px;min-height:1.2em"></p>
     <input id="nameIn" maxlength="14" placeholder="הכינוי שלך" style="width:100%;margin-bottom:12px" autocomplete="off">
     <button id="demoBtn" style="width:100%;margin-bottom:10px;background:#1f6f4a">🎮 נסה דמו – למד לשחק מול בוטים</button>
     <button id="resumeBtn" class="hidden" style="width:100%;margin-bottom:10px;background:#7a4a10;border:2px solid var(--accent)"></button>
@@ -398,7 +403,7 @@
     </div>
     <div id="shareBox" class="urls" style="direction:rtl;text-align:right;font-family:inherit">
       <div class="row" style="justify-content:space-between">
-        <span>קוד החדר: <b id="roomCode" style="font-size:26px;letter-spacing:5px;color:var(--accent);direction:ltr;display:inline-block"></b></span>
+        <span><span id="netBadge" style="font-size:13px;padding:2px 8px;border-radius:10px;background:#2a3550;margin-left:6px"></span>קוד החדר: <b id="roomCode" style="font-size:26px;letter-spacing:5px;color:var(--accent);direction:ltr;display:inline-block"></b></span>
         <button id="copyBtn">📋 העתק קישור לחברים</button>
       </div>
       <div id="shareLink" style="direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:13px;color:var(--muted);margin-top:6px;word-break:break-all"></div>
@@ -521,7 +526,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="peerjs.min.js"></script>
 <script src="config.js"></script>
 <script src="map.js"></script>
 <script src="engine.js"></script>
@@ -540,11 +545,19 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-165737'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-170948'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
-const peerOpts = c => Object.assign({ config: ICE }, SIGNAL ? { host: SIGNAL.host, port: SIGNAL.port || 443, path: '/', secure: true } : {}, c || {});
+// מצב רשת: 'online' (דרך האינטרנט) או 'local' (שרת הבית, אותו Wi-Fi, בלי אינטרנט)
+let LOCAL = null; // פרטי שרת הבית, אם הדף נטען ממנו
+let NET = 'online';
+try { NET = localStorage.getItem('mm_net') === 'local' ? 'local' : 'online'; } catch (e) {}
+const peerOpts = c => {
+  if (NET === 'local' && LOCAL)
+    return Object.assign({ host: location.hostname, port: Number(location.port) || 80, path: LOCAL.signalPath || '/signal', secure: false, config: { iceServers: [] } }, c || {});
+  return Object.assign({ config: ICE }, SIGNAL ? { host: SIGNAL.host, port: SIGNAL.port || 443, path: '/', secure: true } : {}, c || {});
+};
 function staleBanner() {
   if ($('#staleBar')) return;
   const d = document.createElement('div');
@@ -806,7 +819,11 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && re
 
 function afterJoin() {
   status('');
-  const link = location.origin + location.pathname + '?room=' + ROOM;
+  let origin = location.origin;
+  if (NET === 'local' && LOCAL && /^(localhost|127\.)/.test(location.hostname) && LOCAL.addrs && LOCAL.addrs[0])
+    origin = location.protocol + '//' + LOCAL.addrs[0] + ':' + (location.port || LOCAL.port);
+  const link = origin + location.pathname + '?room=' + ROOM;
+  $('#netBadge').textContent = NET === 'local' ? '🏠 מקומי' : '🌐 אונליין';
   $('#roomCode').textContent = ROOM;
   $('#shareLink').textContent = link;
   try { history.replaceState(null, '', '?room=' + ROOM); } catch (e) {}
@@ -824,14 +841,41 @@ const urlRoom = new URLSearchParams(location.search).get('room');
 if (urlRoom) { $('#codeIn').value = urlRoom.toUpperCase(); $('#joinBtn').classList.add('primary'); }
 try { $('#fixedRoom').checked = localStorage.getItem('mm_fixed') === '1'; } catch (e) {}
 $('#fixedRoom').onchange = e => { try { localStorage.setItem('mm_fixed', e.target.checked ? '1' : '0'); } catch (er) {} };
-$('#hostBtn').onclick = () => {
+$('#hostBtn').onclick = () => LOCAL_READY.then(() => {
   if ($('#fixedRoom').checked) {
     let code = null; try { code = localStorage.getItem('mm_fixed_code'); } catch (e) {}
     if (!code) { code = makeCode(); try { localStorage.setItem('mm_fixed_code', code); } catch (e) {} }
     hostGame(getName(), 0, { room: code, snapshot: null, pid: null });
   } else hostGame(getName());
-};
+});
 $('#demoBtn').onclick = startDemo;
+function renderNet() {
+  $('#netOnline').classList.toggle('primary', NET === 'online');
+  $('#netLocal').classList.toggle('primary', NET === 'local');
+  let h;
+  if (NET === 'online') h = 'משחקים דרך האינטרנט – עם חברים מכל מקום.';
+  else if (LOCAL && LOCAL.signal) h = 'כולם באותו Wi-Fi, בלי אינטרנט ובלי חשבון.' + (LOCAL.addrs && LOCAL.addrs[0] ? ' החברים נכנסים ל: ' + LOCAL.addrs[0] + ':' + (location.port || LOCAL.port) : '');
+  else h = 'מצב מקומי עובד כשפותחים את המשחק משרת הבית: במחשב בבית מריצים npm start, וכולם נכנסים לכתובת שהוא מציג.';
+  $('#netHint').textContent = h;
+}
+function setNet(m) {
+  if (m === 'local' && !(LOCAL && LOCAL.signal)) { NET = 'online'; renderNet(); $('#netHint').textContent = 'מצב מקומי עובד כשפותחים את המשחק משרת הבית: במחשב בבית מריצים npm start, וכולם נכנסים לכתובת שהוא מציג.'; return; }
+  NET = m; try { localStorage.setItem('mm_net', m); } catch (e) {}
+  renderNet();
+}
+$('#netOnline').onclick = () => setNet('online');
+$('#netLocal').onclick = () => setNet('local');
+renderNet();
+// אם הדף נטען משרת הבית – מצב מקומי זמין (וברירת המחדל בפעם הראשונה)
+const LOCAL_READY = location.protocol !== 'http:' ? Promise.resolve() : fetch('local.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return;
+  LOCAL = j;
+  let saved = null; try { saved = localStorage.getItem('mm_net'); } catch (e) {}
+  if (!saved && j.signal) NET = 'local';
+  if (NET === 'local' && !j.signal) NET = 'online';
+  renderNet();
+}).catch(() => {});
+if (location.protocol !== 'http:' && NET === 'local') { NET = 'online'; renderNet(); }
 // המשך חדר שהייתי המארח שלו (אחרי נפילה, רענון או סגירה בטעות)
 (function () {
   try {
@@ -847,7 +891,7 @@ $('#demoBtn').onclick = startDemo;
 })();
 document.querySelectorAll('.exitDemo').forEach(b => b.onclick = () => { location.href = location.pathname; });
 $('#tutClose').onclick = () => { tutStep = TUT.length; renderTut(); };
-$('#joinBtn').onclick = () => joinGame(getName(), $('#codeIn').value);
+$('#joinBtn').onclick = () => LOCAL_READY.then(() => joinGame(getName(), $('#codeIn').value));
 $('#codeIn').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
 $('#nameIn').onkeydown = e => { if (e.key === 'Enter') (urlRoom ? $('#joinBtn') : $('#hostBtn')).click(); };
 $('#copyBtn').onclick = () => {
