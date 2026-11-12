@@ -342,6 +342,7 @@
 <div id="keysPanel" class="screen hidden">
   <div class="card" style="max-width:460px">
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">⚙️ הגדרות</h2><button id="keysClose">✕ סגור</button></div>
+    <button id="leaveBtn" class="hidden" style="width:100%;margin-top:10px;background:#5a1f2a;border:2px solid var(--imp)">🚪 יציאה מהמשחק</button>
     <p class="sub" style="margin:8px 0 12px">לחץ על מקש ברשימה ואז על המקש החדש שאתה רוצה. החצים תמיד עובדים לתזוזה.</p>
     <div class="row" style="margin:6px 0 12px;background:#151b2c;border-radius:10px;padding:8px 10px"><span>🔍 זום תצוגה</span><input type="range" id="zoomRange" min="60" max="180" step="5" value="100" style="flex:1;min-width:120px"><b id="zoomVal">100%</b></div>
     <div class="setrow"><label><input type="checkbox" id="cbMode"> 🎨 מצב עיוורון צבעים (סמל על כל צבע)</label></div>
@@ -545,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-172209'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-173603'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -566,7 +567,7 @@ function wakeSignal(showStatus) {
   return new Promise(done => {
     const tryOnce = () => {
       const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 15000);
-      fetch(url, { cache: 'no-store', signal: ac.signal }).then(r => { clearTimeout(to); if (r.ok) { signalAwake = true; if (showStatus) status(''); done(); } else again(); }, () => { clearTimeout(to); again(); });
+      fetch(url, { cache: 'no-store', signal: ac.signal }).then(r => { clearTimeout(to); if (r.ok) { signalAwake = true; if (showStatus) status(''); loadRelay().then(done); } else again(); }, () => { clearTimeout(to); again(); });
     };
     const again = () => {
       if (Date.now() - t0 > 90000) return done(); // ננסה בכל זאת – PeerJS יחזיר שגיאה אם זה לא עובד
@@ -576,12 +577,21 @@ function wakeSignal(showStatus) {
     tryOnce();
   });
 }
+// שרת ממסר (TURN): פרטים זמניים מהשרת שלנו, כדי שקול ומשחק יעברו גם בין מדינות ורשתות סלולריות
+let ICE_ONLINE = null;
+function loadRelay() {
+  if (ICE_ONLINE || !SIGNAL) return Promise.resolve();
+  const ac = new AbortController(); setTimeout(() => ac.abort(), 8000);
+  return fetch('https://' + SIGNAL.host + '/ice', { cache: 'no-store', signal: ac.signal }).then(r => r.json()).then(j => {
+    if (j && Array.isArray(j.iceServers) && j.iceServers.length) ICE_ONLINE = { iceServers: j.iceServers };
+  }).catch(() => {});
+}
 const peerOpts = c => {
   const b = brokerOf(NET);
   if (b === 'home')
     return Object.assign({ host: location.hostname, port: Number(location.port) || 80, path: LOCAL.signalPath || '/signal', secure: false, config: { iceServers: [] } }, c || {});
   if (b === 'private')
-    return Object.assign({ config: ICE, host: SIGNAL.host, port: SIGNAL.port || 443, path: '/', secure: true }, c || {});
+    return Object.assign({ config: ICE_ONLINE || ICE, host: SIGNAL.host, port: SIGNAL.port || 443, path: '/', secure: true }, c || {});
   return Object.assign({ config: ICE }, c || {});
 };
 function staleBanner() {
@@ -600,7 +610,6 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
 // שרתי עזר לחיבור בין רשתות שונות (STUN + שרת ממסר ציבורי) – כדי שהקול יעבוד גם כשכל חבר בבית אחר
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
 ] };
 let engine = null, peer = null, conn = null, isHost = false, ROOM = null;
 const guests = {};
@@ -926,7 +935,8 @@ $('#copyBtn').onclick = () => {
   const t = $('#shareLink').textContent;
   (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('הקישור הועתק!'), () => toast(t));
 };
-window.addEventListener('beforeunload', e => { if (isHost && !DEMO && S && S.phase !== 'lobby') { e.preventDefault(); e.returnValue = ''; } });
+let leaving = false;
+window.addEventListener('beforeunload', e => { if (!leaving && isHost && !DEMO && S && S.phase !== 'lobby') { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- קבלת מצב ----------
 function show(id, on) { $(id).classList.toggle('hidden', !on); }
@@ -2304,7 +2314,15 @@ function refreshKeyLabels() {
   $('#keysList').innerHTML = Object.keys(DEFAULT_KEYS).map(a =>
     `<div class="row"><span>${KEY_NAMES[a]}</span><button data-a="${a}" class="${capturing === a ? 'wait' : ''}">${capturing === a ? 'לחץ מקש…' : keyLabel(KEYS[a])}</button></div>`).join('');
 }
-$('#gearBtn').onclick = () => { capturing = null; refreshKeyLabels(); show('#keysPanel', true); };
+$('#gearBtn').onclick = () => { capturing = null; refreshKeyLabels(); show('#leaveBtn', !!S); show('#keysPanel', true); };
+$('#leaveBtn').onclick = () => {
+  const msg = DEMO ? 'לצאת מהדמו?' : isHost ? 'אתה המארח – אם תצא, המשחק ייגמר לכולם. לצאת?' : 'לצאת מהמשחק? תוכל לחזור עם אותו קוד חדר.';
+  if (!confirm(msg)) return;
+  if (isHost) { try { localStorage.removeItem('mm_host_last'); } catch (e) {} }
+  leaving = true;
+  try { if (peer) peer.destroy(); } catch (e) {}
+  location.href = location.pathname;
+};
 $('#keysClose').onclick = () => { capturing = null; show('#keysPanel', false); };
 $('#keysReset').onclick = () => { KEYS = { ...DEFAULT_KEYS }; capturing = null; saveKeys(); };
 $('#keysList').onclick = e => { const b = e.target.closest('button'); if (b) { capturing = b.dataset.a; refreshKeyLabels(); } };
