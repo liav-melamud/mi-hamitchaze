@@ -145,6 +145,8 @@
   body.touch #ttsBtn { bottom: auto; top: 12px; left: auto; right: calc(50% + 56px); }
   #micBtn.on { background: #1f6f4a; border-color: #4ade80; }
   body.touch #micBtn { bottom: auto; top: 12px; left: auto; right: calc(50% - 56px); }
+  #staleBar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #b4590b; color: #fff; padding: 10px 14px; text-align: center; font-weight: 700; }
+  #staleBar button { margin-right: 10px; background: #fff; color: #7a3a00; }
   #gearBtn { position: fixed; bottom: 16px; left: 16px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
   body.touch #gearBtn { bottom: auto; top: 12px; left: auto; right: 50%; transform: translateX(50%); }
   #keysPanel { z-index: 45; }
@@ -257,6 +259,7 @@
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>תפקידים:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר (מגן אחרי מוות) · מתחזה · משנה צורה (מתחפש לאחרים)<br>
+      <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
     </div>
@@ -325,7 +328,21 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
+const VERSION = '20261112-130553'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
+function staleBanner() {
+  if ($('#staleBar')) return;
+  const d = document.createElement('div');
+  d.id = 'staleBar';
+  d.innerHTML = '⚠️ יש גרסה חדשה של המשחק, ואצלך פתוחה גרסה ישנה (הקול והבוטים עלולים לא לעבוד). <button id="staleBtn">רענן עכשיו</button>';
+  document.body.appendChild(d);
+  $('#staleBtn').onclick = () => location.reload();
+}
+// בודק אם הדף שנטען הוא הגרסה האחרונה שעל השרת
+fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
+  const m = t.match(/const VERSION = '([^']+)'/);
+  if (m && VERSION !== 'dev' && m[1] !== 'dev' && m[1] !== VERSION) staleBanner();
+}).catch(() => {});
 // שרתי עזר לחיבור בין רשתות שונות (STUN + שרת ממסר ציבורי) – כדי שהקול יעבוד גם כשכל חבר בבית אחר
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' },
@@ -457,7 +474,8 @@ function hostGame(name, tries = 0) {
         const taken = Object.values(guests).some(g => g.pid === d.id) || d.id === ID;
         const pid = engine.join(String(d.name || 'שחקן'), taken ? null : d.id);
         guests[c.peer] = { conn: c, pid };
-        c.send({ type: 'joined', id: pid, room: ROOM });
+        c.send({ type: 'joined', id: pid, room: ROOM, v: VERSION });
+        if (d.v && d.v !== VERSION && VERSION !== 'dev' && d.v !== 'dev') toast('⚠️ ' + String(d.name || 'חבר') + ' משתמש בגרסה אחרת של המשחק – כדאי שירענן');
         setTimeout(sendVoicePeers, 500);
         return;
       }
@@ -483,9 +501,9 @@ function joinGame(name, code) {
   peer.on('call', onCall);
   peer.on('open', () => {
     conn = peer.connect(PREFIX + ROOM, { reliable: true });
-    conn.on('open', () => conn.send({ type: 'join', name, id: ss.get('mm_id_' + ROOM) }));
+    conn.on('open', () => conn.send({ type: 'join', name, id: ss.get('mm_id_' + ROOM), v: VERSION }));
     conn.on('data', d => {
-      if (d.type === 'joined') { ID = d.id; ss.set('mm_id_' + ROOM, ID); afterJoin(); }
+      if (d.type === 'joined') { ID = d.id; ss.set('mm_id_' + ROOM, ID); afterJoin(); if (d.v && d.v !== VERSION && d.v !== 'dev' && VERSION !== 'dev') staleBanner(); }
       else if (d.type === 'state') onState(d.s);
       else if (d.type === 'voicePeers') setPeers(d.list);
     });
@@ -1063,6 +1081,7 @@ async function toggleMic() {
   applyVoice();
 }
 $('#micBtn').onclick = toggleMic;
+document.addEventListener('click', e => { const b = e.target.closest('#micBtn, #gearBtn, #ttsBtn, #actions button'); if (b) b.blur(); });
 let lastTalk = false, lastTalkSent = 0;
 setInterval(() => {
   const mine = !!talking.me && micOn && !!ID;
@@ -1758,6 +1777,7 @@ function frame(t) {
 }
 requestAnimationFrame(frame);
 refreshKeyLabels();
+$('#verTxt').textContent = VERSION;
 if (isTouch) document.body.classList.add('touch');
 </script>
 </body>
