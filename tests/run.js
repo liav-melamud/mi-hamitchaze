@@ -176,6 +176,19 @@ test('סיוע למגע: אצבע לא מדויקת מגיעה לכל חדר', (
   }
 });
 
+test('סיכום משחק: ציר זמן ופרסים, ו"שחק שוב" מתחיל סבב חדש', () => {
+  const g = createGame(MAP); const a = g.join('x');
+  g.act(a, { type: 'settings', impostors: 2, bots: 7, killCd: 15, tasks: 4, meetingTime: 20 }); g.act(a, { type: 'start' });
+  let v = g.view(a);
+  for (let i = 0; i < 60000 && v.phase !== 'end'; i++) { tick(g, 1); v = g.view(a); if (v.phase === 'meeting' && !v.meeting.myVote && v.me.alive) g.act(a, { type: 'vote', target: 'skip' }); }
+  ok(v.phase === 'end', 'המשחק לא נגמר');
+  ok(v.summary && v.summary.events.length >= 2 && v.summary.events[0].text.includes('התחיל'), 'חסר ציר זמן');
+  ok(v.summary.events[v.summary.events.length - 1].type === 'end', 'הציר צריך להסתיים בסיום');
+  ok(Array.isArray(v.summary.awards), 'חסרים פרסים');
+  g.act(a, { type: 'again' }); sec(g, 1);
+  const v2 = g.view(a); ok(v2.phase === 'play' && v2.tasks.total > 0 && !v2.summary, 'צריך להתחיל סבב חדש');
+});
+
 // ---------------------------------------------------------------------------
 console.log('\nמשחקים מלאים (בוטים בלבד)');
 test('30 משחקים מלאים נגמרים בלי שגיאות ובלי להיתקע', () => {

@@ -46,6 +46,9 @@ let usedLines = new Set();
 let gusts = [], windT = 14;
 // חבלות: sab = משבר פעיל (חשמל/חמצן/כור), דלתות סגורות לפי חדר
 let sab = null, sabCd = 20, doorsUntil = {}, doorCool = {};
+let events = [], gameStartT = 0;
+const ev = (type, text) => { events.push({ t: Math.max(0, Math.round(now() - gameStartT)), type, text }); if (events.length > 300) events.shift(); };
+const nm = p => String(p.name).replace(/^🤖\s*/, '');
 const SAB_TIME = 45, SAB_CD = 30, DOOR_TIME = 12, DOOR_COOL = 20;
 const SAB_WIN = { oxygen: 'האוויר בתחנה נגמר!', reactor: 'הכור התפוצץ!' };
 const doorBlocked = (x, y) => {
@@ -59,12 +62,13 @@ const doorBlocked = (x, y) => {
 function startSab(kind) {
   if (sab || sabCd > 0) return;
   sab = { type: kind, t: kind === 'lights' ? 0 : SAB_TIME, fixed: MAP.SAB_POINTS[kind].map(() => false) };
+  ev('sab', { lights: '💡 החשמל הופל', oxygen: '💨 הופסק החמצן', reactor: '☢️ הכור התחמם' }[kind]);
   toastAll(kind === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל' : kind === 'oxygen' ? '💨 הפסקת חמצן! יש 45 שניות לתקן בשתי נקודות' : '☢️ הכור מתחמם! יש 45 שניות לקרר בשתי נקודות');
 }
 function fixSab(i) {
   if (!sab || sab.fixed[i]) return;
   sab.fixed[i] = true;
-  if (sab.fixed.every(Boolean)) { sab = null; sabCd = SAB_CD; toastAll('✅ התקלה תוקנה'); }
+  if (sab.fixed.every(Boolean)) { sab = null; sabCd = SAB_CD; toastAll('✅ התקלה תוקנה'); ev('fix', '✅ התקלה תוקנה'); }
 }
 function closeDoors(roomId) {
   const r = MAP.ROOMS[roomId];
@@ -147,13 +151,14 @@ function startGame(by) {
   const nSpecial = settings.newRoles ? Math.max(1, Math.round(crew.length * 0.7)) : specials.length;
   crew.forEach((p, i) => { p.role = i < Math.min(specials.length, nSpecial) && crew.length > 1 ? specials[i] : 'crew'; });
 
+  events = []; gameStartT = now(); ev('start', '🚀 המשחק התחיל');
   taskTotal = 0; taskDone = 0;
   // בקבוצה קטנה כל איש צוות מקבל יותר משימות, כדי שהצוות לא יסיים מהר מדי (לפחות 20 משימות בסך הכל)
   const tasksEach = Math.min(8, Math.max(settings.tasks, Math.ceil(20 / Math.max(1, crew.length))));
   all.forEach(p => {
     p.alive = true; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
-    p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.vanishUntil = 0; p.vanishCd = 0; p.nearKill = 0;
+    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.vanishUntil = 0; p.vanishCd = 0; p.nearKill = 0;
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
@@ -184,13 +189,14 @@ function checkWin() {
   if (imps === 0) w = { team: 'crew', reason: 'כל המתחזים הודחו!' };
   else if (taskTotal > 0 && taskDone >= taskTotal) w = { team: 'crew', reason: 'הצוות השלים את כל המשימות!' };
   else if (imps >= crew) w = { team: 'imp', reason: 'המתחזים השתלטו על התחנה!' };
-  if (w) { winner = w; phase = 'end'; settings.reveal = true; return true; }
+  if (w) { winner = w; phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + w.reason); return true; }
   return false;
 }
 
 function completeTask(p, t) {
   t.done = true;
   if (team(p) === 'crew') taskDone++;
+  p.stats.tasks++;
   toast(p, '✔ ' + MAP.TASKS[t.i].name + ' הושלמה');
   checkWin();
 }
@@ -206,6 +212,7 @@ function callMeeting(by, body) {
       room = 'מסדרון ליד ' + near.name;
     }
   }
+  by.stats.reports++; ev('meeting', body ? `📢 ${nm(by)} דיווח על הגופה של ${players[body.id] ? nm(players[body.id]) : 'שחקן'} (${room})` : `🚨 ${nm(by)} כינס ישיבת חירום`);
   meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {}, floor: Infinity };
   chat = [];
   bodies = [];
@@ -241,6 +248,9 @@ function resolveMeeting() {
   if (best && best !== 'skip' && !tie && players[best]) {
     ej = players[best]; ej.alive = false;
   }
+  // סטטיסטיקה: מי הצביע נכון (נגד מתחזה) ומי טעה (נגד איש צוות)
+  voters.forEach(v => { const tg = meeting.votes[v.id]; if (tg && tg !== 'skip' && players[tg]) { if (team(players[tg]) === 'imp') v.stats.goodVotes++; else v.stats.badVotes++; } });
+  ev('eject', ej ? `🚀 ${nm(ej)} הודח (היה ${ROLES[ej.role].name})` : (tie ? '🤝 תיקו בהצבעה – אף אחד לא הודח' : '⏭ ההצבעה דילגה – אף אחד לא הודח'));
   eject = ej
     ? { id: ej.id, name: ej.name, color: ej.color, role: settings.confirm ? ROLES[ej.role].name : null, team: settings.confirm ? team(ej) : null, tally, t: EJECT_TIME }
     : { id: null, tally, t: EJECT_TIME, tie };
@@ -362,6 +372,7 @@ function act(p, a) {
       tgt.alive = false; tgt.work = null; tgt.cam = false;
       bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + 8 : 0 });
       p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor();
+      p.stats.kills++; ev('kill', `🔪 ${nm(p)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
       // לבלש: מי שהיה ליד הזירה נרשם כחשוד קל
       list().forEach(q => { if (q.alive && !q.spectator && dist(q, tgt) < 700) q.nearKill = (q.nearKill || 0) + 1; });
       // בוטים שראו את החיסול זוכרים מי עשה את זה
@@ -469,6 +480,7 @@ function act(p, a) {
     }
     case 'start': startGame(p.id); break;
     case 'lobby': backToLobby(p.id); break;
+    case 'again': if (p.id === hostId && phase === 'end') { backToLobby(p.id); startGame(p.id); } break;
   }
 }
 
@@ -802,7 +814,7 @@ function tick() {
     for (const rid of Object.keys(doorsUntil)) if (doorsUntil[rid] <= t) delete doorsUntil[rid];
     if (sab && sab.type !== 'lights') {
       sab.t -= dt;
-      if (sab.t <= 0) { winner = { team: 'imp', reason: SAB_WIN[sab.type] }; phase = 'end'; settings.reveal = true; sab = null; }
+      if (sab.t <= 0) { winner = { team: 'imp', reason: SAB_WIN[sab.type] }; phase = 'end'; settings.reveal = true; sab = null; ev('end', '🏁 ' + winner.reason); }
     }
     // רוח מפתחי האוורור: פעם בכמה שניות פתח אחד נושף ודוחף חלש
     windT -= dt;
@@ -963,6 +975,17 @@ function viewFor(v) {
   }
   if (eject) out.eject = eject;
   if (winner) out.winner = winner;
+  if (phase === 'end') {
+    const all = list().filter(q => !q.spectator && q.stats);
+    const best = (key, minV) => { const top = all.slice().sort((x, y) => y.stats[key] - x.stats[key])[0]; return top && top.stats[key] >= minV ? { name: nm(top), val: top.stats[key], color: COLORS[top.color].c } : null; };
+    const awards = [];
+    const a1 = best('tasks', 1); if (a1) awards.push({ icon: '🛠️', title: 'הכי הרבה משימות', ...a1 });
+    const a2 = best('kills', 1); if (a2) awards.push({ icon: '🔪', title: 'הכי הרבה חיסולים', ...a2 });
+    const a3 = best('goodVotes', 1); if (a3) awards.push({ icon: '🎯', title: 'הצביע נכון הכי הרבה', ...a3 });
+    const a4 = best('badVotes', 1); if (a4) awards.push({ icon: '🤦', title: 'הצביע נגד חפים מפשע', ...a4 });
+    const a5 = best('reports', 1); if (a5) awards.push({ icon: '📢', title: 'הכי הרבה דיווחים', ...a5 });
+    out.summary = { duration: Math.round(t - gameStartT), awards, events: events.slice(-60) };
+  }
   if (phase === 'lobby') out.colors = COLORS;
   return out;
 }
