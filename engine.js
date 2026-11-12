@@ -34,6 +34,7 @@ let phase = 'lobby';
 let hostId = null;
 let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true };
 let usedLines = new Set();
+let alertT = 0;
 let bodies = [];
 let meeting = null, eject = null, winner = null;
 let chat = [];
@@ -140,7 +141,7 @@ function completeTask(p, t) {
 }
 
 function callMeeting(by, body) {
-  phase = 'meeting';
+  phase = 'alert'; alertT = 3.2; // מסך הכרזה לפני הישיבה
   const br = body ? MAP.roomAt(body.x, body.y) : null;
   meeting = { by: by.id, body: body ? body.id : null, room: br ? br.name : 'מסדרון', votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0 };
   chat = [];
@@ -510,6 +511,9 @@ function tick() {
         }
       }
     }
+  } else if (phase === 'alert') {
+    alertT -= dt;
+    if (alertT <= 0) phase = 'meeting';
   } else if (phase === 'meeting') {
     meeting.t -= dt;
     list().filter(p => p.isBot).forEach(botMeeting);
@@ -577,6 +581,11 @@ function viewFor(v) {
       t: Math.ceil(meeting.t), by: by ? by.name : '', body: body ? body.name : null,
       voted: Object.keys(meeting.votes), myVote: meeting.votes[v.id] || null,
     };
+  }
+  if (phase === 'alert' && meeting) {
+    const by = players[meeting.by], body = meeting.body && players[meeting.body];
+    out.alert = { name: by ? by.name : '', color: by ? COLORS[by.color].c : '#fff', hat: by ? by.hat : 0,
+      body: !!body, bodyName: body ? body.name : null, bodyColor: body ? COLORS[body.color].c : null, room: meeting.room };
   }
   if (eject) out.eject = eject;
   if (winner) out.winner = winner;
