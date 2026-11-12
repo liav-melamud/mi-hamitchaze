@@ -136,6 +136,9 @@
   .vrow { display: flex; align-items: center; gap: 6px; background: #151b2c; border-radius: 10px; padding: 6px 10px; font-size: 14px; }
   .vote.talk { box-shadow: 0 0 0 3px #4ade80, 0 0 14px rgba(74,222,128,.5); }
   #micBtn { position: fixed; bottom: 16px; left: 70px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
+  #ttsBtn { position: fixed; bottom: 16px; left: 124px; z-index: 40; height: 46px; padding: 0 12px; border-radius: 23px; font-size: 16px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
+  #ttsBtn.off { opacity: .6; }
+  body.touch #ttsBtn { bottom: auto; top: 12px; left: auto; right: calc(50% + 56px); }
   #micBtn.on { background: #1f6f4a; border-color: #4ade80; }
   body.touch #micBtn { bottom: auto; top: 12px; left: auto; right: calc(50% - 56px); }
   #gearBtn { position: fixed; bottom: 16px; left: 16px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
@@ -171,7 +174,8 @@
 </div>
 <div id="toasts"></div>
 <button id="gearBtn" title="הגדרות מקשים">⚙️</button>
-<button id="micBtn" class="hidden" title="צ'אט קולי (פעיל בלובי ובישיבות)">🔇</button>
+<button id="ttsBtn" title="קול לבוטים">🤖🔊</button>
+<button id="micBtn" class="hidden" title="צ'אט קולי עם החברים">🔇</button>
 <div id="keysPanel" class="screen hidden">
   <div class="card" style="max-width:460px">
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">⚙️ הגדרות מקשים</h2><button id="keysClose">✕ סגור</button></div>
@@ -249,7 +253,7 @@
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>תפקידים:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר (מגן אחרי מוות) · מתחזה · משנה צורה (מתחפש לאחרים)<br>
-      <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בלובי ובישיבות בלבד, ורוחות שומעות רק רוחות.<br>
+      <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
     </div>
   </div>
@@ -317,6 +321,11 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
 const PREFIX = 'mimitchaze-he-';
+// שרתי עזר לחיבור בין רשתות שונות (STUN + שרת ממסר ציבורי) – כדי שהקול יעבוד גם כשכל חבר בבית אחר
+const ICE = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+] };
 let engine = null, peer = null, conn = null, isHost = false, ROOM = null;
 const guests = {};
 const ss = {
@@ -432,7 +441,7 @@ function hostGame(name, tries = 0) {
   busy(true);
   ROOM = makeCode();
   status('יוצר חדר…');
-  peer = new Peer(PREFIX + ROOM);
+  peer = new Peer(PREFIX + ROOM, { config: ICE });
   peer.on('call', onCall);
   peer.on('open', () => { runEngine(name, false); afterJoin(); setInterval(sendVoicePeers, 3000); });
   peer.on('connection', c => {
@@ -465,7 +474,7 @@ function joinGame(name, code) {
   busy(true);
   ROOM = code;
   status('מתחבר לחדר ' + ROOM + '…');
-  peer = new Peer();
+  peer = new Peer(undefined, { config: ICE });
   peer.on('call', onCall);
   peer.on('open', () => {
     conn = peer.connect(PREFIX + ROOM, { reliable: true });
@@ -548,6 +557,7 @@ function onState(s) {
   miniSync(s);
   show('#micBtn', !DEMO);
   applyVoice();
+  ttsSync(s);
 }
 
 function toast(t) {
@@ -968,7 +978,7 @@ $('#hats').onclick = e => { const b = e.target.closest('button'); if (b) api({ t
 let localStream = null, micOn = false;
 const vCalls = {}, vOut = {}, vAudio = {}, talking = {};
 let vPeerMap = {};
-const voicePhase = () => S && ['lobby', 'alert', 'meeting', 'end'].includes(S.phase);
+const voicePhase = () => !!S; // הקול פועל בכל שלבי המשחק
 
 function sendVoicePeers() {
   if (!peer || !isHost || DEMO) return;
@@ -1020,7 +1030,7 @@ function watchTalk(stream, key) {
     setInterval(() => { an.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128)); talking[key] = m > 14; }, 150);
   } catch (e) {}
 }
-// מי שומע את מי: רק בלובי/ישיבה, וחיים לא שומעים רוחות
+// מי שומע את מי: כולם שומעים את כולם, חוץ מזה שחיים לא שומעים רוחות
 function applyVoice() {
   const ok = voicePhase();
   if (localStream) localStream.getAudioTracks().forEach(t => { t.enabled = micOn && ok; });
@@ -1038,7 +1048,7 @@ async function toggleMic() {
     watchTalk(localStream, 'me');
     for (const k in vOut) delete vOut[k];
     callAll();
-    toast('🎙️ המיקרופון פעיל (בלובי ובישיבות)');
+    toast('🎙️ המיקרופון פעיל – החברים שומעים אותך');
   } else { micOn = false; }
   $('#micBtn').classList.toggle('on', micOn);
   $('#micBtn').textContent = micOn ? '🎙️' : '🔇';
@@ -1053,6 +1063,41 @@ setInterval(() => {
     b.classList.toggle('talk', on);
   });
 }, 200);
+
+// ---------- קול לבוטים: הקראה בדפדפן, לכל בוט קול וגובה שונים ----------
+let ttsOn = true; try { ttsOn = localStorage.getItem('mm_tts') !== '0'; } catch (e) {}
+let spoken = 0;
+const hashStr = t => { let h = 0; for (const ch of String(t)) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
+const heVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^he/i.test(v.lang) || /hebrew|carmit|עברית/i.test(v.name)); } catch (e) { return []; } };
+function speakBot(name, text) {
+  if (!ttsOn || !('speechSynthesis' in window)) return;
+  const clean = String(text).replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').replace(/[()]/g, ' ').trim();
+  if (!clean) return;
+  const h = hashStr(String(name).replace(/[^\u0590-\u05FFa-z0-9]/gi, ''));
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = 'he-IL';
+  const vs = heVoices(); if (vs.length) u.voice = vs[h % vs.length];
+  u.pitch = 0.6 + (h % 9) * 0.12;
+  u.rate = 0.95 + (h % 4) * 0.07;
+  try { speechSynthesis.speak(u); } catch (e) {}
+}
+function ttsSync(s) {
+  if (s.phase !== 'meeting') { if (spoken) { spoken = 0; try { speechSynthesis.cancel(); } catch (e) {} } return; }
+  if (s.chat.length < spoken) spoken = 0;
+  for (; spoken < s.chat.length; spoken++) {
+    const c = s.chat[spoken], r = s.roster.find(x => x.id === c.from);
+    if (r && r.bot) speakBot(c.name, c.text);
+  }
+}
+function refreshTts() { $('#ttsBtn').textContent = ttsOn ? '🤖🔊' : '🤖🔇'; $('#ttsBtn').classList.toggle('off', !ttsOn); }
+$('#ttsBtn').onclick = () => {
+  ttsOn = !ttsOn;
+  try { localStorage.setItem('mm_tts', ttsOn ? '1' : '0'); } catch (e) {}
+  if (!ttsOn) { try { speechSynthesis.cancel(); } catch (e) {} }
+  else { speakBot('בוט', 'שלום, אני מדבר!'); }
+  refreshTts();
+};
+refreshTts();
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
 const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC' };
