@@ -89,6 +89,16 @@
   .center { text-align: center; }
   #endlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 14px 0; }
 
+  #tut { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 25; width: min(420px, calc(100vw - 32px));
+    background: rgba(16, 40, 30, .95); border: 2px solid #3fbf7f; border-radius: 16px; padding: 12px 16px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #tutStep { font-size: 12px; color: #8fe0b5; }
+  #tutTitle { font-size: 20px; font-weight: 800; margin: 2px 0 4px; }
+  #tutDesc { font-size: 14px; color: #d7efe2; line-height: 1.6; }
+  #tutDesc kbd { margin: 0 2px; }
+  .keys { display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; justify-content: center; margin-top: 10px; direction: ltr; }
+  .keys b { height: 44px; display: flex; align-items: center; justify-content: center; background: #22293d; border-radius: 9px; border-bottom: 4px solid #11162a; font-size: 14px; transition: all .08s; }
+  .keys b.on { background: var(--accent); color: #1a1205; border-bottom-width: 1px; transform: translateY(3px); }
+  body.meeting-on #tut { top: auto; bottom: 12px; }
   @media (max-width: 640px) {
     #actions { grid-template-columns: repeat(3, 70px); gap: 8px; bottom: 12px; right: 12px; }
     #actions button { height: 70px; font-size: 12px; }
@@ -115,6 +125,17 @@
   <div id="actions"></div>
 </div>
 <div id="toasts"></div>
+<div id="tut" class="hidden">
+  <div id="tutStep"></div>
+  <div id="tutTitle"></div>
+  <div id="tutDesc"></div>
+  <div id="tutKeys" class="hidden">
+    <div class="keys"><span></span><b data-k="up">W ↑</b><span></span><b data-k="left">A ←</b><b data-k="down">S ↓</b><b data-k="right">D →</b></div>
+  </div>
+  <div id="tutBtns" class="row hidden" style="justify-content:center;margin-top:10px">
+    <button id="tutClose">המשך לשחק</button><button class="exitDemo primary">צור חדר עם חברים</button>
+  </div>
+</div>
 <div id="joy" class="hidden"><div id="knob"></div></div>
 
 <!-- הצטרפות -->
@@ -123,7 +144,9 @@
     <h1>מי <span>המתחזה</span>?</h1>
     <p class="sub">משחק חשיפה חברתי עם חברים – תחנת החלל נוגה</p>
     <input id="nameIn" maxlength="14" placeholder="הכינוי שלך" style="width:100%;margin-bottom:12px" autocomplete="off">
-    <button id="hostBtn" class="primary" style="width:100%;margin-bottom:14px">✨ צור חדר חדש</button>
+    <button id="demoBtn" style="width:100%;margin-bottom:10px;background:#1f6f4a">🎮 נסה דמו – למד לשחק מול בוטים</button>
+    <button id="hostBtn" class="primary" style="width:100%;margin-bottom:4px">✨ צור חדר חדש ואָרֵח</button>
+    <p class="sub" style="font-size:13px;margin:0 0 14px">כל אחד יכול ליצור חדר משלו – מי שיוצר הוא המארח, ושולח לחברים את הקוד.</p>
     <div class="row">
       <input id="codeIn" maxlength="4" placeholder="קוד חדר" style="flex:1;text-transform:uppercase;letter-spacing:4px;direction:ltr;text-align:center" autocomplete="off">
       <button id="joinBtn">הצטרף לחדר</button>
@@ -137,7 +160,10 @@
   <div class="card">
     <h1>מי <span>המתחזה</span>?</h1>
     <p class="sub">לובי – מחכים לכולם</p>
-    <div class="urls" style="direction:rtl;text-align:right;font-family:inherit">
+    <div id="demoBox" class="urls hidden" style="direction:rtl;text-align:right;font-family:inherit">
+      <div class="row" style="justify-content:space-between"><span>🎮 מצב דמו – משחק מול בוטים בלבד</span><button class="exitDemo">יציאה מהדמו</button></div>
+    </div>
+    <div id="shareBox" class="urls" style="direction:rtl;text-align:right;font-family:inherit">
       <div class="row" style="justify-content:space-between">
         <span>קוד החדר: <b id="roomCode" style="font-size:26px;letter-spacing:5px;color:var(--accent);direction:ltr;display:inline-block"></b></span>
         <button id="copyBtn">📋 העתק קישור לחברים</button>
@@ -230,32 +256,101 @@ function getName() {
   return n;
 }
 
+// מריץ את מנוע המשחק בדפדפן הזה (מארח או דמו)
+function runEngine(name, demo) {
+  isHost = true;
+  engine = createGame(MAP, { demo });
+  ID = engine.join(name);
+  // שעון ב-Worker כדי שהמשחק ימשיך לרוץ גם כשהלשונית של המארח ברקע
+  let tickN = 0;
+  const onTick = () => { engine.tick(); if (++tickN % 2 === 0) broadcast(); };
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),33)'], { type: 'text/javascript' })));
+    w.onmessage = onTick;
+  } catch (e) { setInterval(onTick, 33); }
+  function broadcast() {
+    const s = engine.view(ID);
+    if (s) onState(s);
+    for (const g of Object.values(guests)) {
+      if (g.pid && g.conn.open) { const v = engine.view(g.pid); if (v) g.conn.send({ type: 'state', s: v }); }
+    }
+  }
+}
+
+// ---------- דמו: משחק מול בוטים עם הדרכה צעד-אחר-צעד ----------
+let DEMO = false, tutStep = 0, tutStart = null, tutTasks = 0;
+const TUT = [
+  { t: 'זוז עם המקשים', keys: true, d: 'במחשב: <span dir="ltr"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span> או החצים. בטלפון: הג׳ויסטיק בפינה.' },
+  { t: 'לך לסימן הצהוב ❗', d: 'החץ הצהוב מראה לך לאן ללכת. כל ❗ הוא משימה שלך.', arrow: 'task' },
+  { t: 'בצע את המשימה', d: 'לחץ <kbd>E</kbd> (או ✋ שימוש) ואל תזוז עד שהפס הירוק מתמלא.', arrow: 'task' },
+  { t: 'הפעל מצב חשיפה 👁', d: 'לחץ <kbd>H</kbd> (או הכפתור הסגול למעלה). עכשיו תראה קווים ותגיות לכל השחקנים. האדום הוא המתחזה!' },
+  { t: 'כנס ישיבת חירום 🚨', d: 'לך לכפתור האדום בחדר האוכל ולחץ <kbd>E</kbd>.', arrow: 'button' },
+  { t: 'הצבע!', d: 'לחץ על השחקן שאתה חושד בו – או על "דלג". אחרי שכולם מצביעים רואים מי הודח.' },
+  { t: 'כל הכבוד – אתה יודע לשחק! 🎉', d: 'אפשר להמשיך לשחק בדמו, או לצאת ולצור חדר עם חברים.', done: true },
+];
+
+function startDemo() {
+  DEMO = true;
+  runEngine(getName(), true);
+  engine.act(ID, { type: 'settings', impostors: 1, bots: 5 });
+  engine.act(ID, { type: 'start' });
+  tutStep = 0; tutStart = null; tutTasks = 0;
+  $('#shareBox').classList.add('hidden');
+  $('#demoBox').classList.remove('hidden');
+  renderTut();
+}
+
+function renderTut() {
+  const st = TUT[tutStep];
+  show('#tut', DEMO && !!st);
+  if (!st) return;
+  $('#tutStep').textContent = st.done ? '' : `שלב ${tutStep + 1} מתוך ${TUT.length - 1}`;
+  $('#tutTitle').textContent = st.t;
+  $('#tutDesc').innerHTML = st.d;
+  show('#tutKeys', !!st.keys);
+  show('#tutBtns', !!st.done);
+}
+
+function tutCheck(s) {
+  if (!DEMO || !TUT[tutStep] || TUT[tutStep].done) return;
+  const me = s.players.find(p => p.id === s.me.id);
+  const done = s.me.tasks.filter(t => t.done).length;
+  let next = false;
+  switch (tutStep) {
+    case 0:
+      if (me && !tutStart) tutStart = { x: me.x, y: me.y };
+      next = me && D(me, tutStart) > 120; break;
+    case 1: next = me && s.me.tasks.some(t => !t.done && D(me, MAP.TASKS[t.i]) <= 60); tutTasks = done; break;
+    case 2: next = done > tutTasks; break;
+    case 3: next = s.settings.reveal; break;
+    case 4: next = s.phase === 'meeting'; break;
+    case 5: next = s.phase === 'eject' || s.phase === 'end'; break;
+  }
+  if (next) { tutStep++; renderTut(); }
+}
+
+// יעד החץ בשלבי ההדרכה
+function tutTarget() {
+  const st = DEMO && TUT[tutStep];
+  if (!st || !st.arrow || !S || S.phase !== 'play') return null;
+  if (st.arrow === 'button') return MAP.BUTTON;
+  const pos = myPos();
+  let best = null, bd = Infinity;
+  for (const t of S.me.tasks) {
+    if (t.done) continue;
+    const T = MAP.TASKS[t.i], d = D(pos, T);
+    if (d < bd) { bd = d; best = T; }
+  }
+  return best;
+}
+
 function hostGame(name, tries = 0) {
   if (typeof Peer === 'undefined') return status('לא הצלחתי לטעון את ספריית החיבור – בדוק חיבור לאינטרנט');
   busy(true);
   ROOM = makeCode();
   status('יוצר חדר…');
   peer = new Peer(PREFIX + ROOM);
-  peer.on('open', () => {
-    isHost = true;
-    engine = createGame(MAP);
-    ID = engine.join(name);
-    // שעון ב-Worker כדי שהמשחק ימשיך לרוץ גם כשהלשונית של המארח ברקע
-    let tickN = 0;
-    const onTick = () => { engine.tick(); if (++tickN % 2 === 0) broadcast(); };
-    try {
-      const w = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),33)'], { type: 'text/javascript' })));
-      w.onmessage = onTick;
-    } catch (e) { setInterval(onTick, 33); }
-    function broadcast() {
-      const s = engine.view(ID);
-      if (s) onState(s);
-      for (const g of Object.values(guests)) {
-        if (g.pid && g.conn.open) { const v = engine.view(g.pid); if (v) g.conn.send({ type: 'state', s: v }); }
-      }
-    }
-    afterJoin();
-  });
+  peer.on('open', () => { runEngine(name, false); afterJoin(); });
   peer.on('connection', c => {
     c.on('data', d => {
       if (!d || typeof d !== 'object') return;
@@ -320,6 +415,9 @@ $('#nameIn').value = store.get('mm_name') || '';
 const urlRoom = new URLSearchParams(location.search).get('room');
 if (urlRoom) { $('#codeIn').value = urlRoom.toUpperCase(); $('#joinBtn').classList.add('primary'); }
 $('#hostBtn').onclick = () => hostGame(getName());
+$('#demoBtn').onclick = startDemo;
+document.querySelectorAll('.exitDemo').forEach(b => b.onclick = () => { location.href = location.pathname; });
+$('#tutClose').onclick = () => { tutStep = TUT.length; renderTut(); };
 $('#joinBtn').onclick = () => joinGame(getName(), $('#codeIn').value);
 $('#codeIn').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
 $('#nameIn').onkeydown = e => { if (e.key === 'Enter') (urlRoom ? $('#joinBtn') : $('#hostBtn')).click(); };
@@ -327,7 +425,7 @@ $('#copyBtn').onclick = () => {
   const t = $('#shareLink').textContent;
   (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('הקישור הועתק!'), () => toast(t));
 };
-window.addEventListener('beforeunload', e => { if (isHost && S && S.phase !== 'lobby') { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (isHost && !DEMO && S && S.phase !== 'lobby') { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- קבלת מצב ----------
 function show(id, on) { $(id).classList.toggle('hidden', !on); }
@@ -355,6 +453,8 @@ function onState(s) {
   if (s.phase === 'eject') renderEject(s);
   if (s.phase === 'end') renderEnd(s);
   show('#joy', isTouch && s.phase === 'play');
+  document.body.classList.toggle('meeting-on', s.phase !== 'play');
+  tutCheck(s);
 }
 
 function toast(t) {
@@ -536,6 +636,8 @@ function sendInput() {
   if (keys.has('KeyW') || keys.has('ArrowUp')) dy -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) dy += 1;
   if (joy.active) { dx = joy.dx; dy = joy.dy; }
+  const kc = { up: dy < 0, down: dy > 0, left: dx < 0, right: dx > 0 };
+  document.querySelectorAll('.keys b').forEach(b => b.classList.toggle('on', !!kc[b.dataset.k]));
   const sig = dx.toFixed(2) + ',' + dy.toFixed(2);
   if (sig !== lastIn && ID) { lastIn = sig; api({ type: 'input', dx, dy }); }
 }
@@ -713,6 +815,22 @@ function frame(t) {
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(d.x - 20, d.y + 26, 40, 5);
       ctx.fillStyle = '#4ade80'; ctx.fillRect(d.x - 20, d.y + 26, 40 * Math.min(1, p.work), 5);
     }
+  }
+
+  // חץ הדרכה בדמו
+  const tgt = tutTarget();
+  if (tgt) {
+    const dx = tgt.x - cam.x, dy = tgt.y - cam.y, dd = Math.hypot(dx, dy);
+    const bounce = Math.sin(t / 180) * 6;
+    if (dd > 70) {
+      const a = Math.atan2(dy, dx), r = 62 + bounce;
+      ctx.save(); ctx.translate(cam.x + Math.cos(a) * r, cam.y + Math.sin(a) * r); ctx.rotate(a);
+      ctx.fillStyle = '#ffd646'; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(-10, -16); ctx.lineTo(-3, 0); ctx.lineTo(-10, 16); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.strokeStyle = 'rgba(255,214,70,.9)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(tgt.x, tgt.y, 34 + bounce, 0, Math.PI * 2); ctx.stroke();
   }
 
   // מצב חשיפה: קווי מעקב + תגיות תפקידים

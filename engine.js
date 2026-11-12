@@ -1,6 +1,7 @@
 // מנוע המשחק – רץ בדפדפן של המארח (או ב-Node)
 (function (root) {
-function createGame(MAP) {
+function createGame(MAP, opts) {
+  opts = opts || {};
 const COLORS = [
   { n: 'אדום', c: '#e53935' }, { n: 'כחול', c: '#1e63d6' }, { n: 'ירוק', c: '#22a34a' },
   { n: 'ורוד', c: '#ec5fb5' }, { n: 'כתום', c: '#f08c1e' }, { n: 'צהוב', c: '#f2d22e' },
@@ -83,6 +84,7 @@ function startGame(by) {
   const names = shuffle(BOT_NAMES.slice());
   for (let i = 0; i < settings.bots && list().length < 12; i++) newPlayer('🤖 ' + names[i], freeColor(), true);
   const all = shuffle(list());
+  if (opts.demo) { const me = players[by]; all.splice(all.indexOf(me), 1); all.push(me); } // בדמו: השחקן תמיד איש צוות
   if (all.length < 3) { toast(players[by], 'צריך לפחות 3 שחקנים (אפשר להוסיף בוטים)'); return; }
 
   const nImp = Math.max(1, Math.min(settings.impostors, Math.floor((all.length - 1) / 2)));
@@ -93,7 +95,7 @@ function startGame(by) {
 
   taskTotal = 0; taskDone = 0;
   all.forEach(p => {
-    p.alive = true; p.spectator = false; p.killCd = 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
+    p.alive = true; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, 4).map(i => ({ i, done: false }));
