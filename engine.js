@@ -1,0 +1,471 @@
+// מנוע המשחק – רץ בדפדפן של המארח (או ב-Node)
+(function (root) {
+function createGame(MAP) {
+const COLORS = [
+  { n: 'אדום', c: '#e53935' }, { n: 'כחול', c: '#1e63d6' }, { n: 'ירוק', c: '#22a34a' },
+  { n: 'ורוד', c: '#ec5fb5' }, { n: 'כתום', c: '#f08c1e' }, { n: 'צהוב', c: '#f2d22e' },
+  { n: 'שחור', c: '#3b3f46' }, { n: 'לבן', c: '#e8edf2' }, { n: 'סגול', c: '#7b3fc9' },
+  { n: 'חום', c: '#8a5a33' }, { n: 'תכלת', c: '#36d1d6' }, { n: 'ליים', c: '#9be03a' },
+];
+
+const ROLES = {
+  crew: { name: 'איש צוות', team: 'crew', desc: 'בצע משימות ומצא את המתחזים.' },
+  engineer: { name: 'מהנדס', team: 'crew', desc: 'יכול לזחול בפתחי האוורור (V) כמו המתחזים.' },
+  scientist: { name: 'מדען', team: 'crew', desc: 'רואה מכל מקום מי חי ומי מת – לחץ C.' },
+  angel: { name: 'מלאך שומר', team: 'crew', desc: 'אחרי שתמות תוכל להגן על שחקן מחיסול – לחץ G לידו.' },
+  impostor: { name: 'מתחזה', team: 'imp', desc: 'חסל (Q) את אנשי הצוות בלי להיתפס. אפשר לזחול בפתחים (V).' },
+  shifter: { name: 'משנה צורה', team: 'imp', desc: 'מתחזה שיכול להתחפש לשחקן הקרוב (F) ל-20 שניות.' },
+  spectator: { name: 'צופה', team: 'none', desc: 'הצטרפת באמצע משחק – צפה עד הסבב הבא.' },
+};
+
+const BOT_NAMES = ['בוטי', 'רובי', 'צ׳יפ', 'ננו', 'ביפ', 'זיק', 'פיקסל', 'טורבו', 'גלקסי', 'בורג'];
+const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', 'מי ראה משהו?', 'דלג, אין מספיק מידע', 'זה חשוד…',
+  'ראיתי מישהו ליד הפתח', 'אני סומך על כולם 😅', 'בואו נצביע ביחד', 'אני מהצוות, באמת'];
+
+const SPEED = 220, KILL_RANGE = 90, REPORT_RANGE = 110, USE_RANGE = 60;
+const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15, TASK_TIME = 2.5;
+const MEETING_TIME = 60, EJECT_TIME = 6;
+
+let players = {};
+let phase = 'lobby';
+let hostId = null;
+let settings = { impostors: 1, bots: 4, reveal: false };
+let bodies = [];
+let meeting = null, eject = null, winner = null;
+let chat = [];
+let taskTotal = 0, taskDone = 0;
+
+const now = () => Date.now() / 1000;
+const rid = () => Math.random().toString(36).slice(2, 10);
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const list = () => Object.values(players);
+const humans = () => list().filter(p => !p.isBot);
+const team = p => (ROLES[p.role] || ROLES.crew).team;
+
+function freeColor() {
+  const used = new Set(list().map(p => p.color));
+  const free = COLORS.map((_, i) => i).filter(i => !used.has(i));
+  return free.length ? free[0] : 0;
+}
+
+function newPlayer(name, color, isBot) {
+  const id = rid();
+  const p = {
+    id, name: String(name || 'שחקן').slice(0, 14), color, isBot,
+    x: MAP.BUTTON.x, y: MAP.BUTTON.y, dir: 1, alive: true, role: null, tasks: [],
+    input: { dx: 0, dy: 0 }, work: null, killCd: 0, shiftCd: 0, shapeAs: null, shapeUntil: 0,
+    shieldUntil: 0, gaCd: 0, emergencyUsed: false, toast: [], conn: !isBot, lastSeen: now(),
+    bot: isBot ? { plan: [], wait: 0, goal: null, voteAt: 0, chatAt: 0 } : null,
+  };
+  players[id] = p;
+  return p;
+}
+
+function toast(p, text) { if (p && !p.isBot) p.toast.push(text); }
+function toastAll(text) { humans().forEach(p => toast(p, text)); }
+
+// ---------- מהלך המשחק ----------
+function spawnAround(arr) {
+  arr.forEach((p, i) => {
+    const a = (i / Math.max(1, arr.length)) * Math.PI * 2;
+    p.x = MAP.BUTTON.x + Math.cos(a) * 110;
+    p.y = MAP.BUTTON.y + Math.sin(a) * 90;
+    p.work = null;
+    if (p.bot) { p.bot.plan = []; p.bot.wait = 1 + Math.random() * 2; p.bot.goal = null; }
+  });
+}
+
+function startGame(by) {
+  if (by !== hostId || phase !== 'lobby') return;
+  Object.values(players).filter(p => p.isBot).forEach(p => delete players[p.id]);
+  const names = shuffle(BOT_NAMES.slice());
+  for (let i = 0; i < settings.bots && list().length < 12; i++) newPlayer('🤖 ' + names[i], freeColor(), true);
+  const all = shuffle(list());
+  if (all.length < 3) { toast(players[by], 'צריך לפחות 3 שחקנים (אפשר להוסיף בוטים)'); return; }
+
+  const nImp = Math.max(1, Math.min(settings.impostors, Math.floor((all.length - 1) / 2)));
+  const imps = all.slice(0, nImp), crew = all.slice(nImp);
+  imps.forEach((p, i) => { p.role = (i === 0 && (nImp >= 2 || Math.random() < 0.5)) ? 'shifter' : 'impostor'; });
+  const specials = shuffle(['engineer', 'scientist', 'angel']);
+  crew.forEach((p, i) => { p.role = i < specials.length && crew.length > 1 ? specials[i] : 'crew'; });
+
+  taskTotal = 0; taskDone = 0;
+  all.forEach(p => {
+    p.alive = true; p.spectator = false; p.killCd = 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
+    p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
+    if (team(p) === 'crew') {
+      p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, 4).map(i => ({ i, done: false }));
+      taskTotal += p.tasks.length;
+    } else p.tasks = [];
+  });
+  bodies = []; meeting = null; eject = null; winner = null; chat = [];
+  settings.reveal = false;
+  spawnAround(all);
+  phase = 'play';
+}
+
+function backToLobby(by) {
+  if (by !== hostId) return;
+  Object.values(players).filter(p => p.isBot).forEach(p => delete players[p.id]);
+  list().forEach(p => { p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
+  spawnAround(list());
+  phase = 'lobby'; bodies = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
+}
+
+function checkWin() {
+  if (phase !== 'play' && phase !== 'eject') return false;
+  const alive = list().filter(p => p.alive && !p.spectator);
+  const imps = alive.filter(p => team(p) === 'imp').length;
+  const crew = alive.filter(p => team(p) === 'crew').length;
+  let w = null;
+  if (imps === 0) w = { team: 'crew', reason: 'כל המתחזים הודחו!' };
+  else if (taskTotal > 0 && taskDone >= taskTotal) w = { team: 'crew', reason: 'הצוות השלים את כל המשימות!' };
+  else if (imps >= crew) w = { team: 'imp', reason: 'המתחזים השתלטו על התחנה!' };
+  if (w) { winner = w; phase = 'end'; settings.reveal = true; return true; }
+  return false;
+}
+
+function completeTask(p, t) {
+  t.done = true;
+  if (team(p) === 'crew') taskDone++;
+  toast(p, '✔ ' + MAP.TASKS[t.i].name + ' הושלמה');
+  checkWin();
+}
+
+function callMeeting(by, body) {
+  phase = 'meeting';
+  meeting = { by: by.id, body: body ? body.id : null, votes: {}, t: MEETING_TIME };
+  chat = [];
+  bodies = [];
+  list().forEach(p => {
+    p.work = null; p.shapeAs = null;
+    if (p.bot) { p.bot.voteAt = MEETING_TIME - (6 + Math.random() * 30); p.bot.chatAt = MEETING_TIME - (2 + Math.random() * 20); }
+  });
+}
+
+function resolveMeeting() {
+  const voters = list().filter(p => p.alive && !p.spectator);
+  const tally = {};
+  voters.forEach(v => { const t = meeting.votes[v.id]; if (t) tally[t] = (tally[t] || 0) + 1; });
+  let best = null, max = 0, tie = false;
+  for (const k in tally) {
+    if (tally[k] > max) { max = tally[k]; best = k; tie = false; }
+    else if (tally[k] === max) tie = true;
+  }
+  let ej = null;
+  if (best && best !== 'skip' && !tie && players[best]) {
+    ej = players[best]; ej.alive = false;
+  }
+  eject = ej
+    ? { id: ej.id, name: ej.name, color: ej.color, role: ROLES[ej.role].name, team: team(ej), tally, t: EJECT_TIME }
+    : { id: null, tally, t: EJECT_TIME, tie };
+  meeting = null;
+  phase = 'eject';
+}
+
+function endEject() {
+  eject = null;
+  phase = 'play';
+  if (checkWin()) return;
+  spawnAround(list().filter(p => p.alive));
+  list().forEach(p => { if (team(p) === 'imp') p.killCd = Math.max(p.killCd, 15); });
+}
+
+// ---------- פעולות ----------
+function nearest(p, arr, range) {
+  let best = null, bd = range;
+  arr.forEach(o => { const d = dist(p, o); if (d <= bd) { bd = d; best = o; } });
+  return best;
+}
+
+function act(p, a) {
+  if (!p) return;
+  const t = now();
+  switch (a.type) {
+    case 'input': {
+      const dx = Math.max(-1, Math.min(1, Number(a.dx) || 0));
+      const dy = Math.max(-1, Math.min(1, Number(a.dy) || 0));
+      p.input = { dx, dy };
+      break;
+    }
+    case 'use': {
+      if (phase !== 'play' || p.spectator) return;
+      const t0 = p.tasks.filter(x => !x.done).map(x => ({ ...MAP.TASKS[x.i], ref: x }));
+      const task = nearest(p, t0, USE_RANGE);
+      if (task) { p.work = { ref: task.ref, t: 0 }; return; }
+      if (p.alive && dist(p, MAP.BUTTON) < 80) {
+        if (p.emergencyUsed) return toast(p, 'כבר השתמשת בכפתור החירום');
+        p.emergencyUsed = true;
+        callMeeting(p, null);
+      }
+      break;
+    }
+    case 'kill': {
+      if (phase !== 'play' || !p.alive || team(p) !== 'imp' || p.killCd > 0) return;
+      const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp'), KILL_RANGE);
+      if (!tgt) return;
+      if (tgt.shieldUntil > t) { p.killCd = 10; toast(p, '🛡 המטרה מוגנת על ידי מלאך שומר!'); return; }
+      tgt.alive = false; tgt.work = null;
+      bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color });
+      p.x = tgt.x; p.y = tgt.y; p.killCd = KILL_CD;
+      toast(tgt, '💀 חוסלת! עכשיו אתה רוח – אפשר להמשיך במשימות ולצפות בכולם.');
+      checkWin();
+      break;
+    }
+    case 'report': {
+      if (phase !== 'play' || !p.alive) return;
+      const b = nearest(p, bodies, REPORT_RANGE);
+      if (b) callMeeting(p, b);
+      break;
+    }
+    case 'vent': {
+      if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer'].includes(p.role)) return;
+      const v = nearest(p, MAP.VENTS, USE_RANGE);
+      if (!v) return;
+      const n = MAP.VENTS[(MAP.VENTS.indexOf(v) + 1) % MAP.VENTS.length];
+      p.x = n.x; p.y = n.y; p.work = null;
+      break;
+    }
+    case 'shift': {
+      if (phase !== 'play' || !p.alive || p.role !== 'shifter') return;
+      if (p.shapeAs) { p.shapeAs = null; p.shiftCd = SHIFT_CD; return; }
+      if (p.shiftCd > 0) return;
+      const tgt = nearest(p, list().filter(o => o.id !== p.id && o.alive && !o.spectator), 5000);
+      if (!tgt) return;
+      p.shapeAs = tgt.id; p.shapeUntil = t + SHIFT_TIME;
+      toast(p, '🎭 התחפשת ל' + tgt.name);
+      break;
+    }
+    case 'shield': {
+      if (phase !== 'play' || p.alive || p.role !== 'angel' || p.gaCd > 0) return;
+      const tgt = nearest(p, list().filter(o => o.alive && !o.spectator), 150);
+      if (!tgt) return toast(p, 'התקרב לשחקן חי כדי להגן עליו');
+      tgt.shieldUntil = t + SHIELD_TIME; p.gaCd = GA_CD;
+      toast(p, '🛡 הגנת על ' + tgt.name);
+      break;
+    }
+    case 'vote': {
+      if (phase !== 'meeting' || !p.alive || p.spectator || meeting.votes[p.id]) return;
+      if (a.target !== 'skip' && !(players[a.target] && players[a.target].alive)) return;
+      meeting.votes[p.id] = a.target;
+      break;
+    }
+    case 'chat': {
+      const text = String(a.text || '').trim().slice(0, 140);
+      if (!text) return;
+      if (phase === 'meeting' && !p.alive) return;
+      if (phase !== 'meeting' && phase !== 'lobby') return;
+      chat.push({ name: p.name, color: p.color, text });
+      if (chat.length > 60) chat.shift();
+      break;
+    }
+    case 'reveal':
+      if (p.id === hostId && phase !== 'lobby') settings.reveal = !settings.reveal;
+      break;
+    case 'settings':
+      if (p.id !== hostId || phase !== 'lobby') return;
+      settings.impostors = Math.max(1, Math.min(3, Number(a.impostors) || 1));
+      settings.bots = Math.max(0, Math.min(9, Number(a.bots) || 0));
+      break;
+    case 'color': {
+      if (phase !== 'lobby') return;
+      const c = Number(a.color);
+      if (c >= 0 && c < COLORS.length && !list().some(o => o.id !== p.id && o.color === c)) p.color = c;
+      break;
+    }
+    case 'start': startGame(p.id); break;
+    case 'lobby': backToLobby(p.id); break;
+  }
+}
+
+// ---------- בוטים ----------
+function botGoal(p) {
+  const todo = p.tasks.filter(x => !x.done);
+  let target;
+  if (team(p) === 'crew' && todo.length) {
+    const tk = pick(todo); target = { ...MAP.TASKS[tk.i], ref: tk };
+  } else {
+    const r = pick(Object.values(MAP.ROOMS));
+    target = { x: r.cx + (Math.random() - 0.5) * (r.w - 80), y: r.cy + (Math.random() - 0.5) * (r.h - 80), room: r.id };
+  }
+  const here = MAP.roomAt(p.x, p.y);
+  const pts = here ? MAP.path(here.id, target.room) : [];
+  p.bot.plan = [...pts, { x: target.x, y: target.y }];
+  p.bot.goal = target;
+}
+
+function botTick(p, dt) {
+  const b = p.bot;
+  p.input = { dx: 0, dy: 0 };
+  if (phase !== 'play' || p.spectator) return;
+
+  if (p.alive) {
+    // מתחזה: חסל כשאין עדים
+    if (team(p) === 'imp' && p.killCd <= 0) {
+      const tgt = nearest(p, list().filter(o => o.alive && team(o) !== 'imp'), KILL_RANGE);
+      if (tgt) {
+        const witnesses = list().filter(o => o.alive && o.id !== p.id && o.id !== tgt.id && dist(o, p) < 320);
+        if (!witnesses.length && Math.random() < 0.05) { act(p, { type: 'kill' }); return; }
+      }
+    }
+    if (p.role === 'shifter' && !p.shapeAs && p.shiftCd <= 0 && Math.random() < 0.002) act(p, { type: 'shift' });
+    // צוות: דווח על גופה
+    if (team(p) === 'crew' && bodies.some(bd => dist(bd, p) < REPORT_RANGE - 10) && Math.random() < 0.02) {
+      act(p, { type: 'report' }); return;
+    }
+  }
+
+  if (b.wait > 0) { b.wait -= dt; return; }
+  if (p.work) return;
+  if (!b.plan.length) {
+    if (b.goal && b.goal.ref && !b.goal.ref.done && dist(p, b.goal) < USE_RANGE) {
+      act(p, { type: 'use' }); b.goal = null; return;
+    }
+    b.wait = 0.5 + Math.random() * 2.5;
+    botGoal(p);
+    return;
+  }
+  const n = b.plan[0];
+  const d = dist(p, n);
+  if (d < 8) { b.plan.shift(); return; }
+  p.input = { dx: (n.x - p.x) / d, dy: (n.y - p.y) / d, bot: true };
+}
+
+function botMeeting(p) {
+  const b = p.bot;
+  if (!p.alive || p.spectator) return;
+  if (meeting.t < b.chatAt) { b.chatAt = -999; chat.push({ name: p.name, color: p.color, text: pick(BOT_LINES) }); }
+  if (meeting.t < b.voteAt && !meeting.votes[p.id]) {
+    const opts = list().filter(o => o.alive && o.id !== p.id && !o.spectator && !(team(p) === 'imp' && team(o) === 'imp'));
+    meeting.votes[p.id] = Math.random() < 0.45 || !opts.length ? 'skip' : pick(opts).id;
+  }
+}
+
+// ---------- לולאת משחק ----------
+let last = now();
+function tick() {
+  const t = now();
+  const dt = Math.min(0.1, t - last);
+  last = t;
+
+  if (phase === 'play') {
+    for (const p of list()) {
+      if (p.isBot) botTick(p, dt);
+      if (phase !== 'play') break;
+      p.killCd = Math.max(0, p.killCd - dt);
+      p.shiftCd = Math.max(0, p.shiftCd - (p.shapeAs ? 0 : dt));
+      p.gaCd = Math.max(0, p.gaCd - dt);
+      if (p.shapeAs && (t > p.shapeUntil || !players[p.shapeAs])) { p.shapeAs = null; p.shiftCd = SHIFT_CD; }
+
+      let { dx, dy } = p.input;
+      const len = Math.hypot(dx, dy);
+      if (len > 0) {
+        dx /= len; dy /= len;
+        const step = SPEED * dt;
+        if (!p.alive || p.spectator) {
+          p.x = Math.max(0, Math.min(MAP.WORLD.w, p.x + dx * step));
+          p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
+        } else {
+          if (MAP.walkable(p.x + dx * step, p.y)) p.x += dx * step;
+          if (MAP.walkable(p.x, p.y + dy * step)) p.y += dy * step;
+        }
+        if (Math.abs(dx) > 0.1) p.dir = dx > 0 ? 1 : -1;
+        p.work = null;
+      }
+      if (p.work) {
+        const tk = MAP.TASKS[p.work.ref.i];
+        if (dist(p, tk) > USE_RANGE + 5 || p.work.ref.done) p.work = null;
+        else {
+          p.work.t += dt;
+          if (p.work.t >= TASK_TIME) { const r = p.work.ref; p.work = null; completeTask(p, r); if (phase !== 'play') break; }
+        }
+      }
+    }
+  } else if (phase === 'meeting') {
+    meeting.t -= dt;
+    list().filter(p => p.isBot).forEach(botMeeting);
+    const voters = list().filter(p => p.alive && !p.spectator);
+    if (meeting.t <= 0 || voters.every(v => meeting.votes[v.id])) resolveMeeting();
+  } else if (phase === 'eject') {
+    eject.t -= dt;
+    if (eject.t <= 0) endEject();
+  }
+
+  // ניתוק שחקנים בלובי
+  if (phase === 'lobby') {
+    humans().forEach(p => { if (!p.conn && t - p.lastSeen > 10) delete players[p.id]; });
+  }
+  if (!players[hostId] || !players[hostId].conn) {
+    const h = humans().find(p => p.conn);
+    if (h) hostId = h.id;
+  }
+}
+
+// ---------- תצוגה לכל שחקן ----------
+function viewFor(v) {
+  const t = now();
+  const seeAll = settings.reveal || phase === 'end' || (!v.alive && phase !== 'lobby');
+  const showRoles = phase !== 'lobby';
+  const ps = [];
+  for (const p of list()) {
+    if (phase === 'play' && !p.alive && v.alive && p.id !== v.id) continue; // רוחות נסתרות מהחיים
+    const disp = p.shapeAs && players[p.shapeAs] ? players[p.shapeAs] : p;
+    const o = {
+      id: p.id, x: Math.round(p.x), y: Math.round(p.y), dir: p.dir, name: disp.name, color: COLORS[disp.color].c,
+      alive: p.alive, spec: !!p.spectator, bot: p.isBot, work: p.work ? p.work.t / TASK_TIME : 0,
+    };
+    if (p.shieldUntil > t) o.shield = 1;
+    if (showRoles && p.role && (seeAll || p.id === v.id || (team(v) === 'imp' && team(p) === 'imp'))) {
+      o.role = ROLES[p.role].name; o.team = team(p);
+      if (p.shapeAs) o.realName = p.name;
+    }
+    ps.push(o);
+  }
+  const me = {
+    id: v.id, alive: v.alive, spec: !!v.spectator, role: v.role ? ROLES[v.role].name : null, roleKey: v.role,
+    team: v.role ? team(v) : null, desc: v.role ? ROLES[v.role].desc : '',
+    tasks: v.tasks.map(x => ({ name: MAP.TASKS[x.i].name, i: x.i, done: x.done })),
+    killCd: Math.ceil(v.killCd), shiftCd: Math.ceil(v.shiftCd), shifted: !!v.shapeAs, gaCd: Math.ceil(v.gaCd),
+    emergencyUsed: v.emergencyUsed, work: v.work ? v.work.t / TASK_TIME : 0, host: v.id === hostId,
+    color: v.color,
+  };
+  const out = {
+    phase, me, players: ps, settings, hostId,
+    bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c })),
+    tasks: { done: taskDone, total: taskTotal },
+    toast: v.toast.splice(0),
+    roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color })),
+    chat,
+  };
+  if (v.role === 'scientist' || seeAll) out.vitals = list().filter(p => !p.spectator).map(p => ({ name: p.name, color: COLORS[p.color].c, alive: p.alive }));
+  if (meeting) {
+    const by = players[meeting.by];
+    const body = meeting.body && players[meeting.body];
+    out.meeting = {
+      t: Math.ceil(meeting.t), by: by ? by.name : '', body: body ? body.name : null,
+      voted: Object.keys(meeting.votes), myVote: meeting.votes[v.id] || null,
+    };
+  }
+  if (eject) out.eject = eject;
+  if (winner) out.winner = winner;
+  if (phase === 'lobby') out.colors = COLORS;
+  return out;
+}
+
+
+  function join(name, id) {
+    if (id && players[id]) { players[id].conn = true; return id; }
+    const p = newPlayer(name, freeColor(), false);
+    if (phase !== 'lobby') { p.alive = false; p.spectator = true; p.role = 'spectator'; }
+    if (!hostId || !players[hostId]) hostId = p.id;
+    return p.id;
+  }
+  function setConn(id, on) { const p = players[id]; if (p) { p.conn = on; p.lastSeen = now(); } }
+  function setHost(id) { hostId = id; }
+  return { join, act: (id, a) => act(players[id], a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost };
+}
+if (typeof module !== 'undefined' && module.exports) module.exports = createGame;
+else root.createGame = createGame;
+})(this);
