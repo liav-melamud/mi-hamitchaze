@@ -1152,7 +1152,7 @@ function drawDecor(k, r, t) {
     }
     case 'EL': {
       for (let i = 0; i < 4; i++) {
-        const px = X + 30 + i * 62;
+        const px = X + 26 + i * 56;
         box(px, Y + 42, 48, 60, '#5b6170', '#2a2e38', 4);
         ['#e53935', '#1e63d6', '#f2d22e', '#e83fd0'].forEach((c, j) => { ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px + 8, Y + 52 + j * 12); ctx.quadraticCurveTo(px + 24, Y + 46 + j * 12 + (i % 2) * 10, px + 40, Y + 52 + j * 12); ctx.stroke(); });
       }
