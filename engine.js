@@ -33,7 +33,7 @@ const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15
 const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
   // רמת אורך משימות (1 קל, 2 רגיל, 3 ארוך): מאריכה משימות עם פס התקדמות, ומשימות של בוטים
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
-  const botTaskTime = () => 4 + 4 * settings.taskLevel;
+  const botTaskTime = () => (4 + 4 * settings.taskLevel) * (settings.botLevel === 1 ? 1.3 : settings.botLevel === 3 ? 0.8 : 1);
   // בקבוצה קטנה למתחזה קשה יותר, אז זמן ההמתנה בין חיסולים מתקצר קצת
   const killCdFor = () => { const n = Object.values(players).filter(q => !q.spectator).length; return settings.killCd * (n <= 5 ? 0.7 : n <= 7 ? 0.85 : 1); };
   const isMini = i => !MAP.TASK_TIME[MAP.TASKS[i].kind];
@@ -41,7 +41,7 @@ const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
 let players = {};
 let phase = 'lobby';
 let hostId = null;
-let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true };
+let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2 };
 let usedLines = new Set();
 let gusts = [], windT = 14;
 // חבלות: sab = משבר פעיל (חשמל/חמצן/כור), דלתות סגורות לפי חדר
@@ -110,7 +110,7 @@ function newPlayer(name, color, isBot) {
     x: MAP.BUTTON.x, y: MAP.BUTTON.y, dir: 1, alive: true, role: null, tasks: [],
     input: { dx: 0, dy: 0 }, work: null, killCd: 0, shiftCd: 0, shapeAs: null, shapeUntil: 0,
     shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * (HAT_COUNT - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
-    bot: isBot ? { plan: [], wait: 0, goal: null, voteAt: 0, chatAt: 0 } : null,
+    bot: isBot ? { plan: [], wait: 0, goal: null, voteAt: 0, chatAt: 0, persona: pick(['suspicious', 'quiet', 'chatty', 'aggressive', 'helpful', 'normal', 'normal']) } : null,
   };
   players[id] = p;
   return p;
@@ -153,7 +153,7 @@ function startGame(by) {
   all.forEach(p => {
     p.alive = true; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
-    p.photos = []; p.notes = []; p.photoCd = 0; p.investCd = 0; p.vanishUntil = 0; p.vanishCd = 0; p.nearKill = 0;
+    p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.vanishUntil = 0; p.vanishCd = 0; p.nearKill = 0;
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
@@ -216,10 +216,14 @@ function callMeeting(by, body) {
     p.work = null; p.shapeAs = null; p.inVent = null; p.cam = false; p.sabWork = null;
     if (p.bot) {
       const T = settings.meetingTime;
-      p.bot.chatAt = T - (2 + Math.random() * 8);
-      p.bot.chat2At = Math.random() < 0.5 ? T - (12 + Math.random() * 12) : -999;
-      p.bot.voteAt = T - (Math.min(T - 5, 16 + Math.random() * 18));
-      p.bot.replies = 0; p.bot.replyAt = -999;
+      const pe = p.bot.persona;
+      // שקט מדבר מעט, פטפטן הרבה; תוקפני מצביע מוקדם; רמת הבוטים משפיעה על מהירות התגובה
+      const lvl = settings.botLevel;
+      p.bot.chatAt = pe === 'quiet' && Math.random() < 0.6 ? -999 : T - (2 + Math.random() * 8) * (lvl === 3 ? 0.7 : lvl === 1 ? 1.4 : 1);
+      p.bot.chat2At = pe === 'chatty' ? T - (10 + Math.random() * 8) : (pe === 'quiet' ? -999 : (Math.random() < 0.5 ? T - (12 + Math.random() * 12) : -999));
+      p.bot.chat3At = pe === 'chatty' ? T - (22 + Math.random() * 10) : -999;
+      p.bot.voteAt = T - (Math.min(T - 5, (pe === 'aggressive' ? 10 : 16) + Math.random() * 18));
+      p.bot.replies = 0; p.bot.replyAt = -999; p.bot.shared = false;
     }
   });
 }
@@ -301,6 +305,7 @@ function act(p, a) {
       const nm = tgt.name.replace(/^🤖\s*/, '');
       const text = tgt.nearKill > 0 ? `🔎 ${nm} היה ליד זירת חיסול` : `🔎 ${nm}: אין ראיות נגדו`;
       p.notes.push(text); if (p.notes.length > 6) p.notes.shift();
+      p.noteMeta = p.noteMeta || []; p.noteMeta.push({ id: tgt.id, hit: tgt.nearKill > 0 }); if (p.noteMeta.length > 6) p.noteMeta.shift();
       p.investCd = 35;
       toast(p, text);
       break;
@@ -454,6 +459,7 @@ function act(p, a) {
       settings.openVotes = a.openVotes !== false;
       settings.taskLevel = Math.round(cl(a.taskLevel, 1, 3, 2));
       settings.newRoles = a.newRoles !== false;
+      settings.botLevel = Math.round(cl(a.botLevel, 1, 3, 2));
       break;
     case 'color': {
       if (phase !== 'lobby') return;
@@ -493,7 +499,7 @@ function botTick(p, dt) {
     if (b.seeT <= 0) {
       b.seeT = 1; b.seen = b.seen || {};
       const r = MAP.roomAt(p.x, p.y); if (r) b.lastRoom = r.name;
-      list().forEach(o => { if (o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < 320) { const rr = MAP.roomAt(o.x, o.y); if (rr) b.seen[o.id] = rr.name; } });
+      list().forEach(o => { if (o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < (settings.botLevel === 3 ? 420 : settings.botLevel === 1 ? 240 : 320)) { const rr = MAP.roomAt(o.x, o.y); if (rr) b.seen[o.id] = rr.name; } });
     }
     // רואים שני שחקנים זהים (משנה צורה) – בורחים, ולפעמים רצים לכפתור החירום
     if (team(p) === 'crew' && !b.flee) {
@@ -505,11 +511,18 @@ function botTick(p, dt) {
     if (team(p) === 'imp' && p.killCd <= 0) {
       const tgt = nearest(p, list().filter(o => o.alive && team(o) !== 'imp'), KILL_RANGE);
       if (tgt) {
-        const witnesses = list().filter(o => o.alive && o.id !== p.id && o.id !== tgt.id && dist(o, p) < 320);
-        if (!witnesses.length && Math.random() < 0.05) { act(p, { type: 'kill' }); return; }
+        const lvl = settings.botLevel;
+        const witnesses = list().filter(o => o.alive && o.id !== p.id && o.id !== tgt.id && o.inVent === null && dist(o, p) < (lvl === 3 ? 420 : 320));
+        // קל: מתחזים רשלניים שחונקים גם מול עדים. חכם: מחסלים רק כשאף אחד לא רואה
+        const chance = lvl === 1 ? (witnesses.length ? 0.012 : 0.04) : lvl === 3 ? (witnesses.length ? 0 : 0.08) : (witnesses.length ? 0 : 0.05);
+        if (Math.random() < chance) { act(p, { type: 'kill' }); return; }
       }
     }
     if (p.role === 'shifter' && !p.shapeAs && p.shiftCd <= 0 && Math.random() < 0.002) act(p, { type: 'shift' });
+    // יכולות תפקיד של בוטים
+    if (p.role === 'phantom' && !(p.vanishUntil > now()) && p.vanishCd <= 0 && Math.random() < 0.004 && list().some(o => o.alive && team(o) === 'crew' && dist(o, p) < 320)) act(p, { type: 'vanish' });
+    if (p.role === 'photographer' && p.photoCd <= 0 && Math.random() < 0.012 && list().some(o => o.id !== p.id && o.alive && dist(o, p) < 300)) act(p, { type: 'photo' });
+    if (p.role === 'detective' && p.investCd <= 0 && Math.random() < 0.012 && list().some(o => o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < 150)) act(p, { type: 'investigate' });
     // צוות: דווח על גופה
     if (team(p) === 'crew' && bodies.some(bd => dist(bd, p) < REPORT_RANGE - 10) && Math.random() < (b.sawKill ? 0.15 : 0.03)) {
       act(p, { type: 'report' }); return;
@@ -542,8 +555,9 @@ function botTick(p, dt) {
     }
   }
   if (team(p) === 'imp' && p.alive && !p.inVent) {
-    if (!sab && sabCd <= 0 && Math.random() < 0.0005) startSab(pick(['lights', 'lights', 'oxygen', 'reactor']));
-    else if (Math.random() < 0.0003) closeDoors(pick(Object.keys(MAP.ROOMS)));
+    const sabF = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.6 : 1;
+    if (!sab && sabCd <= 0 && Math.random() < 0.0005 * sabF) startSab(pick(['lights', 'lights', 'oxygen', 'reactor']));
+    else if (Math.random() < 0.0003 * sabF) closeDoors(pick(Object.keys(MAP.ROOMS)));
   }
   if (b.wait > 0) { b.wait -= dt; return; }
   if (p.work || p.sabWork) return;
@@ -651,6 +665,7 @@ function analyze(sp, text) {
   const named = list().filter(o => o.id !== sp.id && bare(o.name).length >= 2 && text.includes(bare(o.name)));
   const bots = shuffle(list().filter(o => o.isBot && o.alive && o.id !== sp.id && !o.spectator));
   const killWord = /רצח|הרג|חיסל|חוסל|נרצח|גופה|מת /.test(text + ' ');
+  const maxResp = settings.botLevel === 1 ? 1 : settings.botLevel === 3 ? 3 : 2;
   let d = 1.5;
   const S = (n) => (meeting.suspect[sp.id] = (meeting.suspect[sp.id] || 0) + n);
 
@@ -672,7 +687,7 @@ function analyze(sp, text) {
     let n = 0;
     for (const b of bots) {
       const seen = b.bot.seen && b.bot.seen[sp.id];
-      if (!seen || n >= 2) continue;
+      if (!seen || n >= maxResp) continue;
       if (seen === room) { queueSay(b, `נכון, ראיתי את ${spN} ב${room}`, d); S(-1); }
       else { queueSay(b, `לא נכון, ראיתי את ${spN} ב${seen}, לא ב${room}`, d); S(2); }
       d += 1.6; n++;
@@ -682,7 +697,7 @@ function analyze(sp, text) {
     let n = 0;
     for (const b of bots) {
       const seen = b.bot.seen && b.bot.seen[x.id];
-      if (!seen || n >= 2) continue;
+      if (!seen || n >= maxResp) continue;
       if (seen === room) queueSay(b, `נכון, גם אני ראיתי את ${xN} ב${room}`, d);
       else { queueSay(b, `ראיתי את ${xN} ב${seen}, לא ב${room}`, d); S(1.5); }
       d += 1.6; n++;
@@ -696,7 +711,19 @@ function analyze(sp, text) {
   }
 }
 
+const PERSONA_LINES = {
+  suspicious: ['משהו כאן מריח לי לא טוב', 'אני לא סומך על אף אחד כרגע', 'מי שלא עשה משימות – חשוד', 'שימו לב מי שותק יותר מדי'],
+  quiet: ['…', 'לא יודע', 'נראה לי'],
+  chatty: ['רגע רגע, תנו לי לספר מה ראיתי', 'יש לי כמה דברים להגיד', 'בואו נעבור על כולם אחד אחד', 'אני זוכר הכל מהסבב הזה'],
+  aggressive: ['תצביעו כבר!', 'בואו נסיים עם זה, מי שנתפס – החוצה', 'אין זמן, מצביעים!', 'אני לא מפחד להצביע'],
+  helpful: ['בואו נסדר: מי היה איפה?', 'אני אספר איפה הייתי ואתם תתקנו אותי', 'בואו נבדוק את האליבי של כל אחד', 'מי שראה משהו – עכשיו הזמן'],
+};
 function botLine(p) {
+  const pl = PERSONA_LINES[p.bot.persona];
+  if (pl && Math.random() < 0.35) return fresh(pl);
+  return botLine0(p);
+}
+function botLine0(p) {
   const b = p.bot, name = id => players[id] ? bare(players[id].name) : '';
   const alive = id => players[id] && players[id].alive;
   const myRoom = b.lastRoom || 'חדר האוכל';
@@ -722,6 +749,18 @@ function botMeeting(p) {
   const T = meeting.t;
   if (T < b.chatAt) { b.chatAt = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
   if (T < b.chat2At) { b.chat2At = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
+  if (T < (b.chat3At || -999)) { b.chat3At = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
+  // בוט צלם או בלש מציג את הראיות שלו
+  if (!b.shared && T < settings.meetingTime - 6 && Math.random() < 0.02) {
+    if (p.role === 'photographer' && p.photos && p.photos.length) {
+      const ph = p.photos[p.photos.length - 1]; b.shared = true;
+      meeting.queue.push({ id: p.id, silent: true, at: T, text: `📸 צילמתי ב${ph.room}: ${ph.names.join(', ') || 'גופה'}` });
+    } else if (p.role === 'detective' && p.noteMeta && p.noteMeta.length) {
+      const hit = p.noteMeta.slice().reverse().find(m => m.hit) || p.noteMeta[p.noteMeta.length - 1]; b.shared = true;
+      meeting.queue.push({ id: p.id, silent: true, at: T, text: p.notes[p.noteMeta.indexOf(hit)] || p.notes[p.notes.length - 1] });
+      if (hit.hit && players[hit.id]) meeting.suspect[hit.id] = (meeting.suspect[hit.id] || 0) + 2;
+    }
+  }
   if (b.replyAt > -1 && T < b.replyAt) {
     b.replyAt = -999; b.replies++;
     const others = list().filter(o => o.alive && o.id !== p.id && !o.spectator);
@@ -735,13 +774,15 @@ function botMeeting(p) {
     else if (team(p) === 'crew' && b.sawKill && ok(b.sawKill)) vote = b.sawKill;
     else {
       const score = {};
-      for (const id in meeting.mentions) score[id] = (score[id] || 0) + meeting.mentions[id];
-      for (const id in meeting.suspect) score[id] = (score[id] || 0) + meeting.suspect[id] * 1.5;
+      const lf = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.4 : 1, pe = b.persona;
+      const pf = pe === 'suspicious' ? 1.4 : pe === 'quiet' ? 0.8 : 1;
+      for (const id in meeting.mentions) score[id] = (score[id] || 0) + meeting.mentions[id] * pf;
+      for (const id in meeting.suspect) score[id] = (score[id] || 0) + meeting.suspect[id] * 1.5 * lf * pf;
       const top = Object.entries(score).filter(([id]) => ok(id)).sort((x, y) => y[1] - x[1])[0];
       if (top && top[1] >= 3) vote = top[0];
       else if (top && top[1] >= 2 && Math.random() < 0.7) vote = top[0];
       else if (top && team(p) === 'imp' && Math.random() < 0.6) vote = top[0];
-      else if (meeting.skipTalk >= 2 || Math.random() < 0.5) vote = 'skip';
+      else if (meeting.skipTalk >= 2 || Math.random() < (b.persona === 'aggressive' ? 0.15 : b.persona === 'quiet' ? 0.7 : 0.5)) vote = 'skip';
       else { const opts = list().filter(o => ok(o.id) && !o.spectator); vote = opts.length ? pick(opts).id : 'skip'; }
     }
     meeting.votes[p.id] = vote || 'skip';
