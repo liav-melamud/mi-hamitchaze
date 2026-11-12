@@ -1,2 +1,2 @@
-// הגדרת שרת הכוונה פרטי. אחרי שתפעיל את השרת בענן, שים כאן את הכתובת (בלי https://).
-window.MM_SIGNAL = { host: '', port: 443 };
+// שרת ההכוונה הפרטי למצב "🌐 אונליין" (Render, תוכנית חינמית). בלי https:// בהתחלה.
+window.MM_SIGNAL = { host: 'mi-hamitchaze-signal.onrender.com', port: 443 };

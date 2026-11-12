@@ -545,7 +545,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-171455'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-172209'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -557,6 +557,25 @@ const urlNet = new URLSearchParams(location.search).get('net');
 if (urlNet === 'local' || urlNet === 'online') NET = urlNet; // קישור מהמארח קובע את המצב
 // איזה שרת הכוונה משמש כל מצב (מחרוזת לזיהוי – אם שני המצבים על אותו שרת, אין טעם לנסות את השני)
 const brokerOf = m => m === 'online' && SIGNAL ? 'private' : m === 'local' && LOCAL && LOCAL.signal ? 'home' : 'public';
+// שרת האונליין החינמי נרדם אחרי זמן בלי שימוש – מעירים אותו לפני שמתחברים (עד כדקה)
+let signalAwake = false;
+function wakeSignal(showStatus) {
+  if (brokerOf(NET) !== 'private' || signalAwake) return Promise.resolve();
+  const url = 'https://' + SIGNAL.host + '/peerjs/id?wake=' + Date.now();
+  const t0 = Date.now();
+  return new Promise(done => {
+    const tryOnce = () => {
+      const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 15000);
+      fetch(url, { cache: 'no-store', signal: ac.signal }).then(r => { clearTimeout(to); if (r.ok) { signalAwake = true; if (showStatus) status(''); done(); } else again(); }, () => { clearTimeout(to); again(); });
+    };
+    const again = () => {
+      if (Date.now() - t0 > 90000) return done(); // ננסה בכל זאת – PeerJS יחזיר שגיאה אם זה לא עובד
+      if (showStatus) status('🌐 מעיר את שרת האונליין… (בפעם הראשונה אחרי הפסקה זה לוקח עד דקה)');
+      setTimeout(tryOnce, 3000);
+    };
+    tryOnce();
+  });
+}
 const peerOpts = c => {
   const b = brokerOf(NET);
   if (b === 'home')
@@ -821,7 +840,7 @@ function joinGame(name, code, silent, flipped) {
     if (e.type === 'peer-unavailable' && !flipped && brokerOf(other) !== brokerOf(NET)) {
       // אולי המארח בחר את המצב השני – מנסים גם שם
       NET = other; renderNet();
-      return joinGame(name, code, silent, true);
+      return wakeSignal(!silent).then(() => joinGame(name, code, silent, true));
     }
     busy(false);
     status(e.type === 'peer-unavailable' ? 'לא נמצא חדר עם הקוד הזה' : 'שגיאת חיבור: ' + e.type);
@@ -854,13 +873,13 @@ const urlRoom = new URLSearchParams(location.search).get('room');
 if (urlRoom) { $('#codeIn').value = urlRoom.toUpperCase(); $('#joinBtn').classList.add('primary'); }
 try { $('#fixedRoom').checked = localStorage.getItem('mm_fixed') === '1'; } catch (e) {}
 $('#fixedRoom').onchange = e => { try { localStorage.setItem('mm_fixed', e.target.checked ? '1' : '0'); } catch (er) {} };
-$('#hostBtn').onclick = () => LOCAL_READY.then(() => {
+$('#hostBtn').onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(true)).then(() => { busy(false);
   if ($('#fixedRoom').checked) {
     let code = null; try { code = localStorage.getItem('mm_fixed_code'); } catch (e) {}
     if (!code) { code = makeCode(); try { localStorage.setItem('mm_fixed_code', code); } catch (e) {} }
     hostGame(getName(), 0, { room: code, snapshot: null, pid: null });
   } else hostGame(getName());
-});
+}); };
 $('#demoBtn').onclick = startDemo;
 function renderNet() {
   $('#netOnline').classList.toggle('primary', NET === 'online');
@@ -873,10 +892,12 @@ function renderNet() {
 function setNet(m) {
   NET = m; try { localStorage.setItem('mm_net', m); } catch (e) {}
   renderNet();
+  wakeSignal(false); // מתחילים להעיר כבר כשבוחרים אונליין
 }
 $('#netOnline').onclick = () => setNet('online');
 $('#netLocal').onclick = () => setNet('local');
 renderNet();
+wakeSignal(false); // אם כבר במצב אונליין – מעירים את השרת מראש
 // אם הדף נטען משרת הבית – מצב מקומי זמין (וברירת המחדל בפעם הראשונה)
 const LOCAL_READY = location.protocol !== 'http:' ? Promise.resolve() : fetch('local.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
   if (!j) return;
@@ -898,7 +919,7 @@ const LOCAL_READY = location.protocol !== 'http:' ? Promise.resolve() : fetch('l
 })();
 document.querySelectorAll('.exitDemo').forEach(b => b.onclick = () => { location.href = location.pathname; });
 $('#tutClose').onclick = () => { tutStep = TUT.length; renderTut(); };
-$('#joinBtn').onclick = () => LOCAL_READY.then(() => joinGame(getName(), $('#codeIn').value));
+$('#joinBtn').onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(true)).then(() => { busy(false); joinGame(getName(), $('#codeIn').value); }); };
 $('#codeIn').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
 $('#nameIn').onkeydown = e => { if (e.key === 'Enter') (urlRoom ? $('#joinBtn') : $('#hostBtn')).click(); };
 $('#copyBtn').onclick = () => {
