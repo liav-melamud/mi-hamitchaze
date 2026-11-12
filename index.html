@@ -192,6 +192,39 @@
   .tmark.done { opacity: .55; filter: grayscale(.6); }
   .tmark.me { font-size: 12px; }
   .tmark.me i { display: block; width: 14px; height: 14px; border-radius: 50%; background: #3be3ff; border: 2px solid #fff; box-shadow: 0 0 0 5px rgba(59,227,255,.4), 0 0 14px #3be3ff; }
+  .maze { display: grid; margin: 10px auto; width: 252px; gap: 0; direction: ltr; }
+  .mz { width: 42px; height: 42px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 0 solid #5ca0ff; background: rgba(10,16,32,.6); }
+  .mzpad { display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; justify-content: center; margin: 8px 0; direction: ltr; }
+  .mzpad button { height: 46px; font-size: 22px; }
+  .valve { position: relative; width: 210px; height: 210px; border-radius: 50%; margin: 14px auto; background: radial-gradient(circle at 40% 35%, #4a5570, #1d2438); border: 6px solid #5b6a8c; touch-action: none; cursor: grab; }
+  .valve .tg { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  .valve .tg i { position: absolute; left: -9px; top: -112px; border: 9px solid transparent; border-top: 16px solid #4ade80; }
+  .valve .kn { position: absolute; inset: 14px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #8a96b4, #3b4560); }
+  .valve .kn::after { content: ''; position: absolute; left: 50%; top: 4px; width: 10px; height: 46px; margin-left: -5px; border-radius: 5px; background: #fff; }
+  .tube { position: relative; height: 48px; background: #101728; border: 3px solid #3a4870; border-radius: 24px; margin: 22px 0 6px; overflow: hidden; }
+  .tube .zone { position: absolute; top: 0; bottom: 0; left: 38%; width: 24%; background: rgba(74,222,128,.35); }
+  .tube .bub { position: absolute; top: 6px; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #7fd6ff); }
+  .row2 { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+  .row2 button { flex: 1; max-width: 140px; height: 54px; font-size: 24px; }
+  .bins { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+  .bin { flex: 1; min-height: 70px; border-radius: 12px; border: 3px dashed; font-weight: 800; padding: 6px; font-size: 14px; }
+  .items { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 12px 0; }
+  .it { width: 62px; height: 62px; border-radius: 14px; font-size: 26px; border: 3px solid transparent; }
+  .it.sel { border-color: #fff; transform: scale(1.1); }
+  .qopts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+  .qopts button { height: 56px; font-size: 22px; font-weight: 800; }
+  .qq { font-size: 34px; font-weight: 800; direction: ltr; margin: 10px 0; color: var(--accent); }
+  .arena2 { position: relative; height: 220px; background: rgba(0,0,0,.4); border: 2px solid #3a4870; border-radius: 14px; margin: 12px 0; touch-action: none; overflow: hidden; }
+  .arena2 .orb { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; border: 3px solid #ffd646; background: rgba(255,214,70,.18); box-shadow: 0 0 18px rgba(255,214,70,.5); }
+  .chbtn { width: 100%; height: 76px; font-size: 22px; border-radius: 18px; margin-top: 10px; touch-action: none; user-select: none; }
+  .swipe { position: relative; height: 74px; margin: 20px 0 8px; background: #1b2236; border-radius: 16px; border: 3px solid #3a4870; touch-action: none; }
+  .swipe .cardx { position: absolute; left: 4px; top: 6px; width: 90px; height: 54px; border-radius: 10px; background: linear-gradient(135deg, #3b6ad9, #1a2a66); border: 2px solid #9ab; display: flex; align-items: center; justify-content: center; font-weight: 800; cursor: grab; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 76px); gap: 6px; justify-content: center; margin: 14px 0; direction: ltr; }
+  .tiles button { height: 76px; font-size: 30px; font-weight: 800; background: #2f4a8a; }
+  .tiles button.blank { visibility: hidden; }
+  .lights { display: grid; grid-template-columns: repeat(3, 76px); gap: 8px; justify-content: center; margin: 14px 0; }
+  .lights button { height: 76px; border-radius: 16px; background: #1c2232; border: 3px solid #3a4870; padding: 0; }
+  .lights button.on { background: #ffd646; border-color: #fff3b0; box-shadow: 0 0 22px rgba(255,214,70,.8); }
   .vdots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 96px; }
   .vdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); display: inline-block; animation: popdot .35s ease-out backwards; }
   @keyframes popdot { from { transform: scale(0); } to { transform: scale(1); } }
@@ -405,6 +438,7 @@ const $ = s => document.querySelector(s);
 const cv = $('#cv');
 let ctx = cv.getContext('2d');
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pick = a => a[Math.floor(Math.random() * a.length)];
 let ID = null, S = null, es = null, lastPhase = null;
 const disp = {};
 const store = {
@@ -414,7 +448,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-135141'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-140500'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -1004,9 +1038,11 @@ function openMini(i) {
   miniKind = T.kind;
   showMini(T.name, T.kind, T.theme || DEFAULT_THEME[T.kind] || 'stars');
 }
-function hideMini() { stopBg(); miniToken++; show('#mini', false); }
+let miniKeyHook = null;
+function hideMini() { stopBg(); miniToken++; miniKeyHook = null; show('#mini', false); }
 function showMini(title, kind, theme) {
   const tk = ++miniToken;
+  miniKeyHook = null;
   $('#miniTitle').textContent = title;
   show('#mini', true);
   startBg(theme);
@@ -1284,21 +1320,24 @@ function buildCatch(b, tk) {
     dots.push(o);
     el.onclick = () => { el.remove(); dots.splice(dots.indexOf(o), 1); $('#cLeft').textContent = --left; if (!left) miniDone(); };
   }
-  const loop = () => {
+  let lc = 0;
+  const loop = now => {
     if (!alive(tk)) return;
+    const k = Math.min(4, (now - (lc || now)) / 16.67 || 1); lc = now;
     const W = arena.clientWidth - 40, H = arena.clientHeight - 40;
-    for (const o of dots) { o.x += o.vx; o.y += o.vy; if (o.x < 0 || o.x > W) o.vx *= -1; if (o.y < 0 || o.y > H) o.vy *= -1; o.el.style.transform = `translate(${o.x}px,${o.y}px)`; }
+    for (const o of dots) { o.x += o.vx * k; o.y += o.vy * k; if (o.x < 0 || o.x > W) o.vx *= -1; if (o.y < 0 || o.y > H) o.vy *= -1; o.el.style.transform = `translate(${o.x}px,${o.y}px)`; }
     requestAnimationFrame(loop);
   };
-  loop();
+  requestAnimationFrame(loop);
 }
 function buildTiming(b, tk) {
   let hits = 0;
   const zc = 20 + Math.random() * 60, zw = 16;
   b.innerHTML = `<p class="sub" style="margin:8px 0">לחץ "עצור" כשהסמן באזור הירוק (<span id="tHits">0</span>/3)</p><div class="track"><i class="zone" style="left:${zc - zw / 2}%;width:${zw}%"></i><b class="mark" id="tMark"></b></div><button id="tStop" class="primary" style="margin-top:14px;width:100%;height:56px;font-size:20px">עצור</button>`;
   let pos = 0, dir = 1, speed = 1.1 + Math.random() * 0.5;
-  const loop = () => { if (!alive(tk)) return; pos += dir * speed; if (pos >= 100 || pos <= 0) dir *= -1; $('#tMark').style.left = pos + '%'; requestAnimationFrame(loop); };
-  loop();
+  let lt = 0;
+  const loop = now => { if (!alive(tk)) return; const k = Math.min(4, (now - (lt || now)) / 16.67 || 1); lt = now; pos += dir * speed * k; if (pos >= 100) { pos = 100; dir = -1; } else if (pos <= 0) { pos = 0; dir = 1; } $('#tMark').style.left = pos + '%'; requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
   $('#tStop').onclick = () => {
     if (Math.abs(pos - zc) <= zw / 2) { hits++; speed += 0.35; } else hits = Math.max(0, hits - 1);
     $('#tHits').textContent = hits; if (hits >= 3) miniDone();
@@ -1321,10 +1360,206 @@ function buildPattern(b, tk) {
     else { ready = false; $('#pMsg').textContent = 'טעות – זכור שוב…'; setTimeout(() => { if (alive(tk)) show(); }, 500); }
   };
 }
-const MINI_BUILD = { wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern };
+
+// ---------- עוד 10 מנגנונים ----------
+function buildMaze(b) {
+  const N = 6, cells = Array.from({ length: N * N }, () => ({ t: 1, r: 1, b: 1, l: 1, v: 0 }));
+  const stack = [0]; cells[0].v = 1;
+  while (stack.length) {
+    const i = stack[stack.length - 1], x = i % N, y = (i / N) | 0, nb = [];
+    if (y > 0 && !cells[i - N].v) nb.push([i - N, 't', 'b']); if (x < N - 1 && !cells[i + 1].v) nb.push([i + 1, 'r', 'l']);
+    if (y < N - 1 && !cells[i + N].v) nb.push([i + N, 'b', 't']); if (x > 0 && !cells[i - 1].v) nb.push([i - 1, 'l', 'r']);
+    if (!nb.length) { stack.pop(); continue; }
+    const [j, a, c] = pick(nb); cells[i][a] = 0; cells[j][c] = 0; cells[j].v = 1; stack.push(j);
+  }
+  let pos = 0; const goal = N * N - 1;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">הוביל את הנקודה 🔵 אל הדגל 🏁 (חצים או מקשי החצים)</p><div class="maze" style="grid-template-columns:repeat(6,42px)"></div><div class="mzpad"><span></span><button data-d="t">↑</button><span></span><button data-d="l">←</button><button data-d="b">↓</button><button data-d="r">→</button></div>';
+  const grid = b.querySelector('.maze');
+  const draw = () => { grid.innerHTML = cells.map((c, i) => `<div class="mz" style="border-width:${c.t ? 3 : 0}px ${c.r ? 3 : 0}px ${c.b ? 3 : 0}px ${c.l ? 3 : 0}px">${i === pos ? '🔵' : i === goal ? '🏁' : ''}</div>`).join(''); };
+  const move = d => {
+    const c = cells[pos]; if (c[d]) return;
+    pos += { t: -N, b: N, l: -1, r: 1 }[d]; draw(); if (pos === goal) miniDone();
+  };
+  draw();
+  b.querySelector('.mzpad').onclick = e => { const t = e.target.closest('button'); if (t) move(t.dataset.d); };
+  miniKeyHook = e => { const d = { ArrowUp: 't', ArrowDown: 'b', ArrowLeft: 'l', ArrowRight: 'r', KeyW: 't', KeyS: 'b', KeyA: 'l', KeyD: 'r' }[e.code]; if (d) { e.preventDefault(); move(d); } else if (e.code === 'Escape') closeMini(); };
+  if (window.__dbg) window.__dbg.solve = () => { // מסלול BFS
+    const prev = { 0: null }, q = [0];
+    while (q.length) { const i = q.shift(); for (const d of ['t', 'r', 'b', 'l']) { if (cells[i][d]) continue; const j = i + { t: -N, b: N, l: -1, r: 1 }[d]; if (!(j in prev)) { prev[j] = [i, d]; q.push(j); } } }
+    const path = []; for (let c = goal; prev[c]; c = prev[c][0]) path.unshift(prev[c][1]); path.forEach(move);
+  };
+}
+function buildValve(b, tk) {
+  const targets = [Math.random() * 300 + 30, Math.random() * 300 + 30, Math.random() * 300 + 30]; let step = 0, hold = 0, ang = 0;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">סובב את הגלגל כך שהסימן הלבן יצביע על החץ הירוק (<span id="vN">0</span>/3)</p><div class="valve" id="vv"><div class="tg" id="vtg"><i></i></div><div class="kn" id="vkn"></div></div>';
+  const vv = $('#vv'), kn = $('#vkn'), tg = $('#vtg');
+  const setT = () => { tg.style.transform = `rotate(${targets[step]}deg)`; };
+  const setA = a => { ang = a; kn.style.transform = `rotate(${a}deg)`; };
+  setT(); setA(0);
+  const toAng = e => { const r = vv.getBoundingClientRect(); return (Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI + 90 + 360) % 360; };
+  let drag = false;
+  vv.onpointerdown = e => { drag = true; vv.setPointerCapture(e.pointerId); setA(toAng(e)); };
+  vv.onpointermove = e => { if (drag) setA(toAng(e)); };
+  vv.onpointerup = () => { drag = false; };
+  const iv = setInterval(() => {
+    if (!alive(tk)) { clearInterval(iv); return; }
+    const d = Math.abs(((ang - targets[step]) % 360 + 540) % 360 - 180);
+    hold = d < 9 ? hold + 1 : 0;
+    if (hold >= 6) { hold = 0; step++; $('#vN').textContent = step; if (step >= 3) { clearInterval(iv); miniDone(); } else setT(); }
+  }, 100);
+  if (window.__dbg) window.__dbg.solve = async () => { for (let k = 0; k < 3; k++) { setA(targets[step]); await sleep(750); } };
+}
+function buildBalance(b, tk) {
+  let p = 50, v = 0, prog = 0, dir = 0;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">שמור על הבועה באזור הירוק (חצים ימין/שמאל או הכפתורים)</p><div class="tube"><i class="zone"></i><b class="bub" id="bb"></b></div><div class="bar big"><i id="bbFill"></i></div><div class="row2"><button id="bL">◀</button><button id="bR">▶</button></div>';
+  const nudge = d => { v += d * 0.9; };
+  $('#bL').onclick = () => nudge(-1); $('#bR').onclick = () => nudge(1);
+  miniKeyHook = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') nudge(-1); else if (e.code === 'ArrowRight' || e.code === 'KeyD') nudge(1); else if (e.code === 'Escape') closeMini(); };
+  let last = 0;
+  const loop = now => {
+    if (!alive(tk)) return;
+    const k = Math.min(4, (now - (last || now)) / 16.67 || 1); last = now;
+    v += (Math.random() - 0.5) * 0.35 * k; v *= Math.pow(0.985, k); p += v * k; if (p < 3 || p > 97) { v *= -0.5; p = Math.max(3, Math.min(97, p)); }
+    const inz = p > 38 && p < 62; prog = Math.max(0, Math.min(100, prog + (inz ? 0.5 : -0.35) * k));
+    $('#bb').style.left = p + '%'; $('#bbFill').style.width = prog + '%';
+    if (prog >= 100) { miniDone(); return; }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+  if (window.__dbg) window.__dbg.state = () => ({ p, v });
+  if (window.__dbg) window.__dbg.nudge = nudge;
+}
+function buildBins(b) {
+  const bins = [{ n: 'אדום', c: '#e53935', i: '🍎' }, { n: 'כחול', c: '#1e63d6', i: '🔹' }, { n: 'ירוק', c: '#22a34a', i: '🥦' }];
+  const items = shuffle([0, 0, 1, 1, 2, 2]).map((k, i) => ({ k, id: i }));
+  let sel = null, left = items.length;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">בחר פריט ואז לחץ על הסל בצבע שלו</p><div class="items">' + items.map(it => `<button class="it" data-id="${it.id}" data-k="${it.k}" style="background:${bins[it.k].c}">${bins[it.k].i}</button>`).join('') + '</div><div class="bins">' + bins.map((x, k) => `<button class="bin" data-k="${k}" style="border-color:${x.c};color:${x.c}">${x.n}</button>`).join('') + '</div>';
+  b.querySelector('.items').onclick = e => { const t = e.target.closest('.it'); if (!t) return; b.querySelectorAll('.it').forEach(x => x.classList.remove('sel')); t.classList.add('sel'); sel = t; };
+  b.querySelector('.bins').onclick = e => {
+    const t = e.target.closest('.bin'); if (!t || !sel) return;
+    if (sel.dataset.k === t.dataset.k) { sel.remove(); sel = null; if (--left === 0) miniDone(); }
+    else t.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 200);
+  };
+}
+function buildQuiz(b) {
+  let n = 0;
+  const q = () => {
+    const a = 3 + Math.floor(Math.random() * 12), c = 2 + Math.floor(Math.random() * 9), op = pick(['+', '-', '×']);
+    const ans = op === '+' ? a + c : op === '-' ? a - c : a * c;
+    const opts = shuffle([ans, ans + 1 + Math.floor(Math.random() * 4), ans - 1 - Math.floor(Math.random() * 4), ans + 5 + Math.floor(Math.random() * 6)]);
+    return { txt: `${a} ${op} ${c} = ?`, ans, opts: [...new Set(opts)] };
+  };
+  let cur = q();
+  const draw = () => {
+    b.innerHTML = `<p class="sub" style="margin:8px 0">פתור את התרגיל (${n}/3)</p><div class="qq">${cur.txt}</div><div class="qopts">${cur.opts.map(o => `<button data-o="${o}">${o}</button>`).join('')}</div>`;
+    b.querySelector('.qopts').onclick = e => { const t = e.target.closest('button'); if (!t) return; if (+t.dataset.o === cur.ans) { if (++n >= 3) { miniDone(); return; } cur = q(); draw(); } else { t.disabled = true; t.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 200); } };
+  };
+  draw();
+  if (window.__dbg) window.__dbg.solve = () => { for (let k = 0; k < 3; k++) { const t = [...b.querySelectorAll('.qopts button')].find(x => +x.dataset.o === cur.ans); if (t) t.click(); } };
+}
+function buildTrack(b, tk) {
+  let prog = 0, mx = -99, my = -99;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">שמור את הסמן (או האצבע) על המעגל הנע</p><div class="arena2" id="ar"><div class="orb" id="orb"></div></div><div class="bar big"><i id="trFill"></i></div>';
+  const ar = $('#ar'), orb = $('#orb');
+  const upd = e => { const r = ar.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; };
+  ar.onpointermove = upd; ar.onpointerdown = e => { ar.setPointerCapture(e.pointerId); upd(e); }; ar.onpointerleave = () => { mx = -99; };
+  let t0 = performance.now(), ox = 0, oy = 0, lastT = 0;
+  const loop = now => {
+    if (!alive(tk)) return;
+    const k = Math.min(4, (now - (lastT || now)) / 16.67 || 1); lastT = now;
+    const W = ar.clientWidth, H = ar.clientHeight, tt = (now - t0) / 1000;
+    ox = W / 2 + Math.sin(tt * 1.1) * (W / 2 - 50); oy = H / 2 + Math.sin(tt * 1.7 + 1) * (H / 2 - 50);
+    orb.style.left = ox + 'px'; orb.style.top = oy + 'px';
+    const on = Math.hypot(mx - ox, my - oy) < 40;
+    prog = Math.max(0, Math.min(100, prog + (on ? 0.45 : -0.3) * k));
+    $('#trFill').style.width = prog + '%';
+    if (prog >= 100) { miniDone(); return; }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+  if (window.__dbg) window.__dbg.orb = () => { const a = ar.getBoundingClientRect(), o = orb.getBoundingClientRect(); return { x: o.left + o.width / 2, y: o.top + o.height / 2, ar: a }; };
+}
+function buildCharge(b, tk) {
+  let val = 0, hold = false, hits = 0, last = 0;
+  const zc = 60 + Math.random() * 24, zw = 12;
+  b.innerHTML = `<p class="sub" style="margin:8px 0">החזק את הכפתור והרפה כשהמד באזור הירוק (<span id="chH">0</span>/3)</p><div class="track"><i class="zone" style="left:${zc - zw / 2}%;width:${zw}%"></i><b class="mark" id="chM" style="left:0"></b></div><button id="chB" class="primary chbtn">החזק…</button>`;
+  const btn = $('#chB');
+  const release = () => {
+    if (!hold) return; hold = false;
+    if (Math.abs(val - zc) <= zw / 2) hits++; else hits = Math.max(0, hits - 1);
+    $('#chH').textContent = hits; val = 0; if (hits >= 3) miniDone();
+  };
+  btn.onpointerdown = e => { hold = true; btn.setPointerCapture(e.pointerId); };
+  btn.onpointerup = release; btn.onpointercancel = release;
+  const loop = now => {
+    if (!alive(tk)) return;
+    const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+    if (hold) val = Math.min(100, val + 62 * dt); else val = Math.max(0, val - 120 * dt);
+    $('#chM').style.left = val + '%';
+    if (hold && val >= 100) { release(); }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+  if (window.__dbg) window.__dbg.charge = { zone: () => zc, val: () => val, down: () => { hold = true; }, up: release };
+}
+function buildSwipe(b, tk) {
+  b.innerHTML = '<p class="sub" id="swMsg" style="margin:8px 0">החלק את הכרטיס ימינה, לא מהר מדי ולא לאט מדי</p><div class="swipe" id="sw"><div class="cardx" id="cx">💳 כרטיס</div></div>';
+  const sw = $('#sw'), cx = $('#cx'), msg = $('#swMsg');
+  let drag = false, off = 0, tStart = 0, started = false;
+  const maxX = () => sw.clientWidth - cx.clientWidth - 8;
+  const setX = x => { cx.style.left = (4 + x) + 'px'; };
+  cx.onpointerdown = e => { drag = true; started = false; off = e.clientX - cx.getBoundingClientRect().left; cx.setPointerCapture(e.pointerId); };
+  cx.onpointermove = e => {
+    if (!drag) return;
+    const x = Math.max(0, Math.min(maxX(), e.clientX - sw.getBoundingClientRect().left - off - 4));
+    setX(x);
+    if (!started && x > maxX() * 0.08) { started = true; tStart = performance.now(); }
+  };
+  cx.onpointerup = () => {
+    if (!drag) return; drag = false;
+    const x = parseFloat(cx.style.left || 4) - 4, dt = performance.now() - tStart;
+    if (started && x > maxX() * 0.92) {
+      if (dt < 450) msg.textContent = '⚡ מהר מדי – נסה שוב';
+      else if (dt > 1100) msg.textContent = '🐌 לאט מדי – נסה שוב';
+      else { msg.textContent = '✅ אושר!'; miniDone(); return; }
+    } else msg.textContent = 'החלק עד הסוף';
+    setX(0);
+  };
+}
+function buildSlide(b) {
+  const t = [1, 2, 3, 4, 5, 6, 7, 8, 0]; let blank = 8, last = -1;
+  for (let k = 0; k < 60; k++) { const nb = [blank - 3, blank + 3, blank % 3 ? blank - 1 : -1, blank % 3 < 2 ? blank + 1 : -1].filter(i => i >= 0 && i < 9 && i !== last); const j = pick(nb); [t[blank], t[j]] = [t[j], t[blank]]; last = blank; blank = j; }
+  if (t.every((v, i) => v === (i + 1) % 9)) { [t[0], t[1]] = [t[1], t[0]]; [t[0], t[1]] = [t[1], t[0]]; }
+  const solved = () => t.every((v, i) => v === (i + 1) % 9);
+  b.innerHTML = '<p class="sub" style="margin:8px 0">סדר את האריחים מ-1 עד 8 (החלל בפינה הימנית-תחתונה)</p><div class="tiles"></div>';
+  const g = b.querySelector('.tiles');
+  const draw = () => { g.innerHTML = t.map((v, i) => `<button data-i="${i}" class="${v ? '' : 'blank'}">${v || ''}</button>`).join(''); };
+  const tap = i => { const z = t.indexOf(0), ok = (Math.abs(i - z) === 3) || (Math.abs(i - z) === 1 && ((i / 3) | 0) === ((z / 3) | 0)); if (!ok) return; [t[i], t[z]] = [t[z], t[i]]; draw(); if (solved()) miniDone(); };
+  g.onclick = e => { const x = e.target.closest('button'); if (x) tap(+x.dataset.i); };
+  draw();
+  if (window.__dbg) window.__dbg.solve = async () => { // פתרון BFS
+    const key = a => a.join(''), start = key(t), goal = key([1, 2, 3, 4, 5, 6, 7, 8, 0]), prev = { [start]: null }, q = [t.slice()];
+    while (q.length) { const cur = q.shift(); if (key(cur) === goal) break; const z = cur.indexOf(0); for (const j of [z - 3, z + 3, z % 3 ? z - 1 : -1, z % 3 < 2 ? z + 1 : -1]) { if (j < 0 || j > 8) continue; const nx = cur.slice(); [nx[z], nx[j]] = [nx[j], nx[z]]; if (!(key(nx) in prev)) { prev[key(nx)] = [key(cur), j]; q.push(nx); } } }
+    const moves = []; for (let k = goal; prev[k]; k = prev[k][0]) moves.unshift(prev[k][1]); for (const m of moves) tap(m);
+  };
+}
+function buildLights(b) {
+  const L = Array(9).fill(true);
+  const press = i => { const x = i % 3, y = (i / 3) | 0; for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (nx >= 0 && nx < 3 && ny >= 0 && ny < 3) L[ny * 3 + nx] = !L[ny * 3 + nx]; } };
+  const pre = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(0, 4); pre.forEach(press);
+  b.innerHTML = '<p class="sub" style="margin:8px 0">הדלק את כל הנורות – לחיצה הופכת גם את השכנות</p><div class="lights"></div>';
+  const g = b.querySelector('.lights');
+  const draw = () => { g.innerHTML = L.map((v, i) => `<button data-i="${i}" class="${v ? 'on' : ''}"></button>`).join(''); };
+  const tap = i => { press(i); draw(); if (L.every(Boolean)) miniDone(); };
+  g.onclick = e => { const x = e.target.closest('button'); if (x) tap(+x.dataset.i); };
+  draw();
+  if (window.__dbg) window.__dbg.solve = () => { pre.forEach(tap); };
+}
+const MINI_BUILD = { maze: buildMaze, valve: buildValve, balance: buildBalance, bins: buildBins, quiz: buildQuiz, track: buildTrack, charge: buildCharge, swipe: buildSwipe, slide: buildSlide, lights: buildLights, wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern };
 
 function miniKey(e) {
   if (e.code === 'Escape') { closeMini(); return; }
+  if (miniKeyHook) { miniKeyHook(e); return; }
   if (!codeKey || miniKind !== 'code') return;
   if (/^(Digit|Numpad)[0-9]$/.test(e.code)) codeKey(e.code.slice(-1));
   else if (e.code === 'Backspace') codeKey('⌫');
