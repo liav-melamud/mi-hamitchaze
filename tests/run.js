@@ -235,6 +235,32 @@ test('שחזור משחק על המפה הקטנה שומר את המפה', () =
 
 // ---------------------------------------------------------------------------
 console.log('\nמשחקים מלאים (בוטים בלבד)');
+test('עד 15 שחקנים בחדר ועד 15 בוטים, ומשחק מלא נגמר', () => {
+  const g = createGame(MAP); const ids = [];
+  for (let i = 0; i < 16; i++) ids.push(g.join('שחקן' + i));
+  ok(ids.slice(0, 15).every(Boolean), 'לא כל 15 השחקנים נכנסו');
+  ok(ids[15] === null, 'שחקן 16 נכנס לחדר מלא');
+  const h = createGame(MAP), a = h.join('מארח');
+  h.act(a, { type: 'settings', bots: 15, impostors: 4, killCd: 10 }); h.act(a, { type: 'start' });
+  ok(h.view(a).roster.length === 16, 'לא נוצרו 15 בוטים');
+  let end = false;
+  for (let i = 0; i < 60000 && !end; i++) { tick(h, 1); const v = h.view(a); if (v.phase === 'meeting' && !v.meeting.myVote && v.me.alive) h.act(a, { type: 'vote', target: 'skip' }); end = v.phase === 'end'; }
+  // כמו בבדיקת 30 המשחקים: מארח אנושי שלא עושה כלום יכול להשאיר משחק פתוח רק אם הוא איש צוות עם משימות פתוחות
+  if (!end) { const v = h.view(a); ok(v.me.team === 'crew' && v.tasks.done < v.tasks.total, 'משחק עם 15 בוטים נתקע בשלב ' + v.phase); }
+});
+test('מפה קטנה: אין חבלת כור', () => {
+  ok(MAP.byId.small.SAB_POINTS.reactor.length === 0, 'יש נקודות כור במפה הקטנה');
+  const { g, a } = newGame({ bots: 5, cfg: { map: 'small', impostors: 2 }, role: 'מתחזה' });
+  g.act(a, { type: 'sab', kind: 'reactor' });
+  ok(!g.view(a).sab, 'חבלת כור הופעלה במפה הקטנה');
+});
+test('מחבל: למשבר שלו 30 שניות במקום 45', () => {
+  const { g, a } = newGame({ bots: 6, cfg: { impostors: 2 }, role: 'מחבל' });
+  sec(g, 20); // ההשהיה של תחילת המשחק
+  if (g.view(a).sab) sec(g, 50); // אם בוט הספיק לחבל – מחכים שייגמר
+  g.act(a, { type: 'sab', kind: 'oxygen' });
+  const s = g.view(a).sab; ok(s && s.t <= 30, 'זמן המשבר של המחבל: ' + (s && s.t));
+});
 test('30 משחקים מלאים נגמרים בלי שגיאות ובלי להיתקע', () => {
   const reasons = {};
   for (let r = 0; r < 30; r++) {

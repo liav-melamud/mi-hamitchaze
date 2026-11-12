@@ -8,7 +8,10 @@ const COLORS = [
   { n: 'ורוד', c: '#ec5fb5' }, { n: 'כתום', c: '#f08c1e' }, { n: 'צהוב', c: '#f2d22e' },
   { n: 'שחור', c: '#3b3f46' }, { n: 'לבן', c: '#e8edf2' }, { n: 'סגול', c: '#7b3fc9' },
   { n: 'חום', c: '#8a5a33' }, { n: 'תכלת', c: '#36d1d6' }, { n: 'ליים', c: '#9be03a' },
+  { n: 'אפור', c: '#8d96a0' }, { n: 'בורדו', c: '#8c1d40' }, { n: 'כחול כהה', c: '#23338f' },
+  { n: 'זית', c: '#6b7a2a' }, { n: 'אפרסק', c: '#f6b38a' }, { n: 'טורקיז', c: '#12907e' },
 ];
+const MAX_HUMANS = 15, MAX_BOTS = 15; // עד 15 שחקנים ועד 15 בוטים
 
 const ROLES = {
   crew: { name: 'איש צוות', team: 'crew', desc: 'בצע משימות ומצא את המתחזים.' },
@@ -23,11 +26,11 @@ const ROLES = {
   phantom: { name: 'נעלם', team: 'imp', desc: 'היעלם (H) ל-8 שניות: אף אחד לא רואה אותך, אבל אי אפשר לחסל בזמן ההיעלמות.' },
   viper: { name: 'מרקיב', team: 'imp', desc: 'הגופות של מי שחיסלת מתפרקות אחרי 8 שניות, ואי אפשר לדווח עליהן.' },
   bodyguard: { name: 'שומר ראש', team: 'crew', desc: 'הגן (B) על שחקן קרוב ל-20 שניות: ניסיון חיסול שלו ייכשל, ותקבל התראה.' },
-  saboteur: { name: 'מחבל', team: 'imp', desc: 'אתה לא מחסל, אבל מחבל מהר פי שניים: חבלה גדולה כל 15 שניות. עוזר לשותף שלך לנצח.' },
+  saboteur: { name: 'מחבל', team: 'imp', desc: 'אתה לא מחסל – אתה מומחה חבלות: חבלה כל 15 שניות (במקום 30), למשברים שלך יש רק 30 שניות לתיקון (במקום 45), ונועל דלתות עם חצי זמן המתנה. עוזר לשותף שלך לנצח.' },
   spectator: { name: 'צופה', team: 'none', desc: 'הצטרפת באמצע משחק – צפה עד הסבב הבא.' },
 };
 
-const BOT_NAMES = ['בוטי', 'רובי', 'צ׳יפ', 'ננו', 'ביפ', 'זיק', 'פיקסל', 'טורבו', 'גלקסי', 'בורג'];
+const BOT_NAMES = ['בוטי', 'רובי', 'צ׳יפ', 'ננו', 'ביפ', 'זיק', 'פיקסל', 'טורבו', 'גלקסי', 'בורג', 'ג׳ט', 'מגנט', 'רדאר', 'קוונטי', 'סטאר'];
 const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', 'מי ראה משהו?', 'דלג, אין מספיק מידע', 'זה חשוד…',
   'ראיתי מישהו ליד הפתח', 'אני סומך על כולם 😅', 'בואו נצביע ביחד', 'אני מהצוות, באמת'];
 
@@ -62,21 +65,24 @@ const doorBlocked = (x, y) => {
   }
   return false;
 };
-function startSab(kind, force) {
+// מחבל (strong): המשברים שלו קשים יותר – 30 שניות לתקן במקום 45
+const SAB_TIME_STRONG = 30;
+function startSab(kind, force, strong) {
   if (sab || (sabCd > 0 && !force)) return;
-  sab = { type: kind, t: kind === 'lights' ? 0 : SAB_TIME, fixed: MAP.SAB_POINTS[kind].map(() => false) };
+  const secs = strong ? SAB_TIME_STRONG : SAB_TIME;
+  sab = { type: kind, t: kind === 'lights' ? 0 : secs, fixed: MAP.SAB_POINTS[kind].map(() => false) };
   ev('sab', { lights: '💡 החשמל הופל', oxygen: '💨 הופסק החמצן', reactor: '☢️ הכור התחמם' }[kind]);
-  toastAll(kind === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל' : kind === 'oxygen' ? '💨 הפסקת חמצן! יש 45 שניות לתקן בשתי נקודות' : '☢️ הכור מתחמם! יש 45 שניות לקרר בשתי נקודות');
+  toastAll(kind === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל' : kind === 'oxygen' ? `💨 הפסקת חמצן! יש ${secs} שניות לתקן בשתי נקודות` : `☢️ הכור מתחמם! יש ${secs} שניות לקרר בשתי נקודות`);
 }
 function fixSab(i) {
   if (!sab || sab.fixed[i]) return;
   sab.fixed[i] = true;
   if (sab.fixed.every(Boolean)) { sab = null; sabCd = SAB_CD; toastAll('✅ התקלה תוקנה'); ev('fix', '✅ התקלה תוקנה'); }
 }
-function closeDoors(roomId) {
+function closeDoors(roomId, noCool) {
   const r = MAP.ROOMS[roomId];
-  // אפשר לנעול כמה חדרים שרוצים. לכל חדר יש זמן קירור של 20 שניות אחרי שהדלתות שלו נפתחות
-  if (!r || (doorsUntil[roomId] || 0) > now() || (doorCool[roomId] || 0) > now()) return false;
+  // אפשר לנעול כמה חדרים שרוצים. לכל חדר יש זמן קירור של 20 שניות אחרי שהדלתות שלו נפתחות (למחבל – חצי מזה)
+  if (!r || (doorsUntil[roomId] || 0) > now() || (doorCool[roomId] || 0) - (noCool ? DOOR_COOL / 2 : 0) > now()) return false;
   doorsUntil[roomId] = now() + DOOR_TIME; doorCool[roomId] = now() + DOOR_TIME + DOOR_COOL;
   // מי שעומד בתוך הדלת נדחף אל מרכז החדר
   for (const q of list()) {
@@ -107,7 +113,10 @@ const team = p => (ROLES[p.role] || ROLES.crew).team;
 function freeColor() {
   const used = new Set(list().map(p => p.color));
   const free = COLORS.map((_, i) => i).filter(i => !used.has(i));
-  return free.length ? free[0] : 0;
+  if (free.length) return free[0];
+  // יותר שחקנים מצבעים: הצבע שהכי פחות בשימוש
+  const cnt = COLORS.map((_, i) => list().filter(p => p.color === i).length);
+  return cnt.indexOf(Math.min(...cnt));
 }
 
 function newPlayer(name, color, isBot) {
@@ -143,7 +152,7 @@ function startGame(by) {
   raceEndAt = 0; raceChaosAt = now() + 20;
   Object.values(players).filter(p => p.isBot).forEach(p => delete players[p.id]);
   const names = shuffle(BOT_NAMES.slice());
-  for (let i = 0; i < settings.bots && list().length < 12; i++) newPlayer('🤖 ' + names[i], freeColor(), true);
+  for (let i = 0; i < settings.bots && i < MAX_BOTS; i++) newPlayer('🤖 ' + names[i], freeColor(), true);
   const all = shuffle(list());
   if (opts.demo) { const me = players[by]; all.splice(all.indexOf(me), 1); all.push(me); } // בדמו: השחקן תמיד איש צוות
   if (all.length < 3) { toast(players[by], 'צריך לפחות 3 שחקנים (אפשר להוסיף בוטים)'); return; }
@@ -366,11 +375,11 @@ function act(p, a) {
     }
     case 'sab': {
       if (phase !== 'play' || !p.alive || team(p) !== 'imp') return;
-      if (a.kind === 'door') { if (!closeDoors(a.room)) toast(p, 'הדלתות עדיין בהשהיה'); return; }
-      if (!['lights', 'oxygen', 'reactor'].includes(a.kind)) return;
+      if (a.kind === 'door') { if (!closeDoors(a.room, p.role === 'saboteur')) toast(p, 'הדלתות עדיין בהשהיה'); return; }
+      if (!['lights', 'oxygen', 'reactor'].includes(a.kind) || !MAP.SAB_POINTS[a.kind].length) return; // במפה הקטנה אין כור
       const fast = p.role === 'saboteur' && sabCd <= SAB_CD / 2; // מחבל: מחכה חצי מהזמן
       if (sab || (sabCd > 0 && !fast)) return toast(p, 'חבלה נוספת בעוד ' + Math.ceil(p.role === 'saboteur' ? sabCd - SAB_CD / 2 : sabCd) + ' שניות');
-      startSab(a.kind, fast);
+      startSab(a.kind, fast, p.role === 'saboteur');
       break;
     }
     case 'sabfinish': {
@@ -501,8 +510,8 @@ function act(p, a) {
       break;
     case 'settings':
       if (p.id !== hostId || phase !== 'lobby') return;
-      settings.impostors = Math.max(1, Math.min(3, Number(a.impostors) || 1));
-      settings.bots = Math.max(0, Math.min(9, Number(a.bots) || 0));
+      settings.impostors = Math.max(1, Math.min(5, Number(a.impostors) || 1));
+      settings.bots = Math.max(0, Math.min(MAX_BOTS, Number(a.bots) || 0));
       const cl = (v, lo, hi, d) => { v = Number(v); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
       settings.killCd = cl(a.killCd, 10, 60, 25);
       settings.speed = cl(a.speed, 0.5, 2, 1);
@@ -629,7 +638,7 @@ function botTick(p, dt) {
   if (team(p) === 'imp' && p.alive && !p.inVent) {
     const sabF = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.6 : 1;
     const sabI = p.role === 'saboteur' ? 2.5 : 1, sabReady = p.role === 'saboteur' ? sabCd <= SAB_CD / 2 : sabCd <= 0;
-    if (!sab && sabReady && Math.random() < 0.0005 * sabF * sabI) startSab(pick(['lights', 'lights', 'oxygen', 'reactor']), p.role === 'saboteur');
+    if (!sab && sabReady && Math.random() < 0.0005 * sabF * sabI) startSab(pick(MAP.SAB_POINTS.reactor.length ? ['lights', 'lights', 'oxygen', 'reactor'] : ['lights', 'lights', 'oxygen']), p.role === 'saboteur', p.role === 'saboteur');
     else if (Math.random() < 0.0003 * sabF) closeDoors(pick(Object.keys(MAP.ROOMS)));
   }
   // זיהוי תקיעה: יש מסלול אבל כמעט לא זזים 3 שניות
@@ -1063,6 +1072,7 @@ function viewFor(v) {
 
   function join(name, id) {
     if (id && players[id]) { players[id].conn = true; return id; }
+    if (humans().length >= MAX_HUMANS) return null; // החדר מלא
     const p = newPlayer(name, freeColor(), false);
     if (phase !== 'lobby') { p.alive = false; p.spectator = true; p.role = 'spectator'; }
     if (!hostId || !players[hostId]) hostId = p.id;

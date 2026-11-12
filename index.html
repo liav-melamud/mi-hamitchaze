@@ -421,7 +421,7 @@
     <div class="row" style="margin:6px 0 12px"><input id="lobbyIn" maxlength="140" placeholder="כתוב הודעה… (או דבר אם המיקרופון דלוק)" style="flex:1" autocomplete="off"><button id="lobbySend">שלח</button></div>
     <b>הגדרות משחק</b>
     <div id="settingsGrid">
-      <label>מתחזים <select data-s="impostors"><option>1</option><option>2</option><option>3</option></select></label>
+      <label>מתחזים <select data-s="impostors"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
       <label>בוטים <select data-s="bots"></select></label>
       <label>זמן בין חיסולים <select data-s="killCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="25">25ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
       <label>מהירות שחקנים <select data-s="speed"><option value="0.75">איטי</option><option value="1">רגיל</option><option value="1.25">מהיר</option><option value="1.5">מהיר מאוד</option></select></label>
@@ -546,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-192953'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-194839'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -748,6 +748,7 @@ function hostGame(name, tries = 0, resume = null) {
           for (const [pr, g] of Object.entries(guests)) if (g.pid === d.id && pr !== c.peer) { try { g.conn.close(); } catch (e) {} delete guests[pr]; }
         }
         const pid = engine.join(String(d.name || 'שחקן'), d.id === ID ? null : d.id);
+        if (!pid) { c.send({ type: 'full' }); setTimeout(() => { try { c.close(); } catch (e) {} }, 500); return; }
         engine.setConn(pid, true);
         guests[c.peer] = { conn: c, pid };
         c.send({ type: 'joined', id: pid, room: ROOM, v: VERSION });
@@ -837,7 +838,8 @@ function joinGame(name, code, silent, flipped) {
         if (reconnecting) { reconnecting = false; reconnectTries = 0; netBar(''); toast('✅ התחברת מחדש'); }
         afterJoin();
         if (d.v && d.v !== VERSION && d.v !== 'dev' && VERSION !== 'dev') staleBanner();
-      } else if (d.type === 'state') onState(d.s);
+      } else if (d.type === 'full') { reconnecting = false; conn = null; try { peer.destroy(); } catch (e) {} busy(false); status('החדר מלא – כבר יש בו 15 שחקנים'); }
+      else if (d.type === 'state') onState(d.s);
       else if (d.type === 'voicePeers') setPeers(d.list);
     });
     myConn.on('close', () => { if (conn === myConn) lostConn(); });
@@ -1025,7 +1027,7 @@ function renderLobby(s) {
   });
 }
 $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) { api({ type: 'color', color: +b.dataset.c }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.color = +b.dataset.c; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
-document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 10 }, (_, i) => `<option>${i}</option>`).join('');
+document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 16 }, (_, i) => `<option>${i}</option>`).join('');
 const sendSettings = () => {
   const o = { type: 'settings' };
   document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : (el.dataset.s === 'confirm' || el.dataset.s === 'openVotes' || el.dataset.s === 'newRoles') ? el.value === '1' : +el.value; });
@@ -1212,7 +1214,7 @@ function buildSabMap() {
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<div class="sroom" style="left:${pc(r.x, W0)};top:${pc(r.y, H0)};width:${pc(r.w, W0)};height:${pc(r.h, H0)}"><span>${r.name}</span></div>`; }
   SCHEM_BASE = h;
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<button class="sbtn sdoor" data-room="${k}" title="נעל דלתות ב${r.name}" style="left:${pc(r.cx, W0)};top:${pc(r.cy + r.h * 0.12, H0)}">🚪</button>`; }
-  const crit = [['reactor', MAP.SAB_POINTS.reactor[0].room, '☢️', 'התחממות הכור'], ['oxygen', MAP.SAB_POINTS.oxygen[0].room, '💨', 'הפסקת חמצן'], ['lights', MAP.SAB_POINTS.lights[0].room, '💡', 'הפלת החשמל']];
+  const crit = [['reactor', (MAP.SAB_POINTS.reactor[0] || {}).room, '☢️', 'התחממות הכור'], ['oxygen', MAP.SAB_POINTS.oxygen[0].room, '💨', 'הפסקת חמצן'], ['lights', MAP.SAB_POINTS.lights[0].room, '💡', 'הפלת החשמל']].filter(c => c[1]); // במפה הקטנה אין כור
   for (const [kind, rk, ic, title] of crit) { const r = MAP.ROOMS[rk]; h += `<button class="sbtn scrit" data-kind="${kind}" title="${title}" style="left:${pc(r.x + r.w, W0)};top:${pc(r.y, H0)}">${ic}</button>`; }
   st.innerHTML = h;
   st.onclick = e => {
@@ -2194,6 +2196,9 @@ function startRec() {
       if (!text || Date.now() < botSpeakUntil || (window.speechSynthesis && speechSynthesis.speaking)) continue;
       api({ type: 'chat', text: text.slice(0, 140), voice: true });
       heardText = '';
+      // מראים בבירור שהדיבור נשלח לצ'אט
+      flashHeardMsg('✅ נשלח לצ\'אט: ' + text.slice(0, 140));
+      toast('💬 נשלח לצ\'אט: ' + text.slice(0, 60) + (text.length > 60 ? '…' : ''));
     }
     if (interim.trim() && !(window.speechSynthesis && speechSynthesis.speaking)) heardText = '🎤 שומע: ' + interim.trim();
     refreshHeard();
