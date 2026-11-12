@@ -1085,8 +1085,8 @@ function drawDrone(x, y, color, dir, opts = {}) {
   // סריקה ביולוגית – כולם רואים
   if (opts.scan) {
     const ph = (performance.now() / 700) % 1;
-    ctx.fillStyle = 'rgba(80,255,160,.16)'; ctx.fillRect(-28, -44, 56, 72);
-    ctx.strokeStyle = 'rgba(80,255,160,.95)'; ctx.lineWidth = 2.5;
+    ctx.fillStyle = 'rgba(70,170,255,.16)'; ctx.fillRect(-28, -44, 56, 72);
+    ctx.strokeStyle = 'rgba(70,170,255,.95)'; ctx.lineWidth = 2.5;
     for (const k of [0, 0.5]) { const yy = 26 - ((ph + k) % 1) * 70; ctx.beginPath(); ctx.ellipse(0, yy, 26, 7, 0, 0, Math.PI * 2); ctx.stroke(); }
   }
   // מגן
@@ -1130,19 +1130,45 @@ function drawDecor(k, r, t) {
   const X = r.x, Y = r.y, glow = 0.6 + 0.4 * Math.sin(t / 300);
   switch (k) {
     case 'U': case 'D': {
-      const ey = k === 'U' ? Y + 90 : Y + 70;
-      // צינורות
-      ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.moveTo(X + 190, ey + 30); ctx.lineTo(X + 270, ey + 30); ctx.lineTo(X + 270, ey + 120); ctx.stroke();
-      // גוף המנוע
-      box(X + 50, ey, 140, 110, '#7d8596', '#3a3f4b', 18);
-      for (let i = 0; i < 4; i++) box(X + 66 + i * 30, ey - 6, 10, 122, '#5b6170', null, 3);
-      box(X + 150, ey + 30, 30, 50, '#c0442f', '#3a3f4b', 6);
-      // פתח פליטה וזוהר
-      ctx.fillStyle = '#4b505c'; ctx.beginPath(); ctx.moveTo(X + 50, ey + 20); ctx.lineTo(X + 18, ey + 5); ctx.lineTo(X + 18, ey + 105); ctx.lineTo(X + 50, ey + 90); ctx.closePath(); ctx.fill();
-      const g = ctx.createRadialGradient(X + 18, ey + 55, 4, X + 18, ey + 55, 50);
-      g.addColorStop(0, `rgba(255,170,60,${0.8 * glow})`); g.addColorStop(1, 'rgba(255,120,30,0)');
-      ctx.fillStyle = g; ctx.fillRect(X + 8, ey, 60, 110);
+      const ey = Y + 70, cyE = ey + 62;
+      // רצפת רשת ואזור אזהרה
+      ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(X + 24, ey + 20, 190, 140);
+      ctx.fillStyle = '#d9a82b';
+      for (let i = 0; i < 9; i++) { ctx.save(); ctx.beginPath(); ctx.rect(X + 24, ey + 150, 190, 10); ctx.clip(); ctx.beginPath(); ctx.moveTo(X + 24 + i * 24, ey + 160); ctx.lineTo(X + 36 + i * 24, ey + 150); ctx.lineTo(X + 48 + i * 24, ey + 150); ctx.lineTo(X + 36 + i * 24, ey + 160); ctx.closePath(); ctx.fill(); ctx.restore(); }
+      // צינורות דלק ומים
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#7a5c2e'; ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(X + 190, ey + 18); ctx.lineTo(X + 250, ey + 18); ctx.lineTo(X + 250, ey + 130); ctx.stroke();
+      ctx.strokeStyle = '#b08a4a'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = '#3d6f8f'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(X + 120, ey + 14); ctx.lineTo(X + 120, ey - 4); ctx.lineTo(X + 270, ey - 4); ctx.lineTo(X + 270, ey + 150); ctx.stroke();
+      ctx.lineCap = 'butt';
+      // גוף המנוע עם מתכת מדורגת
+      const g = ctx.createLinearGradient(0, ey + 14, 0, ey + 112);
+      g.addColorStop(0, '#c4ccd9'); g.addColorStop(0.35, '#8b94a6'); g.addColorStop(0.75, '#555d6d'); g.addColorStop(1, '#2e333f');
+      ctx.fillStyle = g; ctx.strokeStyle = '#1b1f28'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(X + 66, ey + 14, 138, 98, 16); ctx.fill(); ctx.stroke();
+      // טבעות חיזוק ובורגים
+      for (const rx of [X + 98, X + 134, X + 170]) {
+        ctx.fillStyle = 'rgba(20,24,32,.55)'; ctx.fillRect(rx, ey + 12, 8, 102);
+        ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(rx + 8, ey + 14, 2, 98);
+        for (const by of [ey + 20, ey + 106]) disc(rx + 4, by, 2.6, '#d3d9e4', '#1b1f28', 1);
+      }
+      // מד לחץ ותא בעירה אדום
+      box(X + 150, ey + 52, 40, 22, '#a8372a', '#1b1f28', 5);
+      ctx.fillStyle = `rgba(255,200,90,${0.35 + 0.35 * glow})`; ctx.fillRect(X + 154, ey + 56, 32, 14);
+      disc(X + 114, ey + 38, 11, '#f1f3f7', '#1b1f28', 2);
+      ctx.strokeStyle = '#d62828'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X + 114, ey + 38); const na = -2.2 + glow * 1.6; ctx.lineTo(X + 114 + Math.cos(na) * 8, ey + 38 + Math.sin(na) * 8); ctx.stroke();
+      // כניסת אוויר: מאוורר מסתובב
+      disc(X + 62, cyE, 50, '#1b1f28', '#566075', 5);
+      disc(X + 62, cyE, 44, '#0c0e13');
+      ctx.save(); ctx.translate(X + 62, cyE); ctx.rotate(t / 110);
+      for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.fillStyle = i % 2 ? '#7d8799' : '#9aa4b5'; ctx.beginPath(); ctx.moveTo(4, -2); ctx.quadraticCurveTo(26, -14, 40, -4); ctx.lineTo(40, 6); ctx.quadraticCurveTo(24, 2, 4, 4); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+      disc(X + 62, cyE, 9, '#566075', '#1b1f28', 2);
+      // פתח פליטה עם להבה כחולה-כתומה
+      ctx.fillStyle = '#3a404d'; ctx.beginPath(); ctx.moveTo(X + 204, ey + 30); ctx.lineTo(X + 232, ey + 18); ctx.lineTo(X + 232, ey + 106); ctx.lineTo(X + 204, ey + 94); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#1b1f28'; ctx.lineWidth = 3; ctx.stroke();
+      const f = ctx.createRadialGradient(X + 232, cyE, 2, X + 232, cyE, 46);
+      f.addColorStop(0, `rgba(190,235,255,${0.9 * glow})`); f.addColorStop(0.4, `rgba(255,170,60,${0.7 * glow})`); f.addColorStop(1, 'rgba(255,110,30,0)');
+      ctx.fillStyle = f; ctx.fillRect(X + 222, ey + 10, 60, 104);
       break;
     }
     case 'R': {
@@ -1162,8 +1188,8 @@ function drawDecor(k, r, t) {
         box(bx, Y + 160, 50, 60, '#5aa0d8', null, 6);
       }
       // משטח הסריקה
-      disc(870, 200, 32, 'rgba(80,255,160,.12)', `rgba(80,255,160,${0.4 + 0.4 * glow})`, 4);
-      disc(870, 200, 20, null, 'rgba(80,255,160,.6)', 2);
+      disc(870, 200, 32, 'rgba(70,170,255,.12)', `rgba(70,170,255,${0.4 + 0.4 * glow})`, 4);
+      disc(870, 200, 20, null, 'rgba(70,170,255,.6)', 2);
       box(X + 20, Y + 44, 60, 34, '#e8eef5', '#7b8799', 4);
       ctx.fillStyle = '#e53935'; ctx.fillRect(X + 45, Y + 50, 10, 22); ctx.fillRect(X + 39, Y + 56, 22, 10);
       break;
@@ -1246,12 +1272,22 @@ function drawDecor(k, r, t) {
       break;
     }
     case 'SH': {
-      const cx = r.cx, cy = r.cy + 10;
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; ctx.lineTo(cx + Math.cos(a) * 56, cy + Math.sin(a) * 56); }
-      ctx.closePath(); ctx.fillStyle = '#3b4255'; ctx.fill(); ctx.strokeStyle = `rgba(150,170,255,${0.5 + 0.5 * glow})`; ctx.lineWidth = 4; ctx.stroke();
-      disc(cx, cy, 22, `rgba(150,170,255,${0.4 + 0.4 * glow})`);
-      for (const [dx, dy] of [[-120, -70], [120, -70], [-120, 80]]) box(cx + dx - 16, cy + dy - 16, 32, 32, '#5b6170', '#2a2e38', 6);
+      const cx = r.cx, cy = r.cy + 14;
+      disc(cx, cy, 78, '#242a3a', '#555f78', 5);
+      for (let i = 0; i < 3; i++) {
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(t / (900 + i * 400) * (i % 2 ? -1 : 1));
+        ctx.strokeStyle = ['#8fb2ff', '#b08fff', '#78e6ff'][i]; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(0, 0, 66 - i * 17, 0.3, Math.PI * 1.55); ctx.stroke();
+        ctx.restore();
+      }
+      const core = ctx.createRadialGradient(cx, cy, 2, cx, cy, 26);
+      core.addColorStop(0, '#ffffff'); core.addColorStop(0.5, `rgba(160,190,255,${0.7 + 0.3 * glow})`); core.addColorStop(1, 'rgba(160,190,255,0)');
+      ctx.fillStyle = core; ctx.fillRect(cx - 28, cy - 28, 56, 56);
+      for (const [dx, dy] of [[-120, -80], [120, -80], [-120, 70], [120, 70]]) {
+        box(cx + dx - 16, cy + dy - 16, 32, 32, '#4d5466', '#2a2e38', 6);
+        disc(cx + dx, cy + dy, 6, `rgba(140,170,255,${0.4 + 0.6 * glow})`);
+        ctx.strokeStyle = 'rgba(140,170,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + dx, cy + dy); ctx.lineTo(cx + dx * 0.55, cy + dy * 0.55); ctx.stroke();
+      }
       break;
     }
   }
@@ -1306,6 +1342,15 @@ function drawMap(t) {
     ctx.fillStyle = '#2b3242';
     if (c.o === 'v') { ctx.fillRect(c.x + 7, c.y + 20, c.w - 14, 20); ctx.fillRect(c.x + 7, c.y + c.h - 40, c.w - 14, 20); }
     else { ctx.fillRect(c.x + 20, c.y + 10, 20, c.h - 17); ctx.fillRect(c.x + c.w - 40, c.y + 10, 20, c.h - 17); }
+  }
+  // מסגרות דלת בכניסה לכל חדר
+  for (const c of MAP.CORRIDORS) {
+    const ends = c.o === 'v' ? [[c.x + 7, c.y + 22, c.w - 14, true], [c.x + 7, c.y + c.h - 30, c.w - 14, true]] : [[c.x + 22, c.y + 10, c.h - 17, false], [c.x + c.w - 30, c.y + 10, c.h - 17, false]];
+    for (const [ex, ey2, len, vert] of ends) {
+      ctx.fillStyle = '#7e8aa3';
+      if (vert) { ctx.fillRect(ex - 3, ey2, 10, 8); ctx.fillRect(ex + len - 7, ey2, 10, 8); ctx.fillStyle = 'rgba(100,210,255,.7)'; ctx.fillRect(ex + 8, ey2 + 2, len - 16, 3); }
+      else { ctx.fillRect(ex, ey2 - 3, 8, 10); ctx.fillRect(ex, ey2 + len - 7, 8, 10); ctx.fillStyle = 'rgba(100,210,255,.7)'; ctx.fillRect(ex + 2, ey2 + 8, 3, len - 16); }
+    }
   }
   // פתחי אוורור
   for (const v of MAP.VENTS) {
