@@ -546,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-173603'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-192953'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1381,7 +1381,7 @@ function openMini(i) {
   miniOpen = i; miniSabIdx = null;
   const T = MAP.TASKS[i];
   miniKind = T.kind;
-  showMini(T.name, T.kind, T.theme || DEFAULT_THEME[T.kind] || 'stars', (S && S.settings.taskLevel) || 2);
+  showMini(T.name, T.kind, T.theme || DEFAULT_THEME[T.kind] || 'stars', 1); // כל משימה – סיבוב אחד בלבד
 }
 let miniKeyHook = null;
 function hideMini() { stopBg(); miniToken++; miniKeyHook = null; show('#mini', false); }
@@ -1767,24 +1767,36 @@ function buildValve(b, tk) {
   if (window.__dbg) window.__dbg.solve = async () => { for (let k = 0; k < 3; k++) { setA(targets[step]); await sleep(750); } };
 }
 function buildBalance(b, tk) {
-  let p = 50, v = 0, prog = 0, dir = 0;
-  b.innerHTML = '<p class="sub" style="margin:8px 0">שמור על הבועה באזור הירוק (חצים ימין/שמאל או הכפתורים)</p><div class="tube"><i class="zone"></i><b class="bub" id="bb"></b></div><div class="bar big"><i id="bbFill"></i></div><div class="row2"><button id="bL">◀</button><button id="bR">▶</button></div>';
-  const nudge = d => { v += d * 0.9; };
+  // הבועה לא זזה לבד: מזיזים אותה (גרירה/לחיצה על הצינור, חיצים או כפתורים). מגיעים לאזור הירוק = סיבוב הושלם. 5 סיבובים.
+  const GOAL = 5, W = 24;
+  let p = 50, n = 0, zc = 0, busy = false;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">הזז את הבועה לאזור הירוק (<span id="bN">0</span>/' + GOAL + ')</p><div class="tube" id="bt" style="touch-action:none;cursor:pointer"><i class="zone" id="bz"></i><b class="bub" id="bb" style="transition:left .08s"></b></div><div class="row2" style="direction:ltr"><button id="bL">◀</button><button id="bR">▶</button></div>';
+  const tube = $('#bt'), zone = $('#bz'), bub = $('#bb');
+  const draw = () => { bub.style.left = p + '%'; };
+  const newZone = () => {
+    do { zc = 15 + Math.random() * 70; } while (Math.abs(zc - p) < 30);
+    zone.style.left = (zc - W / 2) + '%'; zone.style.width = W + '%';
+  };
+  const check = () => {
+    if (busy || !alive(tk)) return;
+    if (Math.abs(p - zc) <= W / 2) {
+      busy = true; n++; $('#bN').textContent = n;
+      zone.style.background = 'rgba(74,222,128,.9)';
+      if (n >= GOAL) { miniDone(); return; }
+      setTimeout(() => { if (!alive(tk)) return; zone.style.background = ''; newZone(); busy = false; }, 350);
+    }
+  };
+  const setP = x => { if (busy) return; p = Math.max(3, Math.min(97, x)); draw(); check(); };
+  const nudge = d => setP(p + d * 6);
+  const fromEvent = e => { const r = tube.getBoundingClientRect(); setP((e.clientX - r.left) / r.width * 100); };
+  let drag = false;
+  tube.onpointerdown = e => { drag = true; tube.setPointerCapture(e.pointerId); fromEvent(e); };
+  tube.onpointermove = e => { if (drag) fromEvent(e); };
+  tube.onpointerup = tube.onpointercancel = () => { drag = false; };
   $('#bL').onclick = () => nudge(-1); $('#bR').onclick = () => nudge(1);
   miniKeyHook = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') nudge(-1); else if (e.code === 'ArrowRight' || e.code === 'KeyD') nudge(1); else if (e.code === 'Escape') closeMini(); };
-  let last = 0;
-  const loop = now => {
-    if (!alive(tk)) return;
-    const k = Math.min(4, (now - (last || now)) / 16.67 || 1); last = now;
-    v += (Math.random() - 0.5) * 0.35 * k; v *= Math.pow(0.985, k); p += v * k; if (p < 3 || p > 97) { v *= -0.5; p = Math.max(3, Math.min(97, p)); }
-    const inz = p > 38 && p < 62; prog = Math.max(0, Math.min(100, prog + (inz ? 0.5 : -0.35) * k));
-    $('#bb').style.left = p + '%'; $('#bbFill').style.width = prog + '%';
-    if (prog >= 100) { miniDone(); return; }
-    requestAnimationFrame(loop);
-  };
-  requestAnimationFrame(loop);
-  if (window.__dbg) window.__dbg.state = () => ({ p, v });
-  if (window.__dbg) window.__dbg.nudge = nudge;
+  newZone(); draw();
+  if (window.__dbg) { window.__dbg.state = () => ({ p, zc, n }); window.__dbg.nudge = nudge; window.__dbg.solve = async () => { for (let k = 0; k < GOAL; k++) { setP(zc); await sleep(450); } }; }
 }
 function buildBins(b) {
   const bins = [{ n: 'אדום', c: '#e53935', i: '🍎' }, { n: 'כחול', c: '#1e63d6', i: '🔹' }, { n: 'ירוק', c: '#22a34a', i: '🥦' }];

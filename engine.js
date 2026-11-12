@@ -450,7 +450,7 @@ function act(p, a) {
       break;
     }
     case 'finish': {
-      if (phase !== 'play' || !p.work || !p.work.mini || p.work.ref.i !== Number(a.i) || p.work.t < 1.5 * settings.taskLevel) return;
+      if (phase !== 'play' || !p.work || !p.work.mini || p.work.ref.i !== Number(a.i) || p.work.t < 1.5) return; // משימה היא סיבוב אחד, בכל אורך משימות
       const r = p.work.ref; p.work = null; completeTask(p, r);
       break;
     }
