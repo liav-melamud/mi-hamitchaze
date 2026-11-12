@@ -26,18 +26,22 @@ const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', '�
 const SPEED = 220, KILL_RANGE = 90, REPORT_RANGE = 110, USE_RANGE = 60;
 const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15, TASK_TIME = 2.5;
 const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
-  const taskTime = i => MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5;
+  // רמת אורך משימות (1 קל, 2 רגיל, 3 ארוך): מאריכה משימות עם פס התקדמות, ומשימות של בוטים
+  const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
+  const botTaskTime = () => 4 + 4 * settings.taskLevel;
+  // בקבוצה קטנה למתחזה קשה יותר, אז זמן ההמתנה בין חיסולים מתקצר קצת
+  const killCdFor = () => { const n = Object.values(players).filter(q => !q.spectator).length; return settings.killCd * (n <= 5 ? 0.7 : n <= 7 ? 0.85 : 1); };
   const isMini = i => !MAP.TASK_TIME[MAP.TASKS[i].kind];
 
 let players = {};
 let phase = 'lobby';
 let hostId = null;
-let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true };
+let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2 };
 let usedLines = new Set();
 let gusts = [], windT = 14;
 // חבלות: sab = משבר פעיל (חשמל/חמצן/כור), דלתות סגורות לפי חדר
-let sab = null, sabCd = 20, doorsUntil = {}, doorCd = 0;
-const SAB_TIME = 45, SAB_CD = 30, DOOR_TIME = 12, DOOR_CD = 14;
+let sab = null, sabCd = 20, doorsUntil = {}, doorCool = {};
+const SAB_TIME = 45, SAB_CD = 30, DOOR_TIME = 12, DOOR_COOL = 20;
 const SAB_WIN = { oxygen: 'האוויר בתחנה נגמר!', reactor: 'הכור התפוצץ!' };
 const doorBlocked = (x, y) => {
   const tN = now();
@@ -59,8 +63,9 @@ function fixSab(i) {
 }
 function closeDoors(roomId) {
   const r = MAP.ROOMS[roomId];
-  if (!r || doorCd > 0 || (doorsUntil[roomId] || 0) > now()) return false;
-  doorsUntil[roomId] = now() + DOOR_TIME; doorCd = DOOR_CD;
+  // אפשר לנעול כמה חדרים שרוצים. לכל חדר יש זמן קירור של 20 שניות אחרי שהדלתות שלו נפתחות
+  if (!r || (doorsUntil[roomId] || 0) > now() || (doorCool[roomId] || 0) > now()) return false;
+  doorsUntil[roomId] = now() + DOOR_TIME; doorCool[roomId] = now() + DOOR_TIME + DOOR_COOL;
   // מי שעומד בתוך הדלת נדחף אל מרכז החדר
   for (const q of list()) {
     if (!q.alive || q.inVent !== null) continue;
@@ -136,16 +141,18 @@ function startGame(by) {
   crew.forEach((p, i) => { p.role = i < specials.length && crew.length > 1 ? specials[i] : 'crew'; });
 
   taskTotal = 0; taskDone = 0;
+  // בקבוצה קטנה כל איש צוות מקבל יותר משימות, כדי שהצוות לא יסיים מהר מדי (לפחות 20 משימות בסך הכל)
+  const tasksEach = Math.min(8, Math.max(settings.tasks, Math.ceil(20 / Math.max(1, crew.length))));
   all.forEach(p => {
     p.alive = true; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
     if (team(p) === 'crew') {
-      p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, settings.tasks).map(i => ({ i, done: false }));
+      p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
     } else p.tasks = [];
   });
   bodies = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); gusts = []; windT = 10 + Math.random() * 8;
-  sab = null; sabCd = 20; doorsUntil = {}; doorCd = 0;
+  sab = null; sabCd = 20; doorsUntil = {}; doorCool = {};
   settings.reveal = false;
   spawnAround(all);
   phase = 'play';
@@ -157,7 +164,7 @@ function backToLobby(by) {
   list().forEach(p => { p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
   spawnAround(list());
   phase = 'lobby'; bodies = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
-  sab = null; sabCd = 20; doorsUntil = {}; doorCd = 0;
+  sab = null; sabCd = 20; doorsUntil = {}; doorCool = {};
 }
 
 function checkWin() {
@@ -194,9 +201,11 @@ function callMeeting(by, body) {
   meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {}, floor: Infinity };
   chat = [];
   bodies = [];
+  // ישיבה פותחת את כל הדלתות, ולכל חדר שנפתח מתחיל זמן קירור
+  for (const rid of Object.keys(doorsUntil)) doorCool[rid] = Math.max(doorCool[rid] || 0, now() + DOOR_COOL);
+  doorsUntil = {};
   list().forEach(p => {
     p.work = null; p.shapeAs = null; p.inVent = null; p.cam = false; p.sabWork = null;
-    doorsUntil = {};
     if (p.bot) {
       const T = settings.meetingTime;
       p.bot.chatAt = T - (2 + Math.random() * 8);
@@ -305,7 +314,7 @@ function act(p, a) {
       if (tgt.shieldUntil > t) { p.killCd = 10; toast(p, '🛡 המטרה מוגנת על ידי מלאך שומר!'); return; }
       tgt.alive = false; tgt.work = null; tgt.cam = false;
       bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color });
-      p.x = tgt.x; p.y = tgt.y; p.killCd = settings.killCd;
+      p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor();
       // בוטים שראו את החיסול זוכרים מי עשה את זה
       list().forEach(o => {
         if (o.bot && o.alive && o.id !== p.id && team(o) === 'crew' && dist(o, tgt) < 330) {
@@ -338,7 +347,7 @@ function act(p, a) {
       break;
     }
     case 'finish': {
-      if (phase !== 'play' || !p.work || !p.work.mini || p.work.ref.i !== Number(a.i) || p.work.t < 1) return;
+      if (phase !== 'play' || !p.work || !p.work.mini || p.work.ref.i !== Number(a.i) || p.work.t < 1.5 * settings.taskLevel) return;
       const r = p.work.ref; p.work = null; completeTask(p, r);
       break;
     }
@@ -399,6 +408,7 @@ function act(p, a) {
       settings.meetingTime = Math.round(cl(a.meetingTime, 20, 180, 60));
       settings.confirm = a.confirm !== false;
       settings.openVotes = a.openVotes !== false;
+      settings.taskLevel = Math.round(cl(a.taskLevel, 1, 3, 2));
       break;
     case 'color': {
       if (phase !== 'lobby') return;
@@ -488,7 +498,7 @@ function botTick(p, dt) {
   }
   if (team(p) === 'imp' && p.alive && !p.inVent) {
     if (!sab && sabCd <= 0 && Math.random() < 0.0005) startSab(pick(['lights', 'lights', 'oxygen', 'reactor']));
-    else if (doorCd <= 0 && Math.random() < 0.0004) closeDoors(pick(Object.keys(MAP.ROOMS)));
+    else if (Math.random() < 0.0003) closeDoors(pick(Object.keys(MAP.ROOMS)));
   }
   if (b.wait > 0) { b.wait -= dt; return; }
   if (p.work || p.sabWork) return;
@@ -696,7 +706,7 @@ function tick() {
   last = t;
 
   if (phase === 'play') {
-    sabCd = Math.max(0, sabCd - dt); doorCd = Math.max(0, doorCd - dt);
+    sabCd = Math.max(0, sabCd - dt);
     for (const rid of Object.keys(doorsUntil)) if (doorsUntil[rid] <= t) delete doorsUntil[rid];
     if (sab && sab.type !== 'lights') {
       sab.t -= dt;
@@ -752,7 +762,7 @@ function tick() {
         if (dist(p, tk) > USE_RANGE + 5 || p.work.ref.done) p.work = null;
         else {
           p.work.t += dt;
-          if ((!p.work.mini || p.isBot) && p.work.t >= (p.isBot && p.work.mini ? 3.5 : taskTime(p.work.ref.i))) { const r = p.work.ref; p.work = null; completeTask(p, r); if (phase !== 'play') break; }
+          if ((!p.work.mini || p.isBot) && p.work.t >= (p.isBot && p.work.mini ? botTaskTime() : taskTime(p.work.ref.i))) { const r = p.work.ref; p.work = null; completeTask(p, r); if (phase !== 'play') break; }
         }
       }
     }
@@ -821,7 +831,7 @@ function viewFor(v) {
     emergencyUsed: v.emergencyUsed, work: v.work && !v.work.mini ? v.work.t / taskTime(v.work.ref.i) : 0,
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
     sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial' }[sab.type], i: v.sabWork.i } : null,
-    sabCd: Math.ceil(sabCd), doorCd: Math.ceil(doorCd),
+    sabCd: Math.ceil(sabCd),
     color: v.color,
   };
   const out = {
@@ -832,6 +842,7 @@ function viewFor(v) {
     camsOn: list().some(q => q.cam && q.alive),
     sab: sab ? { type: sab.type, t: Math.ceil(sab.t), fixed: sab.fixed.slice() } : null,
     doors: Object.keys(doorsUntil).filter(r => doorsUntil[r] > now()),
+    doorCool: Object.fromEntries(Object.keys(doorCool).filter(r => doorCool[r] > now() && !(doorsUntil[r] > now())).map(r => [r, Math.ceil(doorCool[r] - now())])),
     toast: v.toast.splice(0),
     roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat })),
     chat,

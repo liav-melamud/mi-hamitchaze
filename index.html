@@ -152,7 +152,8 @@
   .sdoor { width: clamp(24px, 3.6vw, 40px); height: clamp(24px, 3.6vw, 40px); background: #2a3a58; border: 2px solid #6aa0e8; }
   .sdoor.closed { background: #7a1a1a; border-color: #ff6b6b; }
   .scrit { width: clamp(34px, 5vw, 56px); height: clamp(34px, 5vw, 56px); background: #5a1a1a; border: 3px solid #ff4d4d; box-shadow: 0 0 14px rgba(255,77,77,.5); }
-  .sbtn:disabled { opacity: .35; box-shadow: none; }
+  .sbtn:disabled { opacity: .45; box-shadow: none; }
+  .sdoor small { font-size: clamp(9px, 1.4vw, 14px); font-weight: 800; color: #ffd0d0; }
   #sabBanner { position: fixed; top: 58px; left: 50%; transform: translateX(-50%); z-index: 26; padding: 8px 16px; border-radius: 12px; font-weight: 800; text-align: center; max-width: calc(100vw - 24px); background: rgba(150,20,20,.92); border: 2px solid #ff6b6b; animation: sabblink 1s infinite; }
   #sabBanner.amber { background: rgba(140,90,10,.92); border-color: #ffb547; animation: none; }
   @keyframes sabblink { 50% { background: rgba(90,10,10,.92); } }
@@ -343,6 +344,7 @@
       <label>זמן בין חיסולים <select data-s="killCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="25">25ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
       <label>מהירות שחקנים <select data-s="speed"><option value="0.75">איטי</option><option value="1">רגיל</option><option value="1.25">מהיר</option><option value="1.5">מהיר מאוד</option></select></label>
       <label>טווח ראייה <select data-s="vision"><option value="0.5">קצר מאוד</option><option value="0.75">קצר</option><option value="1">רגיל</option><option value="1.25">רחוק</option><option value="1.5">רחוק מאוד</option></select></label>
+      <label>אורך משימות <select data-s="taskLevel"><option value="1">קצר</option><option value="2">רגיל</option><option value="3">ארוך</option></select></label>
       <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
@@ -448,7 +450,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-140500'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-142037'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -895,9 +897,13 @@ let sabOpen = false, SCHEM_BASE = '';
 })();
 function updateSabMap(s) {
   const me = s.me, active = !!s.sab;
-  $('#sabHint').textContent = active ? 'יש משבר פעיל – אפשר רק לנעול דלתות עד שיתוקן.' : me.sabCd > 0 ? `חבלה גדולה הבאה אפשרית בעוד ${me.sabCd} שניות.` : 'בחר חבלה: משבר גדול (אייקון אדום) או נעילת דלתות של חדר (🚪).';
+  $('#sabHint').textContent = active ? 'יש משבר פעיל – אפשר רק לנעול דלתות עד שיתוקן (כל חדר עם קירור של 20 שניות).' : me.sabCd > 0 ? `חבלה גדולה הבאה אפשרית בעוד ${me.sabCd} שניות.` : 'בחר חבלה: משבר גדול (אייקון אדום), או נעילת דלתות של חדרים (🚪) – אפשר כמה שרוצים, ולכל חדר 20 שניות קירור אחרי שהדלתות נפתחות.';
   document.querySelectorAll('#sabStage .scrit').forEach(b => { b.disabled = active || me.sabCd > 0; });
-  document.querySelectorAll('#sabStage .sdoor').forEach(b => { const closed = (s.doors || []).includes(b.dataset.room); b.classList.toggle('closed', closed); b.disabled = closed || me.doorCd > 0; });
+  document.querySelectorAll('#sabStage .sdoor').forEach(b => {
+    const rid = b.dataset.room, closed = (s.doors || []).includes(rid), cool = (s.doorCool || {})[rid] || 0;
+    b.classList.toggle('closed', closed); b.disabled = closed || cool > 0;
+    b.innerHTML = cool > 0 ? `<small>${cool}</small>` : (closed ? '🔒' : '🚪');
+  });
 }
 // ---------- מפת משימות: איפה המשימות שלי, איפה אני, ואיפה תקלות ----------
 let tmOpen = false;
@@ -1036,17 +1042,23 @@ function openMini(i) {
   miniOpen = i; miniSabIdx = null;
   const T = MAP.TASKS[i];
   miniKind = T.kind;
-  showMini(T.name, T.kind, T.theme || DEFAULT_THEME[T.kind] || 'stars');
+  showMini(T.name, T.kind, T.theme || DEFAULT_THEME[T.kind] || 'stars', (S && S.settings.taskLevel) || 2);
 }
 let miniKeyHook = null;
 function hideMini() { stopBg(); miniToken++; miniKeyHook = null; show('#mini', false); }
-function showMini(title, kind, theme) {
+// משימה יכולה להיות כמה סיבובים (לפי הגדרת "אורך משימות" בלובי): כל סיבוב הוא פאזל חדש
+let miniCur = { kind: null, theme: null, rounds: 1, round: 1, title: '' };
+function showMini(title, kind, theme, rounds) {
+  miniCur = { kind, theme, rounds: rounds || 1, round: 1, title };
+  startBg(theme);
+  buildRound();
+}
+function buildRound() {
   const tk = ++miniToken;
   miniKeyHook = null;
-  $('#miniTitle').textContent = title;
+  $('#miniTitle').textContent = miniCur.title + (miniCur.rounds > 1 ? ` (${miniCur.round}/${miniCur.rounds})` : '');
   show('#mini', true);
-  startBg(theme);
-  (MINI_BUILD[kind] || buildCode)($('#miniBody'), tk);
+  (MINI_BUILD[miniCur.kind] || buildCode)($('#miniBody'), tk);
 }
 const SAB_TITLES = { switches: '💡 החזרת החשמל', code: '💨 תיקון מערכת החמצן', dial: '☢️ קירור הכור' };
 function openSabMini(m) {
@@ -1070,6 +1082,12 @@ function closeMini() {
   miniOpen = null; miniLock = true; hideMini();
 }
 function miniDone() {
+  if (miniSabIdx === null && miniCur.round < miniCur.rounds) {
+    const done = miniCur.round; miniCur.round++; miniToken++;
+    $('#miniBody').innerHTML = `<div class="big" style="color:var(--ok)">✔ סיבוב ${done} הושלם!</div><p class="sub">מתכוננים לסיבוב הבא…</p>`;
+    setTimeout(() => { if (miniOpen !== null) buildRound(); }, 700);
+    return;
+  }
   const i = miniOpen, sabI = miniSabIdx;
   miniLock = true;
   $('#miniBody').innerHTML = '<div class="big" style="color:var(--ok)">✔ הושלם!</div>';
