@@ -317,7 +317,7 @@ function act(p, a) {
       if (!text) return;
       if (phase === 'meeting' && !p.alive) return;
       if (phase !== 'meeting' && phase !== 'lobby') return;
-      say(p, text);
+      say(p, a.voice ? '🎙️ ' + text : text);
       break;
     }
     case 'reveal':
@@ -461,7 +461,12 @@ function say(p, text, silent) {
     e.mentions.forEach(id => { const o = players[id]; if (o && o.bot && o.bot.replies < 2 && o.bot.replyAt < -1) o.bot.replyAt = meeting.t - (1.5 + Math.random() * 2.5); });
   }
   chat.push(e);
-  if (meeting && !silent && (!p.isBot || team(p) === 'imp')) analyze(p, text);
+  if (meeting && !silent && (!p.isBot || team(p) === 'imp')) {
+    const q0 = meeting.queue.length;
+    analyze(p, text);
+    // גם אם לא זוהתה טענה מסוימת – מישהו מהבוטים מראה שהוא שמע אותך
+    if (!p.isBot && meeting.queue.length === q0 && Math.random() < 0.6) acknowledge(p, text);
+  }
   if (chat.length > 60) chat.shift();
 }
 
@@ -478,6 +483,18 @@ function queueSay(bot, text, delay) { meeting.queue.push({ id: bot.id, text, at:
 const IMPORTANT = /ראיתי|משנה צורה|מחסל|הרג|תצביעו|משקר|המתחזה|נמצא|לא נכון|נכון,|סותר|חשוד מאוד|מצאתי|הגופה/;
 const speechDur = text => 0.9 + String(text).length * 0.075;
 const humanTalking = () => list().some(p => !p.isBot && p.talking && now() - p.talkT < 6);
+
+function acknowledge(sp, text) {
+  const bots = shuffle(list().filter(o => o.isBot && o.alive && !o.spectator && o.id !== sp.id));
+  if (!bots.length) return;
+  const n = bare(sp.name);
+  let line;
+  if (/דלג|סקיפ|skip/i.test(text)) line = fresh(['גם אני חושב שכדאי לדלג', 'אין לנו מספיק מידע, אני בעד לדלג', 'דלג זה לא רעיון רע']);
+  else if (/חושד|חשוד|המתחזה|מתחזה|משקר/.test(text)) line = fresh([`למה אתה חושד? יש לך הוכחה, ${n}?`, 'מעניין… על מה אתה מבסס את זה?', 'שמעתי. מי עוד חושב ככה?']);
+  else if (/הייתי|ראיתי|עשיתי/.test(text)) line = fresh(['אוקיי, שמעתי אותך', 'תודה, זה עוזר. מישהו יכול לאשר?', 'נרשם. מי עוד ראה משהו?']);
+  else line = fresh(['שמעתי אותך, ' + n, 'אוקיי, תמשיך', 'מעניין, מה עוד יש לך?', 'אני מקשיב', 'בוא נשמע גם אחרים']);
+  queueSay(bots[0], line, 1.6);
+}
 
 function analyze(sp, text) {
   const room = roomIn(text);

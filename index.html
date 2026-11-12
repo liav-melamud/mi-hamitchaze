@@ -563,6 +563,7 @@ function onState(s) {
   show('#micBtn', !DEMO);
   applyVoice();
   ttsSync(s);
+  recSync(s);
 }
 
 function toast(t) {
@@ -1055,7 +1056,7 @@ async function toggleMic() {
     watchTalk(localStream, 'me');
     for (const k in vOut) delete vOut[k];
     callAll();
-    toast('🎙️ המיקרופון פעיל – החברים שומעים אותך');
+    toast(SR ? '🎙️ המיקרופון פעיל – החברים והבוטים שומעים אותך' : '🎙️ המיקרופון פעיל – החברים שומעים אותך (הבוטים לא שומעים דיבור בדפדפן הזה, נסה Chrome או Edge)');
   } else { micOn = false; }
   $('#micBtn').classList.toggle('on', micOn);
   $('#micBtn').textContent = micOn ? '🎙️' : '🔇';
@@ -1104,7 +1105,7 @@ function speakBot(name, text) {
   u.rate = 0.98 + (h % 4) * 0.04;
   const cap = $('#nowSpeaking');
   u.onstart = () => { clearTimeout(nowTimer); cap.textContent = '🗣️ ' + String(name).replace(/^🤖\s*/, '') + ': ' + clean; cap.classList.remove('hidden'); };
-  u.onend = () => { nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
+  u.onend = () => { botSpeakUntil = Date.now() + 1200; nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
   try { speechSynthesis.speak(u); } catch (e) {}
 }
 function ttsSync(s) {
@@ -1124,6 +1125,36 @@ $('#ttsBtn').onclick = () => {
   refreshTts(); chatLen = -1;
 };
 refreshTts();
+
+// ---------- הבוטים מקשיבים: זיהוי דיבור בדפדפן (עברית) ----------
+// הדפדפן ממיר את מה שאתה אומר לטקסט, והבוטים מגיבים אליו כמו להודעה בצ'אט. פועל בישיבות כשהמיקרופון דלוק.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recWanted = false, botSpeakUntil = 0, recToast = false;
+function startRec() {
+  if (!SR || rec || !recWanted) return;
+  rec = new SR(); rec.lang = 'he-IL'; rec.continuous = true; rec.interimResults = false;
+  rec.onresult = ev => {
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      if (!ev.results[i].isFinal) continue;
+      const text = ev.results[i][0].transcript.trim();
+      // לא "לשמוע" את הבוטים שמדברים מהרמקולים
+      if (!text || Date.now() < botSpeakUntil || (window.speechSynthesis && speechSynthesis.speaking)) continue;
+      api({ type: 'chat', text: text.slice(0, 140), voice: true });
+    }
+  };
+  rec.onend = () => { rec = null; if (recWanted) setTimeout(startRec, 300); };
+  rec.onerror = ev => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { recWanted = false; toast('אין הרשאה לזיהוי דיבור – הבוטים לא ישמעו אותך'); } };
+  try { rec.start(); } catch (e) { rec = null; }
+}
+function stopRec() { recWanted = false; if (rec) { try { rec.stop(); } catch (e) {} rec = null; } }
+function recSync(s) {
+  const want = micOn && s.phase === 'meeting' && s.me.alive && !!SR;
+  if (want && !recWanted) {
+    recWanted = true; startRec();
+    if (!recToast) { recToast = true; toast('🎤 הבוטים מקשיבים לך (הדפדפן שולח את הדיבור לשירות זיהוי)'); }
+  }
+  if (!want && recWanted) stopRec();
+}
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
 const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC' };
