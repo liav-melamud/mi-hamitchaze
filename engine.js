@@ -142,8 +142,16 @@ function completeTask(p, t) {
 
 function callMeeting(by, body) {
   phase = 'alert'; alertT = 3.2; // מסך הכרזה לפני הישיבה
-  const br = body ? MAP.roomAt(body.x, body.y) : null;
-  meeting = { by: by.id, body: body ? body.id : null, room: br ? br.name : 'מסדרון', votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0 };
+  let room = 'מסדרון';
+  if (body) {
+    const br = MAP.roomAt(body.x, body.y);
+    if (br) room = br.name;
+    else { // גופה במסדרון: מציינים ליד איזה חדר
+      const near = Object.values(MAP.ROOMS).sort((x, y) => dist(body, { x: x.cx, y: x.cy }) - dist(body, { x: y.cx, y: y.cy }))[0];
+      room = 'מסדרון ליד ' + near.name;
+    }
+  }
+  meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0 };
   chat = [];
   bodies = [];
   list().forEach(p => {

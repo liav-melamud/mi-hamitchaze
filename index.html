@@ -132,6 +132,12 @@
   #alertTitle { font-size: clamp(26px, 6vw, 44px); font-weight: 900; text-shadow: 0 3px 0 rgba(0,0,0,.5); }
   #alertSub { font-size: 18px; color: #ffd9a0; margin-top: 6px; }
   @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.06); } 100% { transform: none; opacity: 1; } }
+  #gearBtn { position: fixed; bottom: 16px; left: 16px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
+  body.touch #gearBtn { bottom: auto; top: 12px; left: auto; right: 50%; transform: translateX(50%); }
+  #keysPanel { z-index: 45; }
+  #keysList .row { justify-content: space-between; background: #151b2c; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; }
+  #keysList button { min-width: 90px; font-weight: 700; }
+  #keysList button.wait { background: var(--accent); color: #1a1205; }
   @media (max-width: 640px) {
     #actions { grid-template-columns: repeat(3, 70px); gap: 8px; bottom: 12px; right: 12px; }
     #actions button { height: 70px; font-size: 12px; }
@@ -158,6 +164,15 @@
   <div id="actions"></div>
 </div>
 <div id="toasts"></div>
+<button id="gearBtn" title="הגדרות מקשים">⚙️</button>
+<div id="keysPanel" class="screen hidden">
+  <div class="card" style="max-width:460px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">⚙️ הגדרות מקשים</h2><button id="keysClose">✕ סגור</button></div>
+    <p class="sub" style="margin:8px 0 12px">לחץ על מקש ברשימה ואז על המקש החדש שאתה רוצה. החצים תמיד עובדים לתזוזה.</p>
+    <div id="keysList"></div>
+    <button id="keysReset" style="margin-top:12px">↺ חזרה לברירת המחדל</button>
+  </div>
+</div>
 <div id="tut" class="hidden">
   <div id="tutStep"></div>
   <div id="tutTitle"></div>
@@ -226,7 +241,7 @@
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>תפקידים:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר (מגן אחרי מוות) · מתחזה · משנה צורה (מתחפש לאחרים)<br>
-      <b>מקשים:</b> תזוזה <kbd>WASD</kbd>/חצים · שימוש <kbd>E</kbd> · דיווח <kbd>R</kbd> · חיסול <kbd>Q</kbd> · פתח <kbd>V</kbd> · שינוי צורה <kbd>F</kbd> · מגן <kbd>G</kbd> · סימנים <kbd>C</kbd>
+      <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
     </div>
   </div>
 </div>
@@ -341,7 +356,7 @@ function runEngine(name, demo) {
 // ---------- דמו: משחק מול בוטים עם הדרכה צעד-אחר-צעד ----------
 let DEMO = false, tutStep = 0, tutStart = null, tutTasks = 0;
 const TUT = [
-  { t: 'זוז עם המקשים', keys: true, d: 'במחשב: <span dir="ltr"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span> או החצים. בטלפון: הג׳ויסטיק בפינה.' },
+  { t: 'זוז עם המקשים', keys: true, d: 'במחשב: המקשים שמסומנים למטה או החצים. בטלפון: הג׳ויסטיק בפינה.' },
   { t: 'לך לסימן הצהוב ❗', d: 'החץ הצהוב מראה לך לאן ללכת. כל ❗ הוא משימה שלך.', arrow: 'task' },
   { t: 'בצע את המשימה', d: 'לחץ <kbd>E</kbd> (או ✋ שימוש). בחלק מהמשימות פשוט מחכים שהפס יתמלא, ובאחרות נפתח מיני-משחק: חיבור כבלים, קוד או מחוג.', arrow: 'task' },
   { t: 'כנס ישיבת חירום 🚨', d: 'לך לכפתור האדום בחדר האוכל ולחץ <kbd>E</kbd>.', arrow: 'button' },
@@ -505,6 +520,7 @@ function onState(s) {
   show('#hud', s.phase === 'play');
   show('#meeting', s.phase === 'meeting');
   show('#alert', s.phase === 'alert');
+  if (s.phase !== 'alert') alertSig = '';
   if (s.phase === 'alert') renderAlert(s);
   show('#eject', s.phase === 'eject');
   show('#end', s.phase === 'end');
@@ -682,7 +698,7 @@ let alertSig = '';
 function renderAlert(s) {
   const a = s.alert;
   if (!a) return;
-  const sig = a.name + a.body + a.bodyName + Date.now() / 4000 | 0;
+  const sig = JSON.stringify(a);
   if (sig === alertSig) return;
   alertSig = sig;
   $('#alertBox').className = a.body ? 'body' : 'btn';
@@ -926,15 +942,49 @@ function renderHats(s) {
 }
 $('#hats').onclick = e => { const b = e.target.closest('button'); if (b) api({ type: 'hat', hat: +b.dataset.h }); };
 
+// ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים' };
+let KEYS = { ...DEFAULT_KEYS };
+try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
+let capturing = null;
+const keyLabel = code => !code ? '—' : code.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ')
+  .replace('Space', 'רווח').replace('ShiftLeft', 'Shift').replace('ShiftRight', 'Shift').replace('ControlLeft', 'Ctrl').replace('ControlRight', 'Ctrl')
+  .replace('Enter', 'Enter').replace('Tab', 'Tab').replace('Semicolon', ';').replace('Comma', ',').replace('Period', '.');
+function saveKeys() { try { localStorage.setItem('mm_keys', JSON.stringify(KEYS)); } catch (e) {} refreshKeyLabels(); }
+function refreshKeyLabels() {
+  for (const b of $('#actions').children) { const k = b.querySelector('.k'); if (k) k.textContent = keyLabel(KEYS[b.dataset.a]); }
+  document.querySelectorAll('.keys b').forEach(b => { const arrow = { up: '↑', down: '↓', left: '←', right: '→' }[b.dataset.k]; b.textContent = keyLabel(KEYS[b.dataset.k]) + ' ' + arrow; });
+  $('#keysHelp').innerHTML = `תזוזה <kbd>${keyLabel(KEYS.up)}${keyLabel(KEYS.left)}${keyLabel(KEYS.down)}${keyLabel(KEYS.right)}</kbd>/חצים · ` +
+    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
+  $('#keysList').innerHTML = Object.keys(DEFAULT_KEYS).map(a =>
+    `<div class="row"><span>${KEY_NAMES[a]}</span><button data-a="${a}" class="${capturing === a ? 'wait' : ''}">${capturing === a ? 'לחץ מקש…' : keyLabel(KEYS[a])}</button></div>`).join('');
+}
+$('#gearBtn').onclick = () => { capturing = null; refreshKeyLabels(); show('#keysPanel', true); };
+$('#keysClose').onclick = () => { capturing = null; show('#keysPanel', false); };
+$('#keysReset').onclick = () => { KEYS = { ...DEFAULT_KEYS }; capturing = null; saveKeys(); };
+$('#keysList').onclick = e => { const b = e.target.closest('button'); if (b) { capturing = b.dataset.a; refreshKeyLabels(); } };
+addEventListener('keydown', e => {
+  if (!capturing) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (e.code !== 'Escape') {
+    // אם המקש כבר תפוס – מחליפים בין השניים
+    const other = Object.keys(KEYS).find(a => KEYS[a] === e.code && a !== capturing);
+    if (other) KEYS[other] = KEYS[capturing];
+    KEYS[capturing] = e.code;
+  }
+  capturing = null; saveKeys();
+}, true);
+
 // ---------- קלט ----------
 const keys = new Set();
 let lastIn = '';
 function sendInput() {
   let dx = 0, dy = 0;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
-  if (keys.has('KeyW') || keys.has('ArrowUp')) dy -= 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) dy += 1;
+  if (keys.has(KEYS.left) || keys.has('ArrowLeft')) dx -= 1;
+  if (keys.has(KEYS.right) || keys.has('ArrowRight')) dx += 1;
+  if (keys.has(KEYS.up) || keys.has('ArrowUp')) dy -= 1;
+  if (keys.has(KEYS.down) || keys.has('ArrowDown')) dy += 1;
   if (joy.active) { dx = joy.dx; dy = joy.dy; }
   const kc = { up: dy < 0, down: dy > 0, left: dx < 0, right: dx > 0 };
   document.querySelectorAll('.keys b').forEach(b => b.classList.toggle('on', !!kc[b.dataset.k]));
@@ -963,17 +1013,19 @@ addEventListener('touchstart', e => {
   if (Math.min(...ys) < innerHeight * 0.2 && Math.max(...ys) > innerHeight * 0.8) secretToggle();
 }, { passive: true });
 
-const HOT = { KeyE: 'use', KeyR: 'report', KeyQ: 'kill', KeyV: 'vent', KeyF: 'shift', KeyG: 'shield', KeyC: 'vitals' };
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals'].find(a => KEYS[a] === code);
+const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || capturing) return;
   if (miniOpen !== null) { miniKey(e); return; }
   if (S && S.phase === 'play' && S.me.inVent !== null && S.me.inVent !== undefined && /^Digit[1-9]$/.test(e.code)) {
     const l = MAP.VENTS[S.me.inVent].links[+e.code.slice(5) - 1];
     if (l !== undefined) api({ type: 'ventMove', to: l });
     return;
   }
-  if (HOT[e.code] && !e.repeat) { doAction(HOT[e.code]); return; }
-  if (/^(Key[WASD]|Arrow)/.test(e.code)) { keys.add(e.code); sendInput(); e.preventDefault(); }
+  const act = actionForKey(e.code);
+  if (act && !e.repeat) { doAction(act); return; }
+  if (MOVE_CODES().includes(e.code)) { keys.add(e.code); sendInput(); e.preventDefault(); }
 });
 addEventListener('keyup', e => { keys.delete(e.code); sendInput(); });
 addEventListener('blur', () => { keys.clear(); sendInput(); });
@@ -1391,6 +1443,8 @@ function frame(t) {
   }
 }
 requestAnimationFrame(frame);
+refreshKeyLabels();
+if (isTouch) document.body.classList.add('touch');
 </script>
 </body>
 </html>
