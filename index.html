@@ -247,6 +247,10 @@
   #staleBar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #b4590b; color: #fff; padding: 10px 14px; text-align: center; font-weight: 700; }
   #staleBar button { margin-right: 10px; background: #fff; color: #7a3a00; }
   body.cams-on #rolecard, body.cams-on #taskbar, body.cams-on #topleft, body.cams-on #workbar, body.cams-on #tut { display: none !important; }
+  #appBox { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+  #appBox a.dl { display: block; text-align: center; padding: 12px; border-radius: 12px; background: #1f6f4a; color: #fff; font-weight: 800; text-decoration: none; }
+  #appBox details { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+  #appBox summary { cursor: pointer; }
   #gearBtn { position: fixed; bottom: 16px; left: 16px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
   #keysPanel { z-index: 45; }
   #keysList .row { justify-content: space-between; background: #151b2c; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; }
@@ -357,6 +361,7 @@
       <button id="joinBtn">הצטרף לחדר</button>
     </div>
     <p id="joinStatus" class="sub" style="margin:12px 0 0;min-height:1.2em"></p>
+    <div id="appBox" class="hidden"></div>
   </div>
 </div>
 
@@ -501,7 +506,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-144340'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-145611'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -1889,7 +1894,17 @@ refreshTts();
 
 // ---------- הבוטים מקשיבים: זיהוי דיבור בדפדפן (עברית) ----------
 // הדפדפן ממיר את מה שאתה אומר לטקסט, והבוטים מגיבים אליו כמו להודעה בצ'אט. פועל בישיבות כשהמיקרופון דלוק.
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+// באפליקציית האנדרואיד אין webkitSpeechRecognition, אז יש גשר לזיהוי הדיבור של המכשיר (AndroidSpeech)
+class NativeSR {
+  constructor() { this.lang = 'he-IL'; this.continuous = true; this.interimResults = true; }
+  start() { window.__nsr = this; if (this.onstart) this.onstart(); window.AndroidSpeech.start(this.lang); }
+  stop() { try { window.AndroidSpeech.stop(); } catch (e) {} }
+}
+window.__nsrResult = (text, isFinal) => { const r = window.__nsr; if (!r || !r.onresult) return; const item = [{ transcript: text }]; item.isFinal = !!isFinal; r.onresult({ resultIndex: 0, results: [item] }); };
+window.__nsrEnd = () => { const r = window.__nsr; if (r && r.onend) r.onend(); };
+window.__nsrError = code => { const r = window.__nsr; if (r && r.onerror) r.onerror({ error: code }); };
+const IN_APP = /MiHamitchazeApp/.test(navigator.userAgent);
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition || (window.AndroidSpeech ? NativeSR : null);
 let rec = null, recWanted = false, botSpeakUntil = 0, recToast = false;
 let heardText = '', heardMsg = '', listening = false, heardMsgTimer = null;
 // שורת "מה שמעתי": מראה בזמן אמת מה הדפדפן מזהה, כדי שתדע שהבוטים באמת קולטים אותך
@@ -1945,6 +1960,30 @@ function renderLobbyChat(s) {
 const sendLobby = () => { const t = $('#lobbyIn').value.trim(); if (t) api({ type: 'chat', text: t }); $('#lobbyIn').value = ''; };
 $('#lobbySend').onclick = sendLobby;
 $('#lobbyIn').onkeydown = e => { if (e.key === 'Enter') sendLobby(); e.stopPropagation(); };
+
+// ---------- הורדת אפליקציה (אנדרואיד) ----------
+const APK_URL = 'https://github.com/liav-melamud/mi-hamitchaze/releases/download/app/mi-hamitchaze.apk';
+(function () {
+  const box = $('#appBox');
+  if (IN_APP) return;
+  const ua = navigator.userAgent, android = /Android/i.test(ua), ios = /iPhone|iPad|iPod/i.test(ua);
+  let h = '';
+  if (android) {
+    h = `<a class="dl" href="${APK_URL}">📲 הורד את האפליקציה לאנדרואיד</a>
+      <details><summary>איך מתקינים?</summary>
+        1. לחץ על "הורד" ואשר את ההורדה.<br>
+        2. אם אנדרואיד שואל, אפשר לדפדפן "להתקין אפליקציות ממקור לא ידוע".<br>
+        3. פתח את הקובץ שהורד ולחץ "התקן".<br>
+        4. אם מופיעה אזהרה של Play Protect, בחר "התקן בכל זאת" (האפליקציה לא ב-Google Play).<br>
+        האפליקציה פותחת את המשחק האונליין במסך מלא, עם מיקרופון וזיהוי דיבור.
+      </details>`;
+  } else if (ios) {
+    h = `<div class="sub" style="margin:0">📲 ב-iPhone: לחץ על כפתור השיתוף ואז "הוסף למסך הבית" – והמשחק נפתח כמו אפליקציה במסך מלא.</div>`;
+  } else {
+    h = `<div class="sub" style="margin:0">📲 יש גם אפליקציה לאנדרואיד: <a href="${APK_URL}" style="color:var(--accent)">הורדה ישירה</a> (פתח את האתר בטלפון כדי לקבל הוראות התקנה).</div>`;
+  }
+  box.innerHTML = h; box.classList.remove('hidden');
+})();
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
 const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH' };
