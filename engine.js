@@ -936,7 +936,21 @@ function viewFor(v) {
   }
   function setConn(id, on) { const p = players[id]; if (p) { p.conn = on; p.lastSeen = now(); } }
   function setHost(id) { hostId = id; }
-  return { join, act: (id, a) => act(players[id], a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost };
+  // שמירה ושחזור של מצב המשחק (כדי שמארח שנפל יוכל להמשיך מאותה נקודה)
+  function snapshot() {
+    return JSON.stringify({ v: 1, saved: now(), players, phase, hostId, settings, bodies, meeting, eject, winner, chat, taskTotal, taskDone, sab, doorsUntil, doorCool, sabCd, alertT, gusts, usedLines: [...usedLines] });
+  }
+  function restore(json) {
+    const o = JSON.parse(json);
+    players = o.players || {}; phase = o.phase || 'lobby'; hostId = o.hostId; Object.assign(settings, o.settings || {});
+    bodies = o.bodies || []; meeting = o.meeting || null; eject = o.eject || null; winner = o.winner || null; chat = o.chat || [];
+    taskTotal = o.taskTotal || 0; taskDone = o.taskDone || 0; sab = o.sab || null; doorsUntil = o.doorsUntil || {}; doorCool = o.doorCool || {};
+    sabCd = o.sabCd || 0; alertT = o.alertT || 0; gusts = o.gusts || []; usedLines = new Set(o.usedLines || []);
+    if (meeting && (meeting.floor === null || meeting.floor === undefined)) meeting.floor = Infinity;
+    for (const p of Object.values(players)) { p.conn = p.isBot; p.lastSeen = now(); p.input = { dx: 0, dy: 0 }; p.talking = false; }
+    last = now();
+  }
+  return { join, act: (id, a) => act(players[id], a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost, snapshot, restore, hasPlayer: id => !!players[id] };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = createGame;
 else root.createGame = createGame;

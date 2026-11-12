@@ -251,6 +251,7 @@
   #appBox a.dl { display: block; text-align: center; padding: 12px; border-radius: 12px; background: #1f6f4a; color: #fff; font-weight: 800; text-decoration: none; }
   #appBox details { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.7; }
   #appBox summary { cursor: pointer; }
+  #netBar { position: fixed; top: 0; left: 0; right: 0; z-index: 99; background: #8a4a0a; color: #fff; padding: 8px 14px; text-align: center; font-weight: 700; font-size: 14px; }
   #gearBtn { position: fixed; bottom: 16px; left: 16px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
   #keysPanel { z-index: 45; }
   #keysList .row { justify-content: space-between; background: #151b2c; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; }
@@ -354,6 +355,7 @@
     <p class="sub">משחק חשיפה חברתי עם חברים – תחנת החלל נוגה</p>
     <input id="nameIn" maxlength="14" placeholder="הכינוי שלך" style="width:100%;margin-bottom:12px" autocomplete="off">
     <button id="demoBtn" style="width:100%;margin-bottom:10px;background:#1f6f4a">🎮 נסה דמו – למד לשחק מול בוטים</button>
+    <button id="resumeBtn" class="hidden" style="width:100%;margin-bottom:10px;background:#7a4a10;border:2px solid var(--accent)"></button>
     <button id="hostBtn" class="primary" style="width:100%;margin-bottom:4px">✨ צור חדר חדש ואָרֵח</button>
     <p class="sub" style="font-size:13px;margin:0 0 14px">כל אחד יכול ליצור חדר משלו – מי שיוצר הוא המארח, ושולח לחברים את הקוד.</p>
     <div class="row">
@@ -411,7 +413,7 @@
     <div class="help">
       <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול)<br>
       <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה ל-8ש׳) · מרקיב (גופות מתפרקות)<br>
-      <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span></span><br>
+      <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span> · קול: <span id="linkInfo">לא פעיל</span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
     </div>
@@ -506,7 +508,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-145611'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-151146'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -551,13 +553,23 @@ function getName() {
 }
 
 // מריץ את מנוע המשחק בדפדפן הזה (מארח או דמו)
-function runEngine(name, demo) {
+function runEngine(name, demo, resume) {
   isHost = true;
   engine = createGame(MAP, { demo });
-  ID = engine.join(name);
+  if (resume && resume.snapshot) { try { engine.restore(resume.snapshot); } catch (e) { console.warn('restore failed', e); } }
+  ID = engine.join(name, resume && resume.pid);
+  if (resume && resume.snapshot) engine.setHost(ID);
   // שעון ב-Worker כדי שהמשחק ימשיך לרוץ גם כשהלשונית של המארח ברקע
   let tickN = 0;
-  const onTick = () => { engine.tick(); if (++tickN % 2 === 0) broadcast(); };
+  const saveSnap = () => {
+    if (demo) return;
+    try {
+      localStorage.setItem('mm_snap_' + ROOM, engine.snapshot());
+      localStorage.setItem('mm_host_last', JSON.stringify({ room: ROOM, t: Date.now(), name, pid: ID }));
+    } catch (e) { /* אחסון מלא או חסום */ }
+  };
+  addEventListener('pagehide', saveSnap);
+  const onTick = () => { engine.tick(); if (++tickN % 2 === 0) broadcast(); if (tickN % 60 === 0) saveSnap(); };
   try {
     const w = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(0),33)'], { type: 'text/javascript' })));
     w.onmessage = onTick;
@@ -636,21 +648,24 @@ function tutTarget() {
   return best;
 }
 
-function hostGame(name, tries = 0) {
+function hostGame(name, tries = 0, resume = null) {
   if (typeof Peer === 'undefined') return status('לא הצלחתי לטעון את ספריית החיבור – בדוק חיבור לאינטרנט');
   busy(true);
-  ROOM = makeCode();
-  status('יוצר חדר…');
+  ROOM = resume ? resume.room : makeCode();
+  status(resume ? 'ממשיך את החדר ' + ROOM + '…' : 'יוצר חדר…');
   peer = new Peer(PREFIX + ROOM, { config: ICE });
   peer.on('call', onCall);
-  peer.on('open', () => { runEngine(name, false); afterJoin(); setInterval(sendVoicePeers, 3000); });
+  peer.on('open', () => { runEngine(name, false, resume); afterJoin(); setInterval(sendVoicePeers, 3000); });
   peer.on('connection', c => {
     c.on('data', d => {
       if (!d || typeof d !== 'object') return;
       if (d.type === 'join') {
-        // חזרה עם אותו מזהה מותרת רק אם השחקן הזה לא מחובר כרגע
-        const taken = Object.values(guests).some(g => g.pid === d.id) || d.id === ID;
-        const pid = engine.join(String(d.name || 'שחקן'), taken ? null : d.id);
+        // חזרה עם אותו מזהה: אם נשאר חיבור ישן תקוע של אותו שחקן, מחליפים אותו בחדש
+        if (d.id && d.id !== ID) {
+          for (const [pr, g] of Object.entries(guests)) if (g.pid === d.id && pr !== c.peer) { try { g.conn.close(); } catch (e) {} delete guests[pr]; }
+        }
+        const pid = engine.join(String(d.name || 'שחקן'), d.id === ID ? null : d.id);
+        engine.setConn(pid, true);
         guests[c.peer] = { conn: c, pid };
         c.send({ type: 'joined', id: pid, room: ROOM, v: VERSION });
         if (d.v && d.v !== VERSION && VERSION !== 'dev' && d.v !== 'dev') toast('⚠️ ' + String(d.name || 'חבר') + ' משתמש בגרסה אחרת של המשחק – כדאי שירענן');
@@ -663,35 +678,96 @@ function hostGame(name, tries = 0) {
     c.on('close', () => { const g = guests[c.peer]; if (g) { engine.setConn(g.pid, false); delete guests[c.peer]; } });
   });
   peer.on('error', e => {
-    if (e.type === 'unavailable-id' && tries < 5 && !isHost) { peer.destroy(); hostGame(name, tries + 1); return; }
+    if (e.type === 'unavailable-id' && !isHost) {
+      // בהמשך חדר: מחכים שהחדר הישן ישתחרר אצל השרת (עד כ-50 שניות), ובחדר חדש מנסים קוד אחר
+      if (resume && tries < 25) { status('ממתין לשחרור החדר ' + ROOM + '… (' + (tries + 1) + '/25)'); try { peer.destroy(); } catch (er) {} setTimeout(() => hostGame(name, tries + 1, resume), 2000); return; }
+      if (!resume && tries < 5) { try { peer.destroy(); } catch (er) {} hostGame(name, tries + 1); return; }
+    }
     if (!isHost) { busy(false); status('שגיאה ביצירת חדר: ' + e.type); }
   });
 }
 
-function joinGame(name, code) {
+// זיכרון של המזהה שלי בחדר (נשמר גם אחרי סגירת הלשונית), כדי לחזור לאותו מקום במשחק
+const rememberId = (room, id) => { ss.set('mm_id_' + room, id); try { localStorage.setItem('mm_id_' + room, JSON.stringify({ id, t: Date.now() })); } catch (e) {} };
+const recallId = room => {
+  const a = ss.get('mm_id_' + room); if (a) return a;
+  try { const o = JSON.parse(localStorage.getItem('mm_id_' + room) || 'null'); if (o && Date.now() - o.t < 6 * 3600 * 1000) return o.id; } catch (e) {}
+  return null;
+};
+let guestCtx = null, reconnecting = false, reconnectTries = 0, retryTimer = null;
+function netBar(text) {
+  let el = $('#netBar');
+  if (!text) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'netBar'; document.body.appendChild(el); }
+  el.textContent = text;
+}
+function resetVoiceState() {
+  for (const c of Object.values(vCalls)) { try { c.close(); } catch (e) {} }
+  for (const k of Object.keys(vCalls)) delete vCalls[k];
+  for (const k of Object.keys(vOut)) delete vOut[k];
+  for (const el of Object.values(vAudio)) { try { el.srcObject = null; el.remove(); } catch (e) {} }
+  for (const k of Object.keys(vAudio)) delete vAudio[k];
+  vPeerMap = {};
+}
+function scheduleRetry() {
+  if (retryTimer || !guestCtx) return;
+  if (++reconnectTries > 70) { giveUpReconnect(); return; }
+  retryTimer = setTimeout(() => { retryTimer = null; joinGame(guestCtx.name, guestCtx.code, true); }, reconnectTries < 6 ? 1500 : 3000);
+}
+function lostConn() {
+  if (!guestCtx) return;
+  reconnecting = true;
+  netBar(S && S.phase !== 'lobby' ? '🔄 החיבור נפל – מתחבר מחדש לאותו משחק… (אם המארח נפל, הוא יכול ללחוץ "המשך את החדר הקודם")' : '🔄 החיבור נפל – מתחבר מחדש…');
+  scheduleRetry();
+}
+function giveUpReconnect() {
+  reconnecting = false; guestCtx = null; netBar('');
+  lost();
+}
+function joinGame(name, code, silent) {
   if (typeof Peer === 'undefined') return status('לא הצלחתי לטעון את ספריית החיבור – בדוק חיבור לאינטרנט');
   code = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 4) return status('הקוד צריך להיות 4 תווים');
-  busy(true);
+  guestCtx = { name, code };
+  if (!silent) { busy(true); status('מתחבר לחדר ' + code + '…'); }
   ROOM = code;
-  status('מתחבר לחדר ' + ROOM + '…');
-  peer = new Peer(undefined, { config: ICE });
+  try { if (peer) peer.destroy(); } catch (e) {}
+  resetVoiceState();
+  const myPeer = peer = new Peer(undefined, { config: ICE });
   peer.on('call', onCall);
+  // שעון עצר: אם ניסיון ההתחברות נתקע בלי תשובה, מנסים שוב (או מודיעים למשתמש)
+  const stuck = () => {
+    if (peer !== myPeer || (conn && conn.open && conn.peer === PREFIX + ROOM && !reconnecting)) return;
+    if (reconnecting || silent) scheduleRetry();
+    else { busy(false); status('החיבור לחדר לא נענה – בדוק את הקוד והאינטרנט ונסה שוב'); }
+  };
+  const wdPeer = setTimeout(() => { if (!myPeer.open) stuck(); }, 10000);
   peer.on('open', () => {
-    conn = peer.connect(PREFIX + ROOM, { reliable: true });
-    conn.on('open', () => conn.send({ type: 'join', name, id: ss.get('mm_id_' + ROOM), v: VERSION }));
-    conn.on('data', d => {
-      if (d.type === 'joined') { ID = d.id; ss.set('mm_id_' + ROOM, ID); afterJoin(); if (d.v && d.v !== VERSION && d.v !== 'dev' && VERSION !== 'dev') staleBanner(); }
-      else if (d.type === 'state') onState(d.s);
+    clearTimeout(wdPeer);
+    const myConn = peer.connect(PREFIX + ROOM, { reliable: true });
+    conn = myConn;
+    const wdConn = setTimeout(() => { if (conn === myConn && !myConn.open) stuck(); }, 8000);
+    myConn.on('open', () => { clearTimeout(wdConn); myConn.send({ type: 'join', name, id: recallId(ROOM), v: VERSION }); });
+    myConn.on('data', d => {
+      if (d.type === 'joined') {
+        ID = d.id; rememberId(ROOM, ID);
+        if (reconnecting) { reconnecting = false; reconnectTries = 0; netBar(''); toast('✅ התחברת מחדש'); }
+        afterJoin();
+        if (d.v && d.v !== VERSION && d.v !== 'dev' && VERSION !== 'dev') staleBanner();
+      } else if (d.type === 'state') onState(d.s);
       else if (d.type === 'voicePeers') setPeers(d.list);
     });
-    conn.on('close', lost);
+    myConn.on('close', () => { if (conn === myConn) lostConn(); });
+    myConn.on('error', () => { if (conn === myConn) lostConn(); });
   });
   peer.on('error', e => {
+    if (reconnecting || silent) { scheduleRetry(); return; }
     busy(false);
     status(e.type === 'peer-unavailable' ? 'לא נמצא חדר עם הקוד הזה' : 'שגיאת חיבור: ' + e.type);
   });
 }
+addEventListener('online', () => { if (reconnecting) { clearTimeout(retryTimer); retryTimer = null; scheduleRetry(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && reconnecting) { clearTimeout(retryTimer); retryTimer = null; scheduleRetry(); } });
 
 function afterJoin() {
   status('');
@@ -713,6 +789,19 @@ const urlRoom = new URLSearchParams(location.search).get('room');
 if (urlRoom) { $('#codeIn').value = urlRoom.toUpperCase(); $('#joinBtn').classList.add('primary'); }
 $('#hostBtn').onclick = () => hostGame(getName());
 $('#demoBtn').onclick = startDemo;
+// המשך חדר שהייתי המארח שלו (אחרי נפילה, רענון או סגירה בטעות)
+(function () {
+  try {
+    const last = JSON.parse(localStorage.getItem('mm_host_last') || 'null');
+    if (!last || Date.now() - last.t > 45 * 60 * 1000) return;
+    const snap = localStorage.getItem('mm_snap_' + last.room);
+    if (!snap) return;
+    const b = $('#resumeBtn');
+    b.textContent = `▶ המשך את החדר הקודם שלך (${last.room})`;
+    b.classList.remove('hidden');
+    b.onclick = () => hostGame(getName(), 0, { room: last.room, snapshot: snap, pid: last.pid });
+  } catch (e) {}
+})();
 document.querySelectorAll('.exitDemo').forEach(b => b.onclick = () => { location.href = location.pathname; });
 $('#tutClose').onclick = () => { tutStep = TUT.length; renderTut(); };
 $('#joinBtn').onclick = () => joinGame(getName(), $('#codeIn').value);
@@ -1984,6 +2073,23 @@ const APK_URL = 'https://github.com/liav-melamud/mi-hamitchaze/releases/download
   }
   box.innerHTML = h; box.classList.remove('hidden');
 })();
+
+// חיווי איכות חיבור הקול: ישיר בין המכשירים, או דרך שרת ממסר (איטי יותר אבל עובד בין רשתות)
+async function updateLinkInfo() {
+  const el = $('#linkInfo'); if (!el || !peer || !peer.connections) return;
+  const kinds = new Set();
+  for (const arr of Object.values(peer.connections)) for (const c of arr) {
+    if (c.type !== 'media' || !c.peerConnection || c.peerConnection.connectionState !== 'connected') continue;
+    try {
+      const st = await c.peerConnection.getStats(); let pair = null; const cands = {};
+      st.forEach(r => { if (r.type === 'candidate-pair' && (r.nominated || r.selected) && r.state === 'succeeded') pair = r; if (r.type === 'remote-candidate' || r.type === 'local-candidate') cands[r.id] = r; });
+      if (pair) { const a = cands[pair.localCandidateId], b = cands[pair.remoteCandidateId]; kinds.add(((a && a.candidateType) === 'relay' || (b && b.candidateType) === 'relay') ? 'ממסר' : 'ישיר'); }
+    } catch (e) {}
+  }
+  const n = Object.values(peer.connections).flat().filter(c => c.type === 'media').length;
+  el.textContent = kinds.size ? [...kinds].join(' + ') : (n ? 'מתחבר…' : (micOn ? 'ממתין לחברים' : 'לא פעיל'));
+}
+setInterval(updateLinkInfo, 4000);
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
 const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH' };
