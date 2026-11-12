@@ -12,7 +12,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: "Rubik", "Assistant", "Segoe UI", Arial, sans-serif; -webkit-user-select: none; user-select: none; }
-  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
   button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; padding: 10px 16px; background: #2a3350; color: var(--text); }
   button:disabled { opacity: .4; cursor: default; }
   button.primary { background: var(--accent); color: #1a1205; font-weight: 700; }
@@ -99,6 +99,31 @@
   .keys b { height: 44px; display: flex; align-items: center; justify-content: center; background: #22293d; border-radius: 9px; border-bottom: 4px solid #11162a; font-size: 14px; transition: all .08s; }
   .keys b.on { background: var(--accent); color: #1a1205; border-bottom-width: 1px; transform: translateY(3px); }
   body.meeting-on #tut { top: auto; bottom: 12px; }
+  #hats { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin: 6px 0 14px; }
+  #hats button { padding: 2px; background: #151b2c; border: 2px solid transparent; border-radius: 12px; display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--muted); }
+  #hats button.sel { border-color: var(--accent); color: var(--text); }
+  #hats canvas { width: 56px; height: 56px; }
+  #mini .card { max-width: 460px; }
+  .wires { position: relative; height: 280px; direction: ltr; background: #10162a; border-radius: 12px; margin-top: 8px; }
+  .wires svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .wcol { position: absolute; top: 20px; bottom: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+  .wcol.l { left: 16px; } .wcol.r { right: 16px; }
+  .wcol button { width: 54px; height: 34px; border-radius: 8px; border: 3px solid rgba(0,0,0,.35); padding: 0; }
+  .wcol button.sel { outline: 3px solid #fff; }
+  .wcol button:disabled { opacity: 1; filter: brightness(.7); }
+  .gauge { position: relative; width: 240px; height: 120px; margin: 14px auto; border-radius: 120px 120px 0 0; background: #1b2236; border: 3px solid #3a4870; border-bottom: 0; overflow: hidden; }
+  .gauge .needle, .gauge .mark { position: absolute; left: 50%; bottom: 0; width: 4px; height: 108px; margin-left: -2px; transform-origin: 50% 100%; background: #fff; border-radius: 3px; }
+  .gauge .mark { width: 14px; margin-left: -7px; background: rgba(74,222,128,.45); }
+  .code-show { font-size: 34px; letter-spacing: 10px; font-weight: 800; color: var(--accent); direction: ltr; }
+  .code-in { font-size: 30px; letter-spacing: 10px; direction: ltr; margin: 8px 0; background: #10162a; border-radius: 10px; padding: 6px; }
+  .code-in.bad { background: #5a1a1a; }
+  .pad { display: grid; grid-template-columns: repeat(3, 70px); gap: 8px; justify-content: center; direction: ltr; }
+  .pad button { height: 52px; font-size: 22px; font-weight: 700; }
+  #ventPanel { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 2px solid #59647e; border-radius: 14px; padding: 10px 14px; text-align: center; }
+  #ventPanel .row { justify-content: center; margin-top: 8px; }
+  #settingsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 6px 0; font-size: 14px; }
+  #settingsGrid label { display: flex; justify-content: space-between; align-items: center; gap: 6px; background: #151b2c; padding: 6px 10px; border-radius: 10px; }
+  #settingsGrid select { padding: 4px 6px; }
   @media (max-width: 640px) {
     #actions { grid-template-columns: repeat(3, 70px); gap: 8px; bottom: 12px; right: 12px; }
     #actions button { height: 70px; font-size: 12px; }
@@ -116,12 +141,12 @@
   <div id="taskbar">משימות הצוות <span id="tasktxt"></span><div class="bar"><i id="taskfill"></i></div></div>
   <div id="rolecard"><div id="rolename"></div><div id="roledesc"></div><ul id="tasklist"></ul></div>
   <div id="topleft">
-    <button id="revealBtn" class="hidden">👁 חשיפת תפקידים <kbd>H</kbd></button>
     <div id="revealBadge" class="hidden">👁 מצב חשיפה פעיל – כולם רואים את כל התפקידים</div>
   </div>
   <div id="vitals" class="hidden"></div>
   <div id="workbar" class="hidden">מבצע משימה…<div class="bar"><i id="workfill"></i></div></div>
   <div id="ghostBadge" class="hidden">👻 אתה רוח – רק רוחות רואות אותך</div>
+  <div id="ventPanel" class="hidden"><b>🕳️ אתה בתוך פתח אוורור – אף אחד לא רואה אותך</b><div class="row" id="ventBtns"></div></div>
   <div id="actions"></div>
 </div>
 <div id="toasts"></div>
@@ -172,17 +197,28 @@
     </div>
     <b>בחר צבע</b>
     <div id="colors"></div>
+    <b>בחר כובע</b>
+    <div id="hats"></div>
     <b>שחקנים (<span id="pcount">0</span>)</b>
     <div id="plist"></div>
-    <div id="hostSettings" class="row hidden" style="margin-bottom:12px">
-      <label>מתחזים <select id="setImp"><option>1</option><option>2</option><option>3</option></select></label>
-      <label>בוטים <select id="setBots"></select></label>
+    <b>הגדרות משחק</b>
+    <div id="settingsGrid">
+      <label>מתחזים <select data-s="impostors"><option>1</option><option>2</option><option>3</option></select></label>
+      <label>בוטים <select data-s="bots"></select></label>
+      <label>זמן בין חיסולים <select data-s="killCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="25">25ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
+      <label>מהירות שחקנים <select data-s="speed"><option value="0.75">איטי</option><option value="1">רגיל</option><option value="1.25">מהיר</option><option value="1.5">מהיר מאוד</option></select></label>
+      <label>טווח ראייה <select data-s="vision"><option value="0.5">קצר מאוד</option><option value="0.75">קצר</option><option value="1">רגיל</option><option value="1.25">רחוק</option><option value="1.5">רחוק מאוד</option></select></label>
+      <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+      <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
+      <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
+    </div>
+    <div id="hostSettings" class="row hidden" style="margin:12px 0">
       <button id="startBtn" class="primary">התחל משחק ▶</button>
     </div>
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>תפקידים:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר (מגן אחרי מוות) · מתחזה · משנה צורה (מתחפש לאחרים)<br>
-      <b>מקשים:</b> תזוזה <kbd>WASD</kbd>/חצים · שימוש <kbd>E</kbd> · דיווח <kbd>R</kbd> · חיסול <kbd>Q</kbd> · פתח <kbd>V</kbd> · שינוי צורה <kbd>F</kbd> · מגן <kbd>G</kbd> · סימנים <kbd>C</kbd> · חשיפה (מארח) <kbd>H</kbd>
+      <b>מקשים:</b> תזוזה <kbd>WASD</kbd>/חצים · שימוש <kbd>E</kbd> · דיווח <kbd>R</kbd> · חיסול <kbd>Q</kbd> · פתח <kbd>V</kbd> · שינוי צורה <kbd>F</kbd> · מגן <kbd>G</kbd> · סימנים <kbd>C</kbd>
     </div>
   </div>
 </div>
@@ -201,6 +237,12 @@
     <div class="row"><input id="chatIn" maxlength="140" placeholder="כתוב הודעה…" style="flex:1" autocomplete="off"><button id="chatBtn">שלח</button></div>
   </div>
 </div>
+
+<!-- מיני-משחק -->
+<div id="mini" class="screen hidden"><div class="card center">
+  <div class="row" style="justify-content:space-between"><h2 id="miniTitle" style="margin:0"></h2><button id="miniClose">✕ סגור</button></div>
+  <div id="miniBody"></div>
+</div></div>
 
 <!-- הדחה -->
 <div id="eject" class="screen hidden"><div class="card center" style="max-width:520px"><div id="ejectTxt"></div></div></div>
@@ -221,7 +263,9 @@
 <script src="engine.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-const cv = $('#cv'), ctx = cv.getContext('2d');
+const cv = $('#cv');
+let ctx = cv.getContext('2d');
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 let ID = null, S = null, es = null, lastPhase = null;
 const disp = {};
 const store = {
@@ -282,8 +326,7 @@ let DEMO = false, tutStep = 0, tutStart = null, tutTasks = 0;
 const TUT = [
   { t: 'זוז עם המקשים', keys: true, d: 'במחשב: <span dir="ltr"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span> או החצים. בטלפון: הג׳ויסטיק בפינה.' },
   { t: 'לך לסימן הצהוב ❗', d: 'החץ הצהוב מראה לך לאן ללכת. כל ❗ הוא משימה שלך.', arrow: 'task' },
-  { t: 'בצע את המשימה', d: 'לחץ <kbd>E</kbd> (או ✋ שימוש) ואל תזוז עד שהפס הירוק מתמלא.', arrow: 'task' },
-  { t: 'הפעל מצב חשיפה 👁', d: 'לחץ <kbd>H</kbd> (או הכפתור הסגול למעלה). עכשיו תראה קווים ותגיות לכל השחקנים. האדום הוא המתחזה!' },
+  { t: 'בצע את המשימה', d: 'לחץ <kbd>E</kbd> (או ✋ שימוש). בחלק מהמשימות פשוט מחכים שהפס יתמלא, ובאחרות נפתח מיני-משחק: חיבור כבלים, קוד או מחוג.', arrow: 'task' },
   { t: 'כנס ישיבת חירום 🚨', d: 'לך לכפתור האדום בחדר האוכל ולחץ <kbd>E</kbd>.', arrow: 'button' },
   { t: 'הצבע!', d: 'לחץ על השחקן שאתה חושד בו – או על "דלג". אחרי שכולם מצביעים רואים מי הודח.' },
   { t: 'כל הכבוד – אתה יודע לשחק! 🎉', d: 'אפשר להמשיך לשחק בדמו, או לצאת ולצור חדר עם חברים.', done: true },
@@ -322,9 +365,8 @@ function tutCheck(s) {
       next = me && D(me, tutStart) > 120; break;
     case 1: next = me && s.me.tasks.some(t => !t.done && D(me, MAP.TASKS[t.i]) <= 60); tutTasks = done; break;
     case 2: next = done > tutTasks; break;
-    case 3: next = s.settings.reveal; break;
-    case 4: next = s.phase === 'meeting'; break;
-    case 5: next = s.phase === 'eject' || s.phase === 'end'; break;
+    case 3: next = s.phase === 'meeting'; break;
+    case 4: next = s.phase === 'eject' || s.phase === 'end'; break;
   }
   if (next) { tutStep++; renderTut(); }
 }
@@ -455,6 +497,7 @@ function onState(s) {
   show('#joy', isTouch && s.phase === 'play');
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
+  miniSync(s);
 }
 
 function toast(t) {
@@ -468,6 +511,7 @@ function toast(t) {
 let lobbySig = '';
 function renderLobby(s) {
   const sig = JSON.stringify([s.roster, s.hostId, s.settings, s.me.color]);
+  renderHats(s);
   if (sig === lobbySig) return;
   lobbySig = sig;
   $('#pcount').textContent = s.roster.length;
@@ -478,14 +522,20 @@ function renderLobby(s) {
     `<button title="${c.n}" data-c="${i}" class="${i === s.me.color ? 'sel' : ''}" style="background:${c.c}" ${taken.has(i) ? 'disabled' : ''}></button>`).join('');
   show('#hostSettings', s.me.host);
   show('#waitHost', !s.me.host);
-  $('#setImp').value = s.settings.impostors;
-  $('#setBots').value = s.settings.bots;
+  document.querySelectorAll('#settingsGrid select').forEach(el => {
+    const k = el.dataset.s, v = s.settings[k];
+    el.value = k === 'confirm' ? (v ? '1' : '0') : String(v);
+    el.disabled = !s.me.host;
+  });
 }
 $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) api({ type: 'color', color: +b.dataset.c }); };
-$('#setBots').innerHTML = Array.from({ length: 10 }, (_, i) => `<option>${i}</option>`).join('');
-const sendSettings = () => api({ type: 'settings', impostors: +$('#setImp').value, bots: +$('#setBots').value });
-$('#setImp').onchange = sendSettings;
-$('#setBots').onchange = sendSettings;
+document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 10 }, (_, i) => `<option>${i}</option>`).join('');
+const sendSettings = () => {
+  const o = { type: 'settings' };
+  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'confirm' ? el.value === '1' : +el.value; });
+  api(o);
+};
+document.querySelectorAll('#settingsGrid select').forEach(el => el.onchange = sendSettings);
 $('#startBtn').onclick = () => api({ type: 'start' });
 
 // ---------- HUD ----------
@@ -513,11 +563,12 @@ function actionState(s) {
   const st = {};
   const nearTask = me.tasks.some(t => !t.done && D(pos, MAP.TASKS[t.i]) <= 60);
   const nearBtn = alive && !me.emergencyUsed && D(pos, MAP.BUTTON) < 80;
-  st.use = { show: !me.spec, on: nearTask || nearBtn, label: nearBtn && !nearTask ? 'חירום' : 'שימוש' };
+  const inVent = me.inVent !== null && me.inVent !== undefined;
+  st.use = { show: !me.spec, on: !inVent && (nearTask || nearBtn), label: nearBtn && !nearTask ? 'חירום' : 'שימוש' };
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
-  st.kill = { show: alive && me.team === 'imp', on: me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && ['impostor', 'shifter', 'engineer'].includes(me.roleKey), on: MAP.VENTS.some(v => D(pos, v) <= 60) };
+  st.kill = { show: alive && me.team === 'imp', on: !inVent && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
+  st.vent = { show: alive && ['impostor', 'shifter', 'engineer'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
@@ -543,8 +594,6 @@ function renderHud(s) {
     : me.tasks.map(t => `<li class="${t.done ? 'done' : ''}">${esc(t.name)}</li>`).join('');
   $('#tasktxt').textContent = `(${s.tasks.done}/${s.tasks.total})`;
   $('#taskfill').style.width = (s.tasks.total ? 100 * s.tasks.done / s.tasks.total : 0) + '%';
-  show('#revealBtn', me.host);
-  $('#revealBtn').classList.toggle('on', s.settings.reveal);
   show('#revealBadge', s.settings.reveal);
   show('#workbar', me.work > 0);
   $('#workfill').style.width = Math.min(100, me.work * 100) + '%';
@@ -556,13 +605,21 @@ function renderHud(s) {
     b.disabled = !a.on;
     if (a.label) b.querySelector('.lb').textContent = a.label;
   }
+  const vIdx = me.inVent;
+  show('#ventPanel', vIdx !== null && vIdx !== undefined);
+  if (vIdx !== null && vIdx !== undefined) {
+    const sig = 'v' + vIdx;
+    if ($('#ventBtns').dataset.sig !== sig) {
+      $('#ventBtns').dataset.sig = sig;
+      $('#ventBtns').innerHTML = MAP.VENTS[vIdx].links.map((l, k) => `<button data-to="${l}">${k + 1}. אל ${esc(MAP.VENTS[l].room)}</button>`).join('') + '<button data-exit="1" class="primary">צא (V)</button>';
+    }
+  }
   show('#vitals', vitalsOpen && s.vitals);
   if (vitalsOpen && s.vitals) {
     $('#vitals').innerHTML = '<b>💓 סימנים חיוניים</b>' + s.vitals.map(v =>
       `<div><span class="dot" style="background:${v.color}"></span>${esc(v.name)} — ${v.alive ? '<span style="color:var(--ok)">חי</span>' : '<span style="color:var(--imp)">מת</span>'}</div>`).join('');
   }
 }
-$('#revealBtn').onclick = () => api({ type: 'reveal' });
 
 // ---------- ישיבה ----------
 let meetSig = '', chatLen = -1;
@@ -607,7 +664,7 @@ function renderEject(s) {
   const votes = e.tally ? Object.values(e.tally).reduce((a, b) => a + b, 0) : 0;
   $('#ejectTxt').innerHTML = e.id
     ? `<div style="font-size:64px">🚀</div><div class="big"><span class="dot" style="background:${e.color};width:26px;height:26px"></span> ${esc(e.name)} הודח</div>
-       <p style="font-size:20px">${esc(e.name)} ${e.team === 'imp' ? '<b style="color:var(--imp)">היה ' + esc(e.role) + '!</b>' : '<b style="color:var(--crew)">לא היה מתחזה</b> (' + esc(e.role) + ')'}</p>`
+       ${e.team === null || e.team === undefined ? '' : `<p style="font-size:20px">${esc(e.name)} `}${e.team === null || e.team === undefined ? '' : e.team === 'imp' ? '<b style="color:var(--imp)">היה ' + esc(e.role) + '!</b>' : '<b style="color:var(--crew)">לא היה מתחזה</b> (' + esc(e.role) + ')'}</p>`
     : `<div style="font-size:64px">🤷</div><div class="big">אף אחד לא הודח</div><p class="sub">${e.tie ? 'תיקו בהצבעה' : 'רוב בחר לדלג'}</p>`;
   $('#ejectTxt').innerHTML += `<p class="sub">${votes} קולות</p>`;
 }
@@ -626,6 +683,182 @@ function renderEnd(s) {
 }
 $('#lobbyBtn').onclick = () => api({ type: 'lobby' });
 
+// ---------- מיני-משחקים במשימות ----------
+let miniOpen = null, miniLock = false;
+function miniSync(s) {
+  const want = s.phase === 'play' ? s.me.mini : null;
+  if (want === null || want === undefined) miniLock = false;
+  if (miniLock) return;
+  if (want !== null && want !== undefined && miniOpen === null) openMini(want);
+  else if ((want === null || want === undefined) && miniOpen !== null) { miniOpen = null; show('#mini', false); }
+}
+function openMini(i) {
+  miniOpen = i;
+  const T = MAP.TASKS[i], b = $('#miniBody');
+  $('#miniTitle').textContent = T.name;
+  show('#mini', true);
+  if (T.kind === 'wires') buildWires(b);
+  else if (T.kind === 'dial') buildDial(b);
+  else buildCode(b);
+}
+function closeMini() {
+  if (miniOpen === null) return;
+  api({ type: 'cancel' });
+  miniOpen = null; miniLock = true; show('#mini', false);
+}
+function miniDone() {
+  const i = miniOpen;
+  miniLock = true;
+  $('#miniBody').innerHTML = '<div class="big" style="color:var(--ok)">✔ הושלם!</div>';
+  setTimeout(() => { api({ type: 'finish', i }); miniOpen = null; show('#mini', false); }, 700);
+}
+$('#miniClose').onclick = closeMini;
+
+function buildWires(b) {
+  const cols = ['#e53935', '#1e63d6', '#f2d22e', '#e83fd0'];
+  const L = shuffle(cols.slice()), R = shuffle(cols.slice());
+  const btns = arr => arr.map(c => `<button data-c="${c}" style="background:${c}"></button>`).join('');
+  b.innerHTML = `<p class="sub" style="margin:8px 0 0">חבר כל כבל לכבל באותו צבע: לחץ על כבל משמאל ואז על הכבל המתאים מימין.</p>
+    <div class="wires"><svg></svg><div class="wcol l">${btns(L)}</div><div class="wcol r">${btns(R)}</div></div>`;
+  const box = b.querySelector('.wires'), svg = box.querySelector('svg');
+  let sel = null, done = 0;
+  const center = el => { const r = el.getBoundingClientRect(), o = box.getBoundingClientRect(); return [r.left - o.left + r.width / 2, r.top - o.top + r.height / 2]; };
+  box.querySelector('.l').onclick = e => {
+    const t = e.target.closest('button'); if (!t || t.disabled) return;
+    if (sel) sel.classList.remove('sel');
+    sel = t; t.classList.add('sel');
+  };
+  box.querySelector('.r').onclick = e => {
+    const t = e.target.closest('button'); if (!t || t.disabled || !sel) return;
+    if (t.dataset.c !== sel.dataset.c) { t.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 200); return; }
+    const [x1, y1] = center(sel), [x2, y2] = center(t);
+    svg.insertAdjacentHTML('beforeend', `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${t.dataset.c}" stroke-width="9" stroke-linecap="round"/>`);
+    sel.disabled = t.disabled = true; sel.classList.remove('sel'); sel = null;
+    if (++done === 4) miniDone();
+  };
+}
+
+function buildDial(b) {
+  const target = 10 + Math.floor(Math.random() * 80);
+  b.innerHTML = `<p class="sub" style="margin:8px 0 0">הזז את המחוג עד הסימון הירוק ולחץ "אשר".</p>
+    <div class="gauge"><div class="mark" style="transform:rotate(${target * 1.8 - 90}deg)"></div><div class="needle"></div></div>
+    <input type="range" dir="ltr" min="0" max="100" value="${target > 50 ? 3 : 97}" style="width:100%;padding:0">
+    <button class="primary" style="margin-top:12px">אשר</button>`;
+  const r = b.querySelector('input'), n = b.querySelector('.needle'), btn = b.querySelector('button');
+  const upd = () => {
+    n.style.transform = `rotate(${r.value * 1.8 - 90}deg)`;
+    const ok = Math.abs(r.value - target) <= 3;
+    n.style.background = ok ? 'var(--ok)' : '#fff';
+    btn.disabled = !ok;
+  };
+  r.oninput = upd; upd();
+  btn.onclick = miniDone;
+}
+
+let codeKey = null;
+function buildCode(b) {
+  const code = Array.from({ length: 5 }, () => Math.floor(Math.random() * 10)).join('');
+  b.innerHTML = `<p class="sub" style="margin:8px 0 4px">הקלד את הקוד (אפשר גם עם המקלדת):</p><div class="code-show">${code}</div>
+    <div class="code-in">·····</div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, '⌫', 0, '✓'].map(k => `<button data-k="${k}">${k}</button>`).join('')}</div>`;
+  const out = b.querySelector('.code-in');
+  let cur = '';
+  codeKey = k => {
+    if (k === '⌫') cur = cur.slice(0, -1);
+    else if (k === '✓') {
+      if (cur === code) { codeKey = null; return miniDone(); }
+      out.classList.add('bad'); setTimeout(() => out.classList.remove('bad'), 400); cur = '';
+    } else if (cur.length < 5) cur += k;
+    out.textContent = cur || '·····';
+  };
+  b.querySelector('.pad').onclick = e => { const t = e.target.closest('button'); if (t && codeKey) codeKey(t.dataset.k); };
+}
+
+function miniKey(e) {
+  if (e.code === 'Escape') { closeMini(); return; }
+  if (!codeKey || MAP.TASKS[miniOpen].kind !== 'code') return;
+  if (/^(Digit|Numpad)[0-9]$/.test(e.code)) codeKey(e.code.slice(-1));
+  else if (e.code === 'Backspace') codeKey('⌫');
+  else if (e.code === 'Enter' || e.code === 'NumpadEnter') codeKey('✓');
+}
+
+$('#ventBtns').onclick = e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.exit) api({ type: 'vent' }); else api({ type: 'ventMove', to: +t.dataset.to });
+};
+
+// ---------- כובעים ----------
+const HATS = ['ללא', 'מסיבה', 'כתר', 'מצחייה', 'ארנב', 'הילה', 'פרח', 'קש', 'משקפיים', 'שף', 'קרניים', 'אוזניות'];
+function drawHat(h, dir) {
+  const c = ctx;
+  if (!h) return;
+  c.save(); c.lineWidth = 2; c.strokeStyle = 'rgba(0,0,0,.5)';
+  switch (h) {
+    case 1:
+      c.fillStyle = '#ff5fa2'; c.beginPath(); c.moveTo(-10, -14); c.lineTo(0, -42); c.lineTo(10, -14); c.closePath(); c.fill(); c.stroke();
+      c.strokeStyle = '#ffe14d'; c.lineWidth = 3; c.beginPath(); c.moveTo(-6, -22); c.lineTo(6, -22); c.moveTo(-3, -31); c.lineTo(3, -31); c.stroke();
+      c.fillStyle = '#ffe14d'; c.beginPath(); c.arc(0, -43, 4, 0, 7); c.fill(); break;
+    case 2:
+      c.fillStyle = '#ffc93c'; c.beginPath(); c.moveTo(-13, -13); c.lineTo(-13, -30); c.lineTo(-6, -22); c.lineTo(0, -34); c.lineTo(6, -22); c.lineTo(13, -30); c.lineTo(13, -13); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#e53935'; c.beginPath(); c.arc(0, -19, 2.5, 0, 7); c.fill(); break;
+    case 3:
+      c.fillStyle = '#2f6fe0'; c.beginPath(); c.arc(0, -13, 13, Math.PI, 0); c.closePath(); c.fill(); c.stroke();
+      c.beginPath(); c.ellipse(dir * 15, -13, 10, 3, 0, 0, 7); c.fill(); c.stroke(); break;
+    case 4:
+      for (const s of [-1, 1]) {
+        c.fillStyle = '#f4f4f8'; c.beginPath(); c.ellipse(s * 7, -32, 5, 14, s * 0.15, 0, 7); c.fill(); c.stroke();
+        c.fillStyle = '#ffb3c8'; c.beginPath(); c.ellipse(s * 7, -32, 2.2, 9, s * 0.15, 0, 7); c.fill();
+      } break;
+    case 5:
+      c.strokeStyle = '#ffe066'; c.lineWidth = 4; c.beginPath(); c.ellipse(0, -38, 13, 4, 0, 0, 7); c.stroke(); break;
+    case 6:
+      c.strokeStyle = '#3c9a4a'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, -20); c.lineTo(0, -13); c.stroke();
+      for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; c.fillStyle = '#ff7eb6'; c.beginPath(); c.arc(Math.cos(a) * 6, -27 + Math.sin(a) * 6, 4.5, 0, 7); c.fill(); }
+      c.fillStyle = '#ffd23f'; c.beginPath(); c.arc(0, -27, 4, 0, 7); c.fill(); break;
+    case 7:
+      c.fillStyle = '#e8c66a'; c.beginPath(); c.ellipse(0, -14, 23, 5, 0, 0, 7); c.fill(); c.stroke();
+      c.beginPath(); c.arc(0, -16, 10, Math.PI, 0); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#c0392b'; c.fillRect(-10, -19, 20, 3); break;
+    case 8:
+      c.fillStyle = '#111'; c.beginPath(); c.roundRect(dir * 5 - 11, -7, 22, 11, 4); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(dir * 5 - 7, -4); c.lineTo(dir * 5 - 2, -4); c.stroke(); break;
+    case 9:
+      c.fillStyle = '#fff'; c.fillRect(-9, -24, 18, 10); c.strokeRect(-9, -24, 18, 10);
+      for (const [x, y] of [[-7, -28], [0, -32], [7, -28]]) { c.beginPath(); c.arc(x, y, 7, 0, 7); c.fill(); } break;
+    case 10:
+      c.fillStyle = '#d62828';
+      for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 3, -16); c.quadraticCurveTo(s * 10, -24, s * 14, -33); c.lineTo(s * 12, -15); c.closePath(); c.fill(); c.stroke(); } break;
+    case 11:
+      c.strokeStyle = '#333'; c.lineWidth = 4; c.beginPath(); c.arc(0, -2, 21, Math.PI * 1.08, Math.PI * 1.92); c.stroke();
+      c.fillStyle = '#ff4d6d'; c.fillRect(-24, -9, 7, 13); c.fillRect(17, -9, 7, 13); break;
+  }
+  c.restore();
+}
+
+let hatSig = '';
+function renderHats(s) {
+  const col = s.colors[s.me.color].c, sig = col + s.me.hat;
+  if (sig === hatSig) return;
+  hatSig = sig;
+  const box = $('#hats');
+  box.innerHTML = '';
+  HATS.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = i === s.me.hat ? 'sel' : '';
+    btn.dataset.h = i;
+    const cnv = document.createElement('canvas');
+    cnv.width = cnv.height = 112;
+    const saved = ctx;
+    ctx = cnv.getContext('2d');
+    ctx.setTransform(2, 0, 0, 2, 56, 66);
+    drawDrone(0, 0, col, 1, { hat: i, noShadow: true });
+    ctx = saved;
+    btn.appendChild(cnv);
+    btn.appendChild(document.createTextNode(name));
+    box.appendChild(btn);
+  });
+}
+$('#hats').onclick = e => { const b = e.target.closest('button'); if (b) api({ type: 'hat', hat: +b.dataset.h }); };
+
 // ---------- קלט ----------
 const keys = new Set();
 let lastIn = '';
@@ -641,10 +874,37 @@ function sendInput() {
   const sig = dx.toFixed(2) + ',' + dy.toFixed(2);
   if (sig !== lastIn && ID) { lastIn = sig; api({ type: 'input', dx, dy }); }
 }
+// קיצור סודי: '/' ו-'׳' (או ') ביחד במחשב, או נגיעה בו-זמנית למעלה ולמטה במסך בטלפון.
+// מפעיל/מכבה את מצב החשיפה – וכשהוא פעיל כולם רואים אותו ומופיע שלט למעלה.
+const held = new Set();
+let lastSecret = 0;
+function secretToggle() {
+  const t = Date.now();
+  if (!S || S.phase === 'lobby' || t - lastSecret < 800) return;
+  lastSecret = t;
+  api({ type: 'reveal' });
+}
+addEventListener('keydown', e => {
+  held.add(e.key);
+  if (held.has('/') && (held.has("'") || held.has('׳'))) secretToggle();
+}, true);
+addEventListener('keyup', e => held.delete(e.key), true);
+addEventListener('blur', () => held.clear());
+addEventListener('touchstart', e => {
+  if (e.touches.length < 2) return;
+  const ys = [...e.touches].map(t => t.clientY);
+  if (Math.min(...ys) < innerHeight * 0.2 && Math.max(...ys) > innerHeight * 0.8) secretToggle();
+}, { passive: true });
+
 const HOT = { KeyE: 'use', KeyR: 'report', KeyQ: 'kill', KeyV: 'vent', KeyF: 'shift', KeyG: 'shield', KeyC: 'vitals' };
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
-  if (e.code === 'KeyH' && S && S.me.host && S.phase !== 'lobby') { api({ type: 'reveal' }); return; }
+  if (miniOpen !== null) { miniKey(e); return; }
+  if (S && S.phase === 'play' && S.me.inVent !== null && S.me.inVent !== undefined && /^Digit[1-9]$/.test(e.code)) {
+    const l = MAP.VENTS[S.me.inVent].links[+e.code.slice(5) - 1];
+    if (l !== undefined) api({ type: 'ventMove', to: l });
+    return;
+  }
   if (HOT[e.code] && !e.repeat) { doAction(HOT[e.code]); return; }
   if (/^(Key[WASD]|Arrow)/.test(e.code)) { keys.add(e.code); sendInput(); e.preventDefault(); }
 });
@@ -683,10 +943,11 @@ function drawDrone(x, y, color, dir, opts = {}) {
   ctx.save();
   ctx.translate(x, y);
   if (opts.ghost) ctx.globalAlpha = 0.45;
+  if (opts.vent) ctx.globalAlpha = 0.35;
   const bob = opts.ghost ? Math.sin(performance.now() / 300) * 3 : 0;
   ctx.translate(0, bob);
   // צל
-  if (!opts.ghost) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, 20, 16, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+  if (!opts.ghost && !opts.noShadow) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, 20, 16, 5, 0, 0, Math.PI * 2); ctx.fill(); }
   // אנטנות
   ctx.strokeStyle = '#cfd6e4'; ctx.lineWidth = 2.5;
   for (const s of [-1, 1]) {
@@ -701,6 +962,14 @@ function drawDrone(x, y, color, dir, opts = {}) {
   // עין
   ctx.fillStyle = '#f4f7fb'; ctx.beginPath(); ctx.arc(dir * 5, -1, 8, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#141826'; ctx.beginPath(); ctx.arc(dir * 8, -1, 4, 0, Math.PI * 2); ctx.fill();
+  drawHat(opts.hat || 0, dir);
+  // סריקה ביולוגית – כולם רואים
+  if (opts.scan) {
+    const ph = (performance.now() / 700) % 1;
+    ctx.fillStyle = 'rgba(80,255,160,.16)'; ctx.fillRect(-28, -44, 56, 72);
+    ctx.strokeStyle = 'rgba(80,255,160,.95)'; ctx.lineWidth = 2.5;
+    for (const k of [0, 0.5]) { const yy = 26 - ((ph + k) % 1) * 70; ctx.beginPath(); ctx.ellipse(0, yy, 26, 7, 0, 0, Math.PI * 2); ctx.stroke(); }
+  }
   // מגן
   if (opts.shield) { ctx.strokeStyle = 'rgba(120,200,255,.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 26, 0, Math.PI * 2); ctx.stroke(); }
   ctx.restore();
@@ -784,7 +1053,7 @@ function frame(t) {
   drawMap(t);
 
   const noDark = !me.alive || me.spec;
-  const vision = me.team === 'imp' ? 430 : 310;
+  const vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
   const reveal = S.settings.reveal || noDark;
   const inView = p => noDark || D(cam, disp[p.id] || p) <= vision;
 
@@ -806,7 +1075,7 @@ function frame(t) {
     if (p.spec) continue;
     if (!inView(p) && !S.settings.reveal) continue;
     const d = disp[p.id];
-    drawDrone(d.x, d.y, p.color, p.dir || 1, { ghost: !p.alive, shield: p.shield });
+    drawDrone(d.x, d.y, p.color, p.dir || 1, { ghost: !p.alive, shield: p.shield, hat: p.hat, scan: p.scan, vent: p.vent });
     ctx.textAlign = 'center'; ctx.font = 'bold 14px Rubik, Arial';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
     const nameCol = p.team === 'imp' && (p.id === me.id || me.team === 'imp' || reveal) ? '#ff6b6b' : '#fff';
@@ -815,6 +1084,20 @@ function frame(t) {
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(d.x - 20, d.y + 26, 40, 5);
       ctx.fillStyle = '#4ade80'; ctx.fillRect(d.x - 20, d.y + 26, 40 * Math.min(1, p.work), 5);
     }
+  }
+
+  // חיצים לפתחים מחוברים כשאתה בתוך פתח
+  if (me.inVent !== null && me.inVent !== undefined) {
+    const v = MAP.VENTS[me.inVent];
+    MAP.VENTS[me.inVent].links.forEach((l, k) => {
+      const o = MAP.VENTS[l], a = Math.atan2(o.y - v.y, o.x - v.x);
+      const ax = v.x + Math.cos(a) * 80, ay = v.y + Math.sin(a) * 80;
+      ctx.save(); ctx.translate(ax, ay); ctx.rotate(a);
+      ctx.fillStyle = '#ffb547'; ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-10, -14); ctx.lineTo(-10, 14); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Rubik, Arial'; ctx.textAlign = 'center';
+      ctx.fillText((k + 1) + '. ' + o.room, v.x + Math.cos(a) * 120, v.y + Math.sin(a) * 120 + 5);
+    });
   }
 
   // חץ הדרכה בדמו

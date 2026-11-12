@@ -1,15 +1,20 @@
 // מפת "תחנת נוגה" – משותפת לשרת ולדפדפן
 (function (root) {
   const ROOMS = {
-    Q: { name: 'מגורים', x: 200, y: 80, w: 300, h: 220, c: '#2b3a55' },
-    B: { name: 'גשר הפיקוד', x: 850, y: 80, w: 300, h: 220, c: '#30405e' },
-    C: { name: 'תקשורת', x: 1500, y: 80, w: 300, h: 220, c: '#2d4a4f' },
-    E: { name: 'חדר מנועים', x: 100, y: 450, w: 300, h: 350, c: '#4a3a32' },
-    F: { name: 'חדר אוכל', x: 750, y: 450, w: 500, h: 350, c: '#38424f' },
-    L: { name: 'מעבדה', x: 1600, y: 450, w: 300, h: 350, c: '#2f4a3d' },
-    S: { name: 'חדר שרתים', x: 150, y: 950, w: 300, h: 250, c: '#3a3352' },
-    T: { name: 'מחסן', x: 750, y: 1000, w: 500, h: 220, c: '#4a4433' },
-    G: { name: 'חממה', x: 1550, y: 950, w: 300, h: 250, c: '#2e4d2e' },
+    U: { name: 'מנוע עליון', x: 150, y: 80, w: 300, h: 240, c: '#4a3a32' },
+    M: { name: 'מרפאה', x: 650, y: 80, w: 300, h: 240, c: '#2f4a4a' },
+    F: { name: 'חדר אוכל', x: 1150, y: 60, w: 500, h: 340, c: '#38424f' },
+    W: { name: 'נשק', x: 1850, y: 80, w: 300, h: 240, c: '#4a3340' },
+    O: { name: 'חמצן', x: 2300, y: 120, w: 250, h: 200, c: '#2d4a3a' },
+    R: { name: 'כור', x: 40, y: 500, w: 280, h: 340, c: '#4d2f2f' },
+    SE: { name: 'אבטחה', x: 520, y: 540, w: 260, h: 240, c: '#33384d' },
+    EL: { name: 'חשמל', x: 900, y: 620, w: 300, h: 240, c: '#4a4530' },
+    A: { name: 'ניהול', x: 1350, y: 560, w: 380, h: 260, c: '#30405e' },
+    N: { name: 'ניווט', x: 2300, y: 660, w: 300, h: 300, c: '#2b3a55' },
+    D: { name: 'מנוע תחתון', x: 150, y: 1040, w: 300, h: 240, c: '#4a3a32' },
+    T: { name: 'מחסן', x: 900, y: 1020, w: 520, h: 300, c: '#4a4433' },
+    C: { name: 'תקשורת', x: 1600, y: 1080, w: 300, h: 220, c: '#2d4a4f' },
+    SH: { name: 'מגנים', x: 2150, y: 1040, w: 320, h: 260, c: '#3a3352' },
   };
   for (const k in ROOMS) {
     const r = ROOMS[k];
@@ -18,9 +23,11 @@
 
   const CW = 90;
   const CORR = [
-    ['Q', 'B', 'h', 190], ['B', 'C', 'h', 190], ['B', 'F', 'v', 1000], ['Q', 'E', 'v', 350],
-    ['C', 'L', 'v', 1650], ['E', 'F', 'h', 625], ['F', 'L', 'h', 625], ['F', 'T', 'v', 1000],
-    ['E', 'S', 'v', 300], ['L', 'G', 'v', 1700], ['S', 'T', 'h', 1105], ['T', 'G', 'h', 1105],
+    ['U', 'M', 'h', 200], ['M', 'F', 'h', 200], ['F', 'W', 'h', 200], ['W', 'O', 'h', 220],
+    ['O', 'N', 'v', 2450], ['U', 'R', 'v', 235], ['R', 'D', 'v', 235], ['R', 'SE', 'h', 660],
+    ['M', 'SE', 'v', 715], ['F', 'A', 'v', 1500], ['EL', 'A', 'h', 720], ['EL', 'T', 'v', 1050],
+    ['D', 'T', 'h', 1160], ['T', 'C', 'h', 1180], ['C', 'SH', 'h', 1180], ['N', 'SH', 'v', 2380],
+    ['A', 'N', 'h', 740],
   ];
   const CORRIDORS = CORR.map(([a, b, o, c]) => {
     const A = ROOMS[a], B = ROOMS[b];
@@ -32,30 +39,47 @@
       da: { x: A.x + A.w - 25, y: c }, db: { x: B.x + 25, y: c } };
   });
 
+  // kind: hold = להחזיק E · scan = משימה גלויה (כולם רואים) · wires/dial/code = מיני-משחק
   const TASKS = [
-    { room: 'Q', x: 260, y: 130, name: 'סידור מיטות' },
-    { room: 'B', x: 900, y: 120, name: 'כיול ניווט' },
-    { room: 'B', x: 1100, y: 250, name: 'בדיקת מכ"ם' },
-    { room: 'C', x: 1750, y: 130, name: 'כוונון אנטנה' },
-    { room: 'E', x: 150, y: 500, name: 'תדלוק מנוע' },
-    { room: 'E', x: 350, y: 760, name: 'החלפת מסנן' },
-    { room: 'F', x: 800, y: 500, name: 'ניקוי פילטר אוויר' },
-    { room: 'F', x: 1200, y: 760, name: 'פינוי אשפה' },
-    { room: 'L', x: 1850, y: 500, name: 'ניתוח דגימות' },
-    { room: 'L', x: 1650, y: 760, name: 'הפעלת מיקרוסקופ' },
-    { room: 'S', x: 200, y: 1150, name: 'אתחול שרת' },
-    { room: 'T', x: 800, y: 1170, name: 'סידור ארגזים' },
-    { room: 'T', x: 1200, y: 1050, name: 'ספירת מלאי' },
-    { room: 'G', x: 1800, y: 1000, name: 'השקיית צמחים' },
+    { room: 'M', x: 870, y: 200, name: 'סריקה ביולוגית', kind: 'scan' },
+    { room: 'M', x: 700, y: 140, name: 'בדיקת דגימות', kind: 'hold' },
+    { room: 'EL', x: 950, y: 680, name: 'תיקון חשמל', kind: 'wires' },
+    { room: 'EL', x: 1130, y: 800, name: 'כיול מתח', kind: 'dial' },
+    { room: 'SE', x: 600, y: 600, name: 'בדיקת מצלמות', kind: 'hold' },
+    { room: 'R', x: 100, y: 560, name: 'הפעלת הכור', kind: 'code' },
+    { room: 'U', x: 380, y: 140, name: 'תדלוק מנוע עליון', kind: 'hold' },
+    { room: 'D', x: 380, y: 1230, name: 'תדלוק מנוע תחתון', kind: 'hold' },
+    { room: 'F', x: 1220, y: 120, name: 'ניקוי פילטר אוויר', kind: 'hold' },
+    { room: 'F', x: 1600, y: 360, name: 'פינוי אשפה', kind: 'hold' },
+    { room: 'W', x: 2050, y: 150, name: 'כיוון תותחים', kind: 'dial' },
+    { room: 'O', x: 2490, y: 270, name: 'ניקוי מסנן חמצן', kind: 'hold' },
+    { room: 'N', x: 2550, y: 900, name: 'כיול ניווט', kind: 'dial' },
+    { room: 'A', x: 1680, y: 620, name: 'העלאת נתונים', kind: 'code' },
+    { room: 'T', x: 960, y: 1270, name: 'סידור ארגזים', kind: 'hold' },
+    { room: 'T', x: 1380, y: 1060, name: 'תדלוק מיכל', kind: 'hold' },
+    { room: 'C', x: 1850, y: 1120, name: 'כוונון אנטנה', kind: 'dial' },
+    { room: 'SH', x: 2420, y: 1250, name: 'הפעלת מגנים', kind: 'wires' },
   ];
+  const TASK_TIME = { hold: 2.5, scan: 6 };
 
+  // רשת פתחי אוורור: שלוש רשתות נפרדות (מערב, מרכז, מזרח)
   const VENTS = [
-    { x: 130, y: 780 }, { x: 420, y: 980 }, { x: 1000, y: 1190 },
-    { x: 1580, y: 1180 }, { x: 1880, y: 780 }, { x: 1120, y: 100 },
+    { x: 400, y: 290, links: [1, 2] },   // 0 מנוע עליון
+    { x: 90, y: 800, links: [0, 2] },    // 1 כור
+    { x: 400, y: 1070, links: [0, 1] },  // 2 מנוע תחתון
+    { x: 680, y: 290, links: [4, 5] },   // 3 מרפאה
+    { x: 740, y: 740, links: [3, 5] },   // 4 אבטחה
+    { x: 1160, y: 840, links: [3, 4] },  // 5 חשמל
+    { x: 2100, y: 290, links: [7] },     // 6 נשק
+    { x: 2560, y: 700, links: [6, 8] },  // 7 ניווט
+    { x: 2200, y: 1260, links: [7] },    // 8 מגנים
+    { x: 1690, y: 790, links: [10, 11] },// 9 ניהול
+    { x: 1640, y: 1250, links: [9] },    // 10 תקשורת
+    { x: 1600, y: 100, links: [9] },     // 11 חדר אוכל
   ];
 
-  const BUTTON = { x: 1000, y: 625 };
-  const WORLD = { w: 2000, h: 1300 };
+  const BUTTON = { x: 1400, y: 230 };
+  const WORLD = { w: 2700, h: 1400 };
   const R = 18;
 
   function walkable(x, y, r) {
@@ -108,7 +132,8 @@
     return pts;
   }
 
-  const MAP = { ROOMS, CORRIDORS, TASKS, VENTS, BUTTON, WORLD, R, walkable, roomAt, path };
+  VENTS.forEach(v => { const r = roomAt(v.x, v.y); v.room = r ? r.name : ''; });
+  const MAP = { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, walkable, roomAt, path };
   if (typeof module !== 'undefined' && module.exports) module.exports = MAP;
   else root.MAP = MAP;
 })(this);
