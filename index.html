@@ -2,7 +2,14 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="מי המתחזה">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>מי המתחזה?</title>
 <style>
   :root {
@@ -12,7 +19,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
     font-family: "Rubik", "Assistant", "Segoe UI", Arial, sans-serif; -webkit-user-select: none; user-select: none; }
-  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; padding: 10px 16px; background: #2a3350; color: var(--text); }
   button:disabled { opacity: .4; cursor: default; }
   button.primary { background: var(--accent); color: #1a1205; font-weight: 700; }
@@ -72,7 +79,7 @@
   #ghostBadge { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(80,90,120,.85); padding: 6px 14px; border-radius: 10px; font-size: 14px; }
 
   /* ג'ויסטיק למגע */
-  #joy { position: fixed; left: 24px; bottom: 24px; width: 130px; height: 130px; border-radius: 50%; background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.15); z-index: 11; touch-action: none; }
+  #joy { position: fixed; left: 24px; top: 60%; width: 130px; height: 130px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.25); z-index: 11; pointer-events: none; }
   #knob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.25); }
 
   /* ישיבה */
@@ -236,18 +243,52 @@
   #micBtn { position: fixed; bottom: 16px; left: 70px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
   #ttsBtn { position: fixed; bottom: 16px; left: 124px; z-index: 40; height: 46px; padding: 0 12px; border-radius: 23px; font-size: 16px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
   #ttsBtn.off { opacity: .6; }
-  body.touch #ttsBtn { bottom: auto; top: 12px; left: auto; right: calc(50% + 56px); }
   #micBtn.on { background: #1f6f4a; border-color: #4ade80; }
-  body.touch #micBtn { bottom: auto; top: 12px; left: auto; right: calc(50% - 56px); }
   #staleBar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #b4590b; color: #fff; padding: 10px 14px; text-align: center; font-weight: 700; }
   #staleBar button { margin-right: 10px; background: #fff; color: #7a3a00; }
   body.cams-on #rolecard, body.cams-on #taskbar, body.cams-on #topleft, body.cams-on #workbar, body.cams-on #tut { display: none !important; }
   #gearBtn { position: fixed; bottom: 16px; left: 16px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
-  body.touch #gearBtn { bottom: auto; top: 12px; left: auto; right: 50%; transform: translateX(50%); }
   #keysPanel { z-index: 45; }
   #keysList .row { justify-content: space-between; background: #151b2c; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; }
   #keysList button { min-width: 90px; font-weight: 700; }
   #keysList button.wait { background: var(--accent); color: #1a1205; }
+  html, body { overscroll-behavior: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  body { height: 100dvh; }
+  /* אזורי בטיחות (נוץ של iPhone, פינות מעוגלות) */
+  #rolecard { top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); }
+  #taskbar { top: calc(12px + env(safe-area-inset-top)); }
+  #topleft { top: calc(12px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); }
+  #actions { bottom: calc(16px + env(safe-area-inset-bottom)); right: calc(16px + env(safe-area-inset-right)); }
+  #gearBtn, #micBtn, #ttsBtn { margin-bottom: env(safe-area-inset-bottom); margin-left: env(safe-area-inset-left); }
+  #sabBanner { top: calc(58px + env(safe-area-inset-top)); }
+  /* מפות החבלות והמשימות מתאימות את עצמן לגובה המסך (בלי גלילה) */
+  #sabStage, #tmStage { width: min(100%, calc((100dvh - 190px) * 1.9286)); margin-left: auto; margin-right: auto; }
+  body.overlay-open #fsBtn, body.overlay-open #gearBtn, body.overlay-open #micBtn, body.overlay-open #ttsBtn { display: none; }
+  #fsBtn { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 60; padding: 6px 14px; border-radius: 99px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; font-size: 14px; }
+  #rotHint { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); z-index: 45; background: rgba(40,30,0,.92); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 14px; font-weight: 700; text-align: center; max-width: 90vw; }
+  @media (max-height: 520px) {
+    .card { padding: 12px 14px; }
+    .screen { padding: 8px; }
+    #sabStage, #tmStage { width: min(100%, calc((100dvh - 108px) * 1.9286)); }
+    #sabMap .legend, #tmList { display: none; }
+    #sabHint, #tmHint { font-size: 12px; margin: 2px 0 6px !important; }
+    #sabMap h2, #taskMap h2 { font-size: 18px; }
+    #actions { grid-template-columns: repeat(4, 60px); gap: 6px; }
+    #actions button { height: 60px; font-size: 10px; border-radius: 14px; }
+    #actions button .ic { font-size: 20px; }
+    #actions button .k { display: none; }
+    #rolecard { width: 168px; font-size: 10px; padding: 5px 8px; max-height: 38vh; overflow: auto; }
+    #rolename { font-size: 14px; }
+    #roledesc { display: none; }
+    #tasklist li { padding: 0; }
+    #taskbar { width: min(300px, 40vw); font-size: 11px; padding: 3px 8px; }
+    #tut { top: auto; bottom: 8px; width: min(420px, 60vw); padding: 8px 12px; }
+    #tutDesc, #tutTitle { font-size: 12px; }
+    #gearBtn, #micBtn { width: 38px; height: 38px; font-size: 18px; }
+    #ttsBtn { height: 38px; font-size: 14px; left: 100px; }
+    #micBtn { left: 58px; }
+    #mini .card { max-height: 100%; overflow-y: auto; }
+  }
   @media (max-width: 640px) {
     #actions { grid-template-columns: repeat(3, 70px); gap: 8px; bottom: 12px; right: 12px; }
     #actions button { height: 70px; font-size: 12px; }
@@ -279,8 +320,10 @@
 <button id="micBtn" class="hidden" title="צ'אט קולי עם החברים">🔇</button>
 <div id="keysPanel" class="screen hidden">
   <div class="card" style="max-width:460px">
-    <div class="row" style="justify-content:space-between"><h2 style="margin:0">⚙️ הגדרות מקשים</h2><button id="keysClose">✕ סגור</button></div>
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">⚙️ הגדרות</h2><button id="keysClose">✕ סגור</button></div>
     <p class="sub" style="margin:8px 0 12px">לחץ על מקש ברשימה ואז על המקש החדש שאתה רוצה. החצים תמיד עובדים לתזוזה.</p>
+    <div class="row" style="margin:6px 0 12px;background:#151b2c;border-radius:10px;padding:8px 10px"><span>🔍 זום תצוגה</span><input type="range" id="zoomRange" min="60" max="180" step="5" value="100" style="flex:1;min-width:120px"><b id="zoomVal">100%</b></div>
+    <p class="sub" style="margin:0 0 8px;font-size:13px">בטלפון: אם רואים יותר מדי רחוק, הגדל את הזום. מקשים (במחשב):</p>
     <div id="keysList"></div>
     <button id="keysReset" style="margin-top:12px">↺ חזרה לברירת המחדל</button>
   </div>
@@ -297,6 +340,8 @@
   </div>
 </div>
 <div id="joy" class="hidden"><div id="knob"></div></div>
+<button id="fsBtn" class="hidden">📱 מסך מלא</button>
+<div id="rotHint" class="hidden">📱 סובב את הטלפון לרוחב לתצוגה טובה יותר <button id="rotX" style="margin-right:8px;padding:2px 8px">✕</button></div>
 
 <!-- הצטרפות -->
 <div id="join" class="screen">
@@ -374,7 +419,7 @@
     <div class="row" style="justify-content:space-between"><h2 style="margin:0">🛠️ מפת חבלות</h2><button id="sabClose">✕ סגור</button></div>
     <p id="sabHint" class="sub" style="margin:6px 0 10px"></p>
     <div id="sabStage"></div>
-    <p class="sub" style="font-size:13px;margin:10px 0 0">🚪 נעילת דלתות החדר ל-12 שניות · 💡 הפלת החשמל · 💨 הפסקת חמצן (45ש׳) · ☢️ התחממות הכור (45ש׳)</p>
+    <p class="sub legend" style="font-size:13px;margin:10px 0 0">🚪 נעילת דלתות החדר ל-12 שניות · 💡 הפלת החשמל · 💨 הפסקת חמצן (45ש׳) · ☢️ התחממות הכור (45ש׳)</p>
   </div>
 </div>
 <div id="sabBanner" class="hidden"></div>
@@ -456,7 +501,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-143001'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-144340'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -702,7 +747,7 @@ function onState(s) {
   if (s.phase === 'meeting') renderMeeting(s);
   if (s.phase === 'eject') renderEject(s);
   if (s.phase === 'end') renderEnd(s);
-  show('#joy', isTouch && s.phase === 'play');
+  if (s.phase !== 'play' && joy.active) window.__joyEnd && window.__joyEnd();
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
   miniSync(s);
@@ -1948,7 +1993,7 @@ function sendInput() {
   const kc = { up: dy < 0, down: dy > 0, left: dx < 0, right: dx > 0 };
   document.querySelectorAll('.keys b').forEach(b => b.classList.toggle('on', !!kc[b.dataset.k]));
   const sig = dx.toFixed(2) + ',' + dy.toFixed(2);
-  if (sig !== lastIn && ID) { lastIn = sig; api({ type: 'input', dx, dy }); }
+  if (sig !== lastIn && ID) { lastIn = sig; api({ type: 'input', dx, dy, assist: isTouch }); }
 }
 // קיצור סודי: מקשי צ+מ ביחד (המקשים M+N, בכל שפת מקלדת), או נגיעה בו-זמנית למעלה ולמטה במסך בטלפון.
 // מפעיל/מכבה את מצב החשיפה – וכשהוא פעיל כולם רואים אותו ומופיע שלט למעלה.
@@ -1995,27 +2040,67 @@ addEventListener('blur', () => { keys.clear(); sendInput(); });
 setInterval(() => { if (S && S.phase === 'play') { lastIn = ''; sendInput(); } }, 1000);
 
 const isTouch = matchMedia('(pointer: coarse)').matches;
+if (isTouch) document.body.classList.add('touch');
 const joy = { active: false, dx: 0, dy: 0 };
+// ג'ויסטיק צף: נוגעים בצד שמאל של המסך והוא נפתח במקום האצבע. עובד גם כשלוחצים על כפתורים באצבע אחרת.
 (function () {
   const el = $('#joy'), knob = $('#knob');
-  let cx, cy;
+  let id = null, cx = 0, cy = 0;
+  const M = 55;
   const move = t => {
     let dx = t.clientX - cx, dy = t.clientY - cy;
-    const l = Math.hypot(dx, dy), m = 50;
-    if (l > m) { dx = dx / l * m; dy = dy / l * m; }
+    const l = Math.hypot(dx, dy);
+    if (l > M) { dx = dx / l * M; dy = dy / l * M; }
     knob.style.transform = `translate(${dx}px,${dy}px)`;
-    joy.dx = Math.abs(dx) > 10 ? dx / m : 0; joy.dy = Math.abs(dy) > 10 ? dy / m : 0;
+    joy.dx = Math.abs(dx) > 8 ? dx / M : 0; joy.dy = Math.abs(dy) > 8 ? dy / M : 0;
     sendInput();
   };
-  el.addEventListener('touchstart', e => { const r = el.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; joy.active = true; move(e.touches[0]); e.preventDefault(); }, { passive: false });
-  el.addEventListener('touchmove', e => { move(e.touches[0]); e.preventDefault(); }, { passive: false });
-  el.addEventListener('touchend', () => { joy.active = false; joy.dx = joy.dy = 0; knob.style.transform = ''; sendInput(); });
+  const end = () => { id = null; joy.active = false; joy.dx = joy.dy = 0; knob.style.transform = ''; el.classList.add('hidden'); sendInput(); };
+  document.addEventListener('touchstart', e => {
+    if (!S || S.phase !== 'play' || id !== null || S.me.cam || miniOpen !== null || sabOpen || tmOpen) return;
+    for (const t of e.changedTouches) {
+      if (t.target !== cv || t.clientX > innerWidth * 0.55) continue;
+      id = t.identifier; cx = t.clientX; cy = t.clientY; joy.active = true;
+      el.style.left = (cx - 65) + 'px'; el.style.top = (cy - 65) + 'px'; el.classList.remove('hidden');
+      move(t); e.preventDefault(); break;
+    }
+  }, { passive: false });
+  document.addEventListener('touchmove', e => { if (id === null) return; for (const t of e.changedTouches) if (t.identifier === id) { move(t); e.preventDefault(); } }, { passive: false });
+  const fin = e => { if (id === null) return; for (const t of e.changedTouches) if (t.identifier === id) end(); };
+  document.addEventListener('touchend', fin); document.addEventListener('touchcancel', fin);
+  window.__joyEnd = end;
 })();
+// אין זום בצביטה / לחיצה כפולה (iPhone)
+['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => document.addEventListener(ev, e => e.preventDefault()));
+
+// מסך מלא + נעילה לרוחב, ורמז לסיבוב המכשיר
+(function () {
+  const btn = $('#fsBtn'), standalone = navigator.standalone || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches;
+  const refresh = () => btn.classList.toggle('hidden', !isTouch || standalone || !!document.fullscreenElement || !!(S && S.phase !== 'lobby'));
+  setInterval(refresh, 800);
+  refresh(); document.addEventListener('fullscreenchange', refresh);
+  btn.onclick = async () => {
+    const de = document.documentElement;
+    try { if (de.requestFullscreen) { await de.requestFullscreen({ navigationUI: 'hide' }); try { await screen.orientation.lock('landscape'); } catch (e) {} } else toast('ב-iPhone: לחץ על כפתור השיתוף ואז "הוסף למסך הבית" – ואז המשחק נפתח במסך מלא'); }
+    catch (e) { toast('המכשיר לא אישר מסך מלא. ב-iPhone: שיתוף ← הוסף למסך הבית'); }
+    refresh();
+  };
+  setInterval(() => document.body.classList.toggle('overlay-open', !!(sabOpen || tmOpen || miniOpen !== null || (S && ['alert', 'eject'].includes(S.phase)))), 250);
+  let hintOff = false;
+  $('#rotX').onclick = () => { hintOff = true; $('#rotHint').classList.add('hidden'); };
+  setInterval(() => { const portrait = innerHeight > innerWidth; $('#rotHint').classList.toggle('hidden', !(isTouch && portrait && !hintOff && S && S.phase === 'play')); }, 1000);
+})();
+
+// זום תצוגה מותאם אישית (נשמר במכשיר)
+let ZOOM = 1;
+try { const zv = parseFloat(localStorage.getItem('mm_zoom')); if (zv >= 0.6 && zv <= 1.8) ZOOM = zv; else if (isTouch) ZOOM = 1.2; } catch (e) {}
+$('#zoomRange').value = Math.round(ZOOM * 100); $('#zoomVal').textContent = Math.round(ZOOM * 100) + '%';
+$('#zoomRange').oninput = e => { ZOOM = +e.target.value / 100; $('#zoomVal').textContent = e.target.value + '%'; try { localStorage.setItem('mm_zoom', ZOOM); } catch (er) {} };
 
 // ---------- ציור ----------
 let W, H, DPR;
 function resize() {
-  DPR = Math.min(2, devicePixelRatio || 1);
+  DPR = Math.min(isTouch ? 1.5 : 2, devicePixelRatio || 1);
   W = innerWidth; H = innerHeight;
   cv.width = W * DPR; cv.height = H * DPR;
 }
@@ -2498,7 +2583,8 @@ function frame(t) {
     for (const p of S.players) { const d = disp[p.id]; if (d) { const k = Math.min(1, dt * 14); d.x += (p.x - d.x) * k; d.y += (p.y - d.y) * k; } }
     drawCams(t); return;
   }
-  const z = Math.max(0.55, Math.min(1.5, Math.min(W, H) / 720));
+  // זום יחסי לגודל המסך (כך שטווח הראייה נראה אותו דבר בטלפון ובמחשב), ועם זום מותאם אישית
+  const z = Math.min(2.6, Math.max(0.4, Math.min(1.5, Math.min(W, H) / 720)) * ZOOM);
   const ox = W / 2 - cam.x * z, oy = H / 2 - cam.y * z;
   ctx.setTransform(DPR * z, 0, 0, DPR * z, DPR * ox, DPR * oy);
   VIEW = { x0: cam.x - W / (2 * z) - 80, x1: cam.x + W / (2 * z) + 80, y0: cam.y - H / (2 * z) - 80, y1: cam.y + H / (2 * z) + 80 };

@@ -1,0 +1,14 @@
+{
+  "name": "מי המתחזה?",
+  "short_name": "מי המתחזה",
+  "description": "משחק חשיפה חברתי בעברית עם חברים",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b0e16",
+  "theme_color": "#0b0e16",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

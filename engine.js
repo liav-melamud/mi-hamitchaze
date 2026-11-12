@@ -277,6 +277,7 @@ function act(p, a) {
       const dx = Math.max(-1, Math.min(1, Number(a.dx) || 0));
       const dy = Math.max(-1, Math.min(1, Number(a.dy) || 0));
       p.input = { dx, dy };
+      p.assist = !!a.assist; // במגע: רדיוס התנגשות קטן יותר, קל יותר לעבור במסדרונות ובדלתות
       break;
     }
     case 'camoff': p.cam = false; break;
@@ -796,8 +797,9 @@ function tick() {
           p.x = Math.max(0, Math.min(MAP.WORLD.w, p.x + dx * step));
           p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
         } else {
-          if (MAP.walkable(p.x + dx * step, p.y) && !doorBlocked(p.x + dx * step, p.y)) p.x += dx * step;
-          if (MAP.walkable(p.x, p.y + dy * step) && !doorBlocked(p.x, p.y + dy * step)) p.y += dy * step;
+          const rr = p.assist ? 10 : 18;
+          if (MAP.walkable(p.x + dx * step, p.y, rr) && !doorBlocked(p.x + dx * step, p.y)) p.x += dx * step;
+          if (MAP.walkable(p.x, p.y + dy * step, rr) && !doorBlocked(p.x, p.y + dy * step)) p.y += dy * step;
         }
         if (Math.abs(dx) > 0.1) p.dir = dx > 0 ? 1 : -1;
         p.work = null; p.cam = false; p.sabWork = null;
