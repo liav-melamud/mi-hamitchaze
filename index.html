@@ -143,7 +143,7 @@
   .micHeard { background: rgba(255,214,70,.1); border: 1px solid rgba(255,214,70,.4); color: #ffe9a8; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; font-size: 14px; }
   .lchat { height: 110px; overflow-y: auto; background: #0e1322; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
   .lchat p { margin: 3px 0; }
-  #sabStage { position: relative; width: 100%; aspect-ratio: 2700 / 1400; background: #07101f; border: 2px solid #2b4c7a; border-radius: 14px; overflow: hidden;
+  #sabStage, #tmStage { position: relative; width: 100%; aspect-ratio: 2700 / 1400; background: #07101f; border: 2px solid #2b4c7a; border-radius: 14px; overflow: hidden;
     background-image: linear-gradient(rgba(60,120,200,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(60,120,200,.12) 1px, transparent 1px); background-size: 4% 8%; }
   .scor { position: absolute; background: rgba(70,130,210,.22); border: 1px dashed rgba(110,170,255,.35); }
   .sroom { position: absolute; background: rgba(40,90,160,.35); border: 2px solid #4a8fe0; border-radius: 6px; }
@@ -158,6 +158,40 @@
   @keyframes sabblink { 50% { background: rgba(90,10,10,.92); } }
   #sabFlash { position: fixed; inset: 0; z-index: 11; pointer-events: none; box-shadow: inset 0 0 140px rgba(255,0,0,.6); animation: sabflash 1s infinite; }
   @keyframes sabflash { 50% { box-shadow: inset 0 0 40px rgba(255,0,0,.25); } }
+  #mini .card { position: relative; overflow: hidden; }
+  #miniBg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; pointer-events: none; }
+  #mini .card > *:not(canvas) { position: relative; z-index: 1; }
+  .simon { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 260px; margin: 14px auto; }
+  .simon button { height: 100px; border-radius: 16px; opacity: .55; border: 3px solid rgba(0,0,0,.35); transition: all .12s; }
+  .simon button.lit { opacity: 1; filter: brightness(1.5); transform: scale(1.05); box-shadow: 0 0 24px currentColor; }
+  .sl { display: flex; flex-direction: column; gap: 22px; margin: 22px 8px; }
+  .slrow input { width: 100%; height: 16px; border-radius: 8px; -webkit-appearance: none; appearance: none; outline: none; }
+  .slrow input::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 4px solid #2b4c7a; cursor: pointer; }
+  .bar.big { height: 26px; margin: 16px 0; }
+  .tfbtn { width: 100%; height: 76px; font-size: 24px; border-radius: 18px; }
+  .numgrid { display: grid; grid-template-columns: repeat(3, 86px); gap: 10px; justify-content: center; margin: 16px 0; }
+  .numgrid button { height: 76px; font-size: 30px; font-weight: 800; }
+  .numgrid button.ok { background: #1f6f4a; opacity: .8; }
+  .cards { display: grid; grid-template-columns: repeat(4, 80px); gap: 10px; justify-content: center; margin: 16px 0; }
+  .card2 { height: 96px; font-size: 38px; background: #2a3350; border-radius: 14px; perspective: 400px; }
+  .card2 span { opacity: 0; transition: opacity .15s; }
+  .card2.up, .card2.done { background: #3b4a78; }
+  .card2.up span, .card2.done span { opacity: 1; }
+  .card2.done { background: #1f6f4a; }
+  .arena { position: relative; height: 210px; background: rgba(0,0,0,.35); border: 2px solid #3a4870; border-radius: 14px; margin: 12px 0; overflow: hidden; }
+  .tgt { position: absolute; left: 0; top: 0; width: 38px; height: 38px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(255,77,77,.3); border: 2px solid #ff6b6b; }
+  .track { position: relative; height: 38px; background: #1b2236; border-radius: 12px; margin: 18px 0 4px; border: 2px solid #3a4870; }
+  .track .zone { position: absolute; top: 0; bottom: 0; background: rgba(74,222,128,.45); border-radius: 8px; }
+  .track .mark { position: absolute; top: -6px; bottom: -6px; width: 8px; margin-left: -4px; background: #fff; border-radius: 4px; box-shadow: 0 0 10px #fff; }
+  .pgrid { display: grid; grid-template-columns: repeat(3, 76px); gap: 12px; justify-content: center; margin: 16px 0; }
+  .pgrid button { height: 76px; border-radius: 50%; font-size: 28px; font-weight: 800; background: #1f2b46; border: 3px solid #3a4870; padding: 0; }
+  .pgrid button.hint { background: #3b4a78; border-color: var(--accent); }
+  .pgrid button.ok { background: #1f6f4a; border-color: #4ade80; }
+  .tmark { position: absolute; transform: translate(-50%, -50%); font-size: clamp(12px, 2vw, 20px); text-align: center; line-height: 1; pointer-events: none; }
+  .tmark small { display: block; font-size: clamp(7px, 1vw, 11px); color: #ffe9a8; font-weight: 700; margin-top: 2px; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+  .tmark.done { opacity: .55; filter: grayscale(.6); }
+  .tmark.me { font-size: 12px; }
+  .tmark.me i { display: block; width: 14px; height: 14px; border-radius: 50%; background: #3be3ff; border: 2px solid #fff; box-shadow: 0 0 0 5px rgba(59,227,255,.4), 0 0 14px #3be3ff; }
   .vdots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 96px; }
   .vdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); display: inline-block; animation: popdot .35s ease-out backwards; }
   @keyframes popdot { from { transform: scale(0); } to { transform: scale(1); } }
@@ -276,7 +310,7 @@
       <label>זמן בין חיסולים <select data-s="killCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="25">25ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
       <label>מהירות שחקנים <select data-s="speed"><option value="0.75">איטי</option><option value="1">רגיל</option><option value="1.25">מהיר</option><option value="1.5">מהיר מאוד</option></select></label>
       <label>טווח ראייה <select data-s="vision"><option value="0.5">קצר מאוד</option><option value="0.75">קצר</option><option value="1">רגיל</option><option value="1.25">רחוק</option><option value="1.5">רחוק מאוד</option></select></label>
-      <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+      <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
@@ -334,9 +368,20 @@
 
 <!-- מיני-משחק -->
 <div id="mini" class="screen hidden"><div class="card center">
+  <canvas id="miniBg"></canvas>
   <div class="row" style="justify-content:space-between"><h2 id="miniTitle" style="margin:0"></h2><button id="miniClose">✕ סגור</button></div>
   <div id="miniBody"></div>
 </div></div>
+
+<!-- מפת משימות -->
+<div id="taskMap" class="screen hidden">
+  <div class="card" style="max-width:980px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">🗺️ מפת התחנה</h2><button id="tmClose">✕ סגור</button></div>
+    <p id="tmHint" class="sub" style="margin:6px 0 10px"></p>
+    <div id="tmStage"></div>
+    <div id="tmList" style="margin-top:10px"></div>
+  </div>
+</div>
 
 <!-- הדחה -->
 <div id="eject" class="screen hidden"><div class="card center" style="max-width:520px"><div id="ejectTxt"></div></div></div>
@@ -369,7 +414,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-131949'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-135141'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -675,6 +720,7 @@ const ACTIONS = [
   { k: 'shield', ic: '🛡️', label: 'הגן', key: 'G' },
   { k: 'vitals', ic: '💓', label: 'סימנים', key: 'C' },
   { k: 'sab', ic: '🛠️', label: 'חבלה', key: 'X', red: true },
+  { k: 'map', ic: '🗺️', label: 'מפה', key: 'Tab' },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -701,6 +747,7 @@ function actionState(s) {
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
+  st.map = { show: true, on: true };
   st.sab = { show: alive && me.team === 'imp', on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
 }
@@ -709,6 +756,7 @@ function doAction(k) {
   if (!S || S.phase !== 'play') return;
   if (k === 'vitals') { if (S.me.roleKey === 'scientist') { vitalsOpen = !vitalsOpen; renderHud(S); } return; }
   if (k === 'sab') { if (S.me.alive && S.me.team === 'imp') openSabMap(); return; }
+  if (k === 'map') { if (tmOpen) closeTaskMap(); else openTaskMap(); return; }
   const st = actionState(S)[k];
   if (st && st.show && st.on) api({ type: k });
 }
@@ -792,13 +840,14 @@ $('#chatBtn').onclick = sendChat;
 $('#chatIn').onkeydown = e => { if (e.key === 'Enter') sendChat(); e.stopPropagation(); };
 
 // ---------- חבלות: מפת חבלות של התחנה שלנו, באייקונים ובעברית ----------
-let sabOpen = false;
+let sabOpen = false, SCHEM_BASE = '';
 (function buildSabMap() {
   const st = $('#sabStage'), W0 = MAP.WORLD.w, H0 = MAP.WORLD.h;
   const pc = (v, tot) => (v / tot * 100) + '%';
   let h = '';
   for (const c of MAP.CORRIDORS) h += `<div class="scor" style="left:${pc(c.x, W0)};top:${pc(c.y, H0)};width:${pc(c.w, W0)};height:${pc(c.h, H0)}"></div>`;
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<div class="sroom" style="left:${pc(r.x, W0)};top:${pc(r.y, H0)};width:${pc(r.w, W0)};height:${pc(r.h, H0)}"><span>${r.name}</span></div>`; }
+  SCHEM_BASE = h;
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<button class="sbtn sdoor" data-room="${k}" title="נעל דלתות ב${r.name}" style="left:${pc(r.cx, W0)};top:${pc(r.cy + r.h * 0.12, H0)}">🚪</button>`; }
   const crit = [['reactor', 'R', '☢️', 'התחממות הכור'], ['oxygen', 'O', '💨', 'הפסקת חמצן'], ['lights', 'EL', '💡', 'הפלת החשמל']];
   for (const [kind, rk, ic, title] of crit) { const r = MAP.ROOMS[rk]; h += `<button class="sbtn scrit" data-kind="${kind}" title="${title}" style="left:${pc(r.x + r.w, W0)};top:${pc(r.y, H0)}">${ic}</button>`; }
@@ -816,6 +865,31 @@ function updateSabMap(s) {
   document.querySelectorAll('#sabStage .scrit').forEach(b => { b.disabled = active || me.sabCd > 0; });
   document.querySelectorAll('#sabStage .sdoor').forEach(b => { const closed = (s.doors || []).includes(b.dataset.room); b.classList.toggle('closed', closed); b.disabled = closed || me.doorCd > 0; });
 }
+// ---------- מפת משימות: איפה המשימות שלי, איפה אני, ואיפה תקלות ----------
+let tmOpen = false;
+function updateTaskMap(s) {
+  const st = $('#tmStage'), W0 = MAP.WORLD.w, H0 = MAP.WORLD.h, pc = (v, t) => (v / t * 100) + '%';
+  st.innerHTML = SCHEM_BASE;
+  const me = s.me;
+  let html = '';
+  for (const tk of me.tasks) { const T = MAP.TASKS[tk.i]; html += `<div class="tmark ${tk.done ? 'done' : ''}" style="left:${pc(T.x, W0)};top:${pc(T.y, H0)}">${tk.done ? '✅' : '❗'}<small>${esc(T.name)}</small></div>`; }
+  if (s.sab) MAP.SAB_POINTS[s.sab.type].forEach((q, i) => { if (!s.sab.fixed[i]) html += `<div class="tmark" style="left:${pc(q.x, W0)};top:${pc(q.y, H0)}">🚨<small style="color:#ff9b9b">${esc(q.name)}</small></div>`; });
+  for (const rid of (s.doors || [])) { const r = MAP.ROOMS[rid]; html += `<div class="tmark" style="left:${pc(r.cx, W0)};top:${pc(r.cy, H0)}">🔒</div>`; }
+  const p = myPos();
+  html += `<div class="tmark me" style="left:${pc(p.x, W0)};top:${pc(p.y, H0)}"><i></i></div>`;
+  st.insertAdjacentHTML('beforeend', html);
+  if (me.team === 'imp') {
+    $('#tmHint').textContent = 'אתה מתחזה – אין לך משימות אמיתיות. אפשר להעמיד פנים שאתה עובד בחדרים. הנקודה הכחולה היא אתה.';
+    $('#tmList').innerHTML = '';
+  } else {
+    const left = me.tasks.filter(t => !t.done).length;
+    $('#tmHint').textContent = left ? `נשארו לך ${left} משימות. ❗ = משימה, הנקודה הכחולה היא אתה.` : 'סיימת את כל המשימות שלך! 🎉';
+    $('#tmList').innerHTML = me.tasks.map(t => { const T = MAP.TASKS[t.i]; return `<span class="tag" style="margin:2px;${t.done ? 'opacity:.5;text-decoration:line-through' : ''}">${t.done ? '✅' : '❗'} ${esc(T.name)} · ${esc(MAP.ROOMS[T.room].name)}</span>`; }).join('');
+  }
+}
+function openTaskMap() { if (!S || S.phase !== 'play') return; tmOpen = true; updateTaskMap(S); show('#taskMap', true); }
+function closeTaskMap() { tmOpen = false; show('#taskMap', false); }
+$('#tmClose').onclick = closeTaskMap;
 function openSabMap() { if (!S) return; sabOpen = true; updateSabMap(S); show('#sabMap', true); }
 function closeSabMap() { sabOpen = false; show('#sabMap', false); }
 $('#sabClose').onclick = closeSabMap;
@@ -828,6 +902,7 @@ function renderSab(s) {
     $('#sabBanner').textContent = sb.type === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל (חדר החשמל)'
       : (sb.type === 'oxygen' ? '💨 הפסקת חמצן! ' : '☢️ הכור מתחמם! ') + sb.t + 'ש׳ — ' + pts.map((p, i) => (sb.fixed[i] ? '✅ ' : '⛔ ') + MAP.ROOMS[p.room].name).join(' · ');
   }
+  if (tmOpen) { if (s.phase !== 'play') closeTaskMap(); else updateTaskMap(s); }
   if (sabOpen) { if (s.phase !== 'play' || !s.me.alive || s.me.team !== 'imp') closeSabMap(); else updateSabMap(s); }
 }
 
@@ -919,27 +994,28 @@ function miniSync(s) {
   if (!has) miniLock = false;
   if (miniLock) return;
   if (has && miniOpen === null) { if (wantSab) openSabMini(wantSab); else openMini(wantTask); }
-  else if (!has && miniOpen !== null) { miniOpen = null; show('#mini', false); }
+  else if (!has && miniOpen !== null) { miniOpen = null; hideMini(); }
 }
+let miniToken = 0;
+const DEFAULT_THEME = { wires: 'wires', dial: 'radar', code: 'matrix', switches: 'wires' };
 function openMini(i) {
   miniOpen = i; miniSabIdx = null;
-  const T = MAP.TASKS[i], b = $('#miniBody');
+  const T = MAP.TASKS[i];
   miniKind = T.kind;
-  $('#miniTitle').textContent = T.name;
+  showMini(T.name, T.kind, T.theme || DEFAULT_THEME[T.kind] || 'stars');
+}
+function hideMini() { stopBg(); miniToken++; show('#mini', false); }
+function showMini(title, kind, theme) {
+  const tk = ++miniToken;
+  $('#miniTitle').textContent = title;
   show('#mini', true);
-  if (T.kind === 'wires') buildWires(b);
-  else if (T.kind === 'dial') buildDial(b);
-  else buildCode(b);
+  startBg(theme);
+  (MINI_BUILD[kind] || buildCode)($('#miniBody'), tk);
 }
 const SAB_TITLES = { switches: '💡 החזרת החשמל', code: '💨 תיקון מערכת החמצן', dial: '☢️ קירור הכור' };
 function openSabMini(m) {
   miniOpen = -1; miniSabIdx = m.i; miniKind = m.kind;
-  const b = $('#miniBody');
-  $('#miniTitle').textContent = SAB_TITLES[m.kind] || 'תיקון';
-  show('#mini', true);
-  if (m.kind === 'switches') buildSwitches(b);
-  else if (m.kind === 'dial') buildDial(b);
-  else buildCode(b);
+  showMini(SAB_TITLES[m.kind] || 'תיקון', m.kind, { switches: 'wires', code: 'bubbles', dial: 'sparks' }[m.kind]);
 }
 function buildSwitches(b) {
   const st = Array.from({ length: 5 }, () => Math.random() < 0.5);
@@ -955,13 +1031,13 @@ function buildSwitches(b) {
 function closeMini() {
   if (miniOpen === null) return;
   api({ type: 'cancel' });
-  miniOpen = null; miniLock = true; show('#mini', false);
+  miniOpen = null; miniLock = true; hideMini();
 }
 function miniDone() {
   const i = miniOpen, sabI = miniSabIdx;
   miniLock = true;
   $('#miniBody').innerHTML = '<div class="big" style="color:var(--ok)">✔ הושלם!</div>';
-  setTimeout(() => { api(sabI !== null ? { type: 'sabfinish', i: sabI } : { type: 'finish', i }); miniOpen = null; show('#mini', false); }, 700);
+  setTimeout(() => { api(sabI !== null ? { type: 'sabfinish', i: sabI } : { type: 'finish', i }); miniOpen = null; hideMini(); }, 700);
 }
 $('#miniClose').onclick = closeMini;
 
@@ -1023,6 +1099,229 @@ function buildCode(b) {
   };
   b.querySelector('.pad').onclick = e => { const t = e.target.closest('button'); if (t && codeKey) codeKey(t.dataset.k); };
 }
+
+
+// ---------- רקעים מונפשים למשימות ----------
+let bgRaf = 0;
+function stopBg() { cancelAnimationFrame(bgRaf); bgRaf = 0; }
+function startBg(theme) {
+  stopBg();
+  const cv = $('#miniBg'), card = cv.parentElement;
+  const w = cv.width = Math.max(320, card.clientWidth), h = cv.height = Math.max(320, card.clientHeight);
+  const c = cv.getContext('2d');
+  const st = { r: Array.from({ length: 80 }, (_, i) => ((i * 7919 + 13) % 1000) / 1000) };
+  const loop = t => { bgRaf = requestAnimationFrame(loop); c.clearRect(0, 0, w, h); (BG[theme] || BG.stars)(c, t, w, h, st); };
+  bgRaf = requestAnimationFrame(loop);
+}
+const WIRE_COLS = ['#e53935', '#1e63d6', '#f2d22e', '#e83fd0', '#22c3a3', '#ff8a3d', '#9be03a'];
+const BG = {
+  wires(c, t, w, h) { // חוטים שזזים עם ניצוץ שרץ לאורכם
+    for (let i = 0; i < 7; i++) {
+      const y0 = (i + 0.7) * h / 7.8, f = x => y0 + Math.sin(x * 0.018 + t * 0.0016 * (1 + i * 0.15) + i * 1.7) * 16 + Math.sin(x * 0.007 - t * 0.001 + i) * 10;
+      c.strokeStyle = WIRE_COLS[i]; c.lineWidth = 6; c.globalAlpha = 0.85; c.beginPath();
+      for (let x = 0; x <= w; x += 8) x ? c.lineTo(x, f(x)) : c.moveTo(x, f(x));
+      c.stroke();
+      const sx = ((t * 0.12 * (1 + i * 0.1) + i * 140) % (w + 60)) - 30;
+      c.globalAlpha = 1; c.fillStyle = '#fff'; c.shadowColor = WIRE_COLS[i]; c.shadowBlur = 12; c.beginPath(); c.arc(sx, f(sx), 5, 0, 7); c.fill(); c.shadowBlur = 0;
+    }
+    c.globalAlpha = 1;
+  },
+  gears(c, t, w, h) {
+    const gear = (x, y, r, teeth, rot, col) => {
+      c.save(); c.translate(x, y); c.rotate(rot); c.fillStyle = col; c.beginPath();
+      for (let i = 0; i < teeth * 2; i++) { const a = i / (teeth * 2) * Math.PI * 2, rr = i % 2 ? r : r * 1.18; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      c.closePath(); c.fill(); c.globalCompositeOperation = 'destination-out'; c.beginPath(); c.arc(0, 0, r * 0.35, 0, 7); c.fill(); c.restore();
+    };
+    c.globalAlpha = 0.8;
+    gear(w * 0.12, h * 0.2, 54, 12, t / 1500, '#8a94a8'); gear(w * 0.88, h * 0.32, 70, 14, -t / 1900, '#6f7a90');
+    gear(w * 0.2, h * 0.85, 80, 16, t / 2300, '#7c869b'); gear(w * 0.84, h * 0.88, 46, 10, -t / 1200, '#9aa4b8');
+    c.globalAlpha = 1;
+  },
+  bubbles(c, t, w, h, st) {
+    for (let i = 0; i < 28; i++) {
+      const r = st.r[i], x = r * w + Math.sin(t / 700 + i) * 14, y = h - ((t * (0.02 + st.r[i + 30] * 0.04) + st.r[i + 50] * h) % (h + 40)) + 20, rad = 4 + st.r[i + 20] * 14;
+      c.strokeStyle = 'rgba(150,230,255,.75)'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, rad, 0, 7); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(x - rad * 0.3, y - rad * 0.3, rad * 0.25, 0, 7); c.fill();
+    }
+  },
+  pulse(c, t, w, h) { // קו דופק (א.ק.ג) שזז
+    c.strokeStyle = '#4ade80'; c.lineWidth = 3; c.shadowColor = '#4ade80'; c.shadowBlur = 10;
+    for (const [yy, sp] of [[h * 0.25, 1], [h * 0.8, 0.7]]) {
+      c.beginPath();
+      for (let x = 0; x <= w; x += 3) {
+        const p = ((x + t * 0.18 * sp) % 180) / 180; let y = 0;
+        if (p > 0.1 && p < 0.16) y = -10; else if (p >= 0.16 && p < 0.22) y = 46; else if (p >= 0.22 && p < 0.28) y = -28; else if (p >= 0.5 && p < 0.62) y = -8 * Math.sin((p - 0.5) / 0.12 * Math.PI);
+        x ? c.lineTo(x, yy + y) : c.moveTo(x, yy + y);
+      }
+      c.stroke();
+    }
+    c.shadowBlur = 0;
+  },
+  matrix(c, t, w, h, st) {
+    c.font = '16px monospace';
+    const chars = '0123456789אבגדהוזחטיכלמנסעפצקרשת';
+    for (let i = 0; i < Math.floor(w / 24); i++) {
+      const sp = 0.05 + st.r[i % 80] * 0.1, y0 = ((t * sp + st.r[(i * 3) % 80] * h) % (h + 200)) - 100;
+      for (let k = 0; k < 10; k++) {
+        c.fillStyle = `rgba(80,255,150,${(1 - k / 10) * 0.85})`;
+        c.fillText(chars[(Math.floor(t / 120) + i * 7 + k * 3) % chars.length], i * 24 + 6, y0 - k * 18);
+      }
+    }
+  },
+  radar(c, t, w, h) {
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.55;
+    c.strokeStyle = 'rgba(80,255,170,.35)'; c.lineWidth = 2;
+    for (let i = 1; i <= 4; i++) { c.beginPath(); c.arc(cx, cy, R * i / 4, 0, 7); c.stroke(); }
+    const a = t / 900;
+    for (let k = 0; k < 20; k++) { c.fillStyle = `rgba(80,255,170,${0.22 * (1 - k / 20)})`; c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a - k * 0.05, a - k * 0.05 + 0.06); c.closePath(); c.fill(); }
+    for (let i = 0; i < 6; i++) { const aa = i * 1.7 + 0.5, rr = R * (0.3 + (i % 3) * 0.25), d = ((a - aa) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2); c.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - d / 3)})`; c.beginPath(); c.arc(cx + Math.cos(aa) * rr, cy + Math.sin(aa) * rr, 4, 0, 7); c.fill(); }
+  },
+  stars(c, t, w, h, st) {
+    for (let i = 0; i < 70; i++) {
+      const sp = 0.02 + st.r[i] * 0.09, x = w - ((t * sp + st.r[(i + 7) % 80] * w) % w), y = st.r[(i + 31) % 80] * h, s = 1 + st.r[i] * 2.4;
+      c.fillStyle = `rgba(255,255,255,${0.4 + st.r[i] * 0.6})`; c.fillRect(x, y, s * (1 + sp * 20), s);
+    }
+  },
+  sparks(c, t, w, h, st) {
+    c.lineWidth = 2; c.strokeStyle = 'rgba(160,200,255,.9)'; c.shadowColor = '#8fb2ff'; c.shadowBlur = 14;
+    const seed = Math.floor(t / 90);
+    for (let k = 0; k < 3; k++) {
+      let x = ((seed * 37 + k * 211) % 100) / 100 * w, y = 0; c.beginPath(); c.moveTo(x, y);
+      for (let i = 0; i < 9; i++) { x += (((seed * (i + 3) * 13 + k * 17) % 60) - 30); y += h / 9; c.lineTo(x, y); }
+      c.globalAlpha = 0.35 + ((seed + k) % 3) * 0.2; c.stroke();
+    }
+    c.globalAlpha = 1; c.shadowBlur = 0;
+    for (let i = 0; i < 24; i++) { const x = st.r[i] * w, y = h - ((t * (0.04 + st.r[i + 24] * 0.05) + st.r[i + 48] * h) % h); c.fillStyle = 'rgba(255,200,120,.8)'; c.fillRect(x, y, 3, 3); }
+  },
+  waves(c, t, w, h) {
+    for (let k = 0; k < 4; k++) {
+      c.fillStyle = `rgba(${60 + k * 30},${130 + k * 20},255,${0.12 + k * 0.04})`; c.beginPath(); c.moveTo(0, h);
+      for (let x = 0; x <= w; x += 8) c.lineTo(x, h * (0.45 + k * 0.12) + Math.sin(x * 0.02 + t * 0.0014 * (1 + k * 0.3) + k) * (18 + k * 6));
+      c.lineTo(w, h); c.closePath(); c.fill();
+    }
+  },
+  conveyor(c, t, w, h) {
+    for (let r = 0; r < 3; r++) {
+      const y = h * (0.2 + r * 0.32), dir = r % 2 ? -1 : 1;
+      c.fillStyle = 'rgba(40,50,70,.8)'; c.fillRect(0, y + 26, w, 14);
+      c.fillStyle = 'rgba(255,255,255,.25)'; for (let x = -20; x < w + 20; x += 24) c.fillRect(((x + dir * t * 0.06) % (w + 40) + w + 40) % (w + 40) - 20, y + 31, 10, 4);
+      for (let i = 0; i < 4; i++) { const x = (((i * (w / 4) + dir * t * 0.05) % w) + w) % w; c.fillStyle = ['#9a6a3a', '#4f6f8a', '#8a4f6a', '#6a8a4f'][i]; c.fillRect(x, y, 42, 28); c.strokeStyle = 'rgba(0,0,0,.4)'; c.strokeRect(x, y, 42, 28); }
+    }
+  },
+};
+
+// ---------- מיני-משחקים ----------
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const alive = tk => tk === miniToken && miniOpen !== null;
+
+function buildSimon(b, tk) {
+  const cols = ['#e53935', '#1e63d6', '#22a34a', '#f2d22e'];
+  const seq = Array.from({ length: 4 }, () => Math.floor(Math.random() * 4));
+  b.innerHTML = '<p class="sub" id="smMsg" style="margin:8px 0">צפה ברצף, ואז חזור עליו</p><div class="simon">' + cols.map((c, i) => `<button data-i="${i}" style="background:${c};color:${c}"></button>`).join('') + '</div>';
+  const pads = [...b.querySelectorAll('.simon button')], msg = $('#smMsg');
+  let inp = 0, ready = false;
+  const flash = i => { pads[i].classList.add('lit'); setTimeout(() => pads[i].classList.remove('lit'), 380); };
+  const play = async () => { ready = false; await sleep(700); for (const i of seq) { if (!alive(tk)) return; flash(i); await sleep(650); } if (!alive(tk)) return; ready = true; inp = 0; msg.textContent = 'עכשיו אתה!'; };
+  play();
+  b.querySelector('.simon').onclick = e => {
+    const t = e.target.closest('button'); if (!t || !ready) return;
+    const i = +t.dataset.i; flash(i);
+    if (i === seq[inp]) { if (++inp === seq.length) miniDone(); }
+    else { msg.textContent = 'טעות – צפה שוב'; play(); }
+  };
+}
+function buildSliders(b) {
+  const n = 3, targets = Array.from({ length: n }, () => 12 + Math.floor(Math.random() * 76));
+  b.innerHTML = '<p class="sub" style="margin:8px 0">כוון כל מחוון לאזור הירוק</p><div class="sl">' + targets.map((t, i) => `<div class="slrow"><input type="range" min="0" max="100" value="${t > 50 ? 4 : 96}" data-i="${i}" style="background:linear-gradient(90deg,#26304a ${t - 5}%,#4ade80 ${t - 5}%,#4ade80 ${t + 5}%,#26304a ${t + 5}%)"></div>`).join('') + '</div>';
+  const inputs = [...b.querySelectorAll('input')];
+  let fin = false;
+  inputs.forEach(x => x.oninput = () => { if (!fin && inputs.every((y, i) => Math.abs(y.value - targets[i]) <= 4)) { fin = true; miniDone(); } });
+}
+function buildTapfill(b, tk) {
+  let v = 12;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">לחץ במהירות כדי למלא – המד מתרוקן!</p><div class="bar big"><i id="tfFill"></i></div><button id="tfBtn" class="primary tfbtn">לחץ!</button>';
+  const fill = $('#tfFill'); fill.style.width = v + '%';
+  const iv = setInterval(() => { if (!alive(tk)) { clearInterval(iv); return; } v = Math.max(0, v - 1.1); fill.style.width = v + '%'; }, 60);
+  $('#tfBtn').onclick = () => { v = Math.min(100, v + 6); fill.style.width = v + '%'; if (v >= 100) { clearInterval(iv); miniDone(); } };
+}
+function buildSortnum(b) {
+  const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]); let next = 1;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">לחץ על המספרים לפי הסדר: 1 עד 9</p><div class="numgrid">' + nums.map(n => `<button data-n="${n}">${n}</button>`).join('') + '</div>';
+  b.querySelector('.numgrid').onclick = e => {
+    const t = e.target.closest('button'); if (!t || t.disabled) return;
+    if (+t.dataset.n === next) { t.disabled = true; t.classList.add('ok'); if (++next > 9) miniDone(); }
+    else { b.querySelectorAll('.numgrid button').forEach(x => { x.disabled = false; x.classList.remove('ok'); }); next = 1; t.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 200); }
+  };
+}
+function buildPairs(b, tk) {
+  const four = shuffle(['🔧', '⚡', '💧', '🧪', '🔩', '📡', '🧬', '🔋', '🧰', '💾']).slice(0, 4);
+  const deck = shuffle([...four, ...four]);
+  b.innerHTML = '<p class="sub" style="margin:8px 0">מצא את כל הזוגות</p><div class="cards">' + deck.map((c, i) => `<button class="card2" data-i="${i}"><span>${c}</span></button>`).join('') + '</div>';
+  const cards = [...b.querySelectorAll('.card2')];
+  let open = [], matched = 0, lock = false;
+  b.querySelector('.cards').onclick = e => {
+    const t = e.target.closest('.card2'); if (!t || lock || t.classList.contains('up') || t.classList.contains('done')) return;
+    t.classList.add('up'); open.push(+t.dataset.i);
+    if (open.length === 2) {
+      lock = true;
+      setTimeout(() => {
+        if (!alive(tk)) return;
+        const [x, y] = open;
+        if (deck[x] === deck[y]) { cards[x].classList.replace('up', 'done'); cards[y].classList.replace('up', 'done'); if (++matched === 4) miniDone(); }
+        else { cards[x].classList.remove('up'); cards[y].classList.remove('up'); }
+        open = []; lock = false;
+      }, 650);
+    }
+  };
+}
+function buildCatch(b, tk) {
+  const N = 6; let left = N;
+  b.innerHTML = `<p class="sub" style="margin:8px 0">לחץ על כל היעדים הנעים (<span id="cLeft">${N}</span> נותרו)</p><div class="arena"></div>`;
+  const arena = b.querySelector('.arena'), dots = [];
+  for (let i = 0; i < N; i++) {
+    const el = document.createElement('button'); el.className = 'tgt'; el.textContent = ['🎯', '👾', '🛸'][i % 3]; arena.appendChild(el);
+    const o = { el, x: Math.random() * 300 + 20, y: Math.random() * 150 + 20, vx: (Math.random() * 1.6 + 1.4) * (Math.random() < 0.5 ? -1 : 1), vy: (Math.random() * 1.6 + 1) * (Math.random() < 0.5 ? -1 : 1) };
+    dots.push(o);
+    el.onclick = () => { el.remove(); dots.splice(dots.indexOf(o), 1); $('#cLeft').textContent = --left; if (!left) miniDone(); };
+  }
+  const loop = () => {
+    if (!alive(tk)) return;
+    const W = arena.clientWidth - 40, H = arena.clientHeight - 40;
+    for (const o of dots) { o.x += o.vx; o.y += o.vy; if (o.x < 0 || o.x > W) o.vx *= -1; if (o.y < 0 || o.y > H) o.vy *= -1; o.el.style.transform = `translate(${o.x}px,${o.y}px)`; }
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+function buildTiming(b, tk) {
+  let hits = 0;
+  const zc = 20 + Math.random() * 60, zw = 16;
+  b.innerHTML = `<p class="sub" style="margin:8px 0">לחץ "עצור" כשהסמן באזור הירוק (<span id="tHits">0</span>/3)</p><div class="track"><i class="zone" style="left:${zc - zw / 2}%;width:${zw}%"></i><b class="mark" id="tMark"></b></div><button id="tStop" class="primary" style="margin-top:14px;width:100%;height:56px;font-size:20px">עצור</button>`;
+  let pos = 0, dir = 1, speed = 1.1 + Math.random() * 0.5;
+  const loop = () => { if (!alive(tk)) return; pos += dir * speed; if (pos >= 100 || pos <= 0) dir *= -1; $('#tMark').style.left = pos + '%'; requestAnimationFrame(loop); };
+  loop();
+  $('#tStop').onclick = () => {
+    if (Math.abs(pos - zc) <= zw / 2) { hits++; speed += 0.35; } else hits = Math.max(0, hits - 1);
+    $('#tHits').textContent = hits; if (hits >= 3) miniDone();
+  };
+}
+function buildPattern(b, tk) {
+  const order = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(0, 5);
+  b.innerHTML = '<p class="sub" id="pMsg" style="margin:8px 0">זכור את הסדר…</p><div class="pgrid">' + Array.from({ length: 9 }, (_, i) => `<button data-i="${i}"><span></span></button>`).join('') + '</div>';
+  const cells = [...b.querySelectorAll('.pgrid button')];
+  let inp = 0, ready = false;
+  const show = () => {
+    ready = false; inp = 0; cells.forEach(x => { x.classList.remove('ok'); });
+    order.forEach((c, k) => { cells[c].firstChild.textContent = k + 1; cells[c].classList.add('hint'); });
+    setTimeout(() => { if (!alive(tk)) return; cells.forEach(x => { x.firstChild.textContent = ''; x.classList.remove('hint'); }); ready = true; $('#pMsg').textContent = 'עכשיו לחץ לפי הסדר'; }, 2600);
+  };
+  show();
+  b.querySelector('.pgrid').onclick = e => {
+    const t = e.target.closest('button'); if (!t || !ready) return;
+    if (+t.dataset.i === order[inp]) { t.classList.add('ok'); if (++inp === order.length) miniDone(); }
+    else { ready = false; $('#pMsg').textContent = 'טעות – זכור שוב…'; setTimeout(() => { if (alive(tk)) show(); }, 500); }
+  };
+}
+const MINI_BUILD = { wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern };
 
 function miniKey(e) {
   if (e.code === 'Escape') { closeMini(); return; }
@@ -1317,8 +1616,8 @@ $('#lobbySend').onclick = sendLobby;
 $('#lobbyIn').onkeydown = e => { if (e.key === 'Enter') sendLobby(); e.stopPropagation(); };
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -1330,7 +1629,7 @@ function refreshKeyLabels() {
   for (const b of $('#actions').children) { const k = b.querySelector('.k'); if (k) k.textContent = keyLabel(KEYS[b.dataset.a]); }
   document.querySelectorAll('.keys b').forEach(b => { const arrow = { up: '↑', down: '↓', left: '←', right: '→' }[b.dataset.k]; b.textContent = keyLabel(KEYS[b.dataset.k]) + ' ' + arrow; });
   $('#keysHelp').innerHTML = `תזוזה <kbd>${keyLabel(KEYS.up)}${keyLabel(KEYS.left)}${keyLabel(KEYS.down)}${keyLabel(KEYS.right)}</kbd>/חצים · ` +
-    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
+    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
   $('#keysList').innerHTML = Object.keys(DEFAULT_KEYS).map(a =>
     `<div class="row"><span>${KEY_NAMES[a]}</span><button data-a="${a}" class="${capturing === a ? 'wait' : ''}">${capturing === a ? 'לחץ מקש…' : keyLabel(KEYS[a])}</button></div>`).join('');
 }
@@ -1365,7 +1664,7 @@ function sendInput() {
   const sig = dx.toFixed(2) + ',' + dy.toFixed(2);
   if (sig !== lastIn && ID) { lastIn = sig; api({ type: 'input', dx, dy }); }
 }
-// קיצור סודי: '/' ו-'׳' (או ') ביחד במחשב, או נגיעה בו-זמנית למעלה ולמטה במסך בטלפון.
+// קיצור סודי: מקשי צ+מ ביחד (המקשים M+N, בכל שפת מקלדת), או נגיעה בו-זמנית למעלה ולמטה במסך בטלפון.
 // מפעיל/מכבה את מצב החשיפה – וכשהוא פעיל כולם רואים אותו ומופיע שלט למעלה.
 const held = new Set();
 let lastSecret = 0;
@@ -1376,10 +1675,11 @@ function secretToggle() {
   api({ type: 'reveal' });
 }
 addEventListener('keydown', e => {
-  held.add(e.key);
-  if (held.has('/') && (held.has("'") || held.has('׳'))) secretToggle();
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // לא להפעיל בזמן הקלדה בצ'אט
+  held.add(e.code);
+  if (held.has('KeyM') && held.has('KeyN')) secretToggle(); // צ + מ במקלדת עברית
 }, true);
-addEventListener('keyup', e => held.delete(e.key), true);
+addEventListener('keyup', e => held.delete(e.code), true);
 addEventListener('blur', () => held.clear());
 addEventListener('touchstart', e => {
   if (e.touches.length < 2) return;
@@ -1387,7 +1687,7 @@ addEventListener('touchstart', e => {
   if (Math.min(...ys) < innerHeight * 0.2 && Math.max(...ys) > innerHeight * 0.8) secretToggle();
 }, { passive: true });
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;
@@ -1397,10 +1697,11 @@ addEventListener('keydown', e => {
     if (l !== undefined) api({ type: 'ventMove', to: l });
     return;
   }
+  if (e.code === 'Escape' && tmOpen) { closeTaskMap(); return; }
   if (e.code === 'Escape' && sabOpen) { closeSabMap(); return; }
   if (e.code === 'Escape' && S && S.me.cam) { api({ type: 'camoff' }); return; }
   const act = actionForKey(e.code);
-  if (act && !e.repeat) { doAction(act); return; }
+  if (act && !e.repeat) { if (e.code === 'Tab') e.preventDefault(); doAction(act); return; }
   if (MOVE_CODES().includes(e.code)) { keys.add(e.code); sendInput(); e.preventDefault(); }
 });
 addEventListener('keyup', e => { keys.delete(e.code); sendInput(); });
@@ -1974,6 +2275,23 @@ function frame(t) {
     }
     ctx.strokeStyle = 'rgba(255,214,70,.9)'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(tgt.x, tgt.y, 34 + bounce, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // חצים אדומים אל נקודות התיקון של חבלה פעילה (לאנשי צוות חיים)
+  if (S.sab && me.team !== 'imp' && me.alive) {
+    MAP.SAB_POINTS[S.sab.type].forEach((q, i) => {
+      if (S.sab.fixed[i]) return;
+      const dx = q.x - cam.x, dy = q.y - cam.y, dd = Math.hypot(dx, dy);
+      if (dd < 150) return;
+      const a = Math.atan2(dy, dx), r = 80 + Math.sin(t / 160) * 5;
+      ctx.save(); ctx.translate(cam.x + Math.cos(a) * r, cam.y + Math.sin(a) * r); ctx.rotate(a);
+      ctx.fillStyle = '#ff4d4d'; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(-10, -18); ctx.lineTo(-2, 0); ctx.lineTo(-10, 18); ctx.closePath(); ctx.stroke(); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = '#ffd0d0'; ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 3; ctx.font = 'bold 12px Rubik, Arial'; ctx.textAlign = 'center';
+      const lx = cam.x + Math.cos(a) * (r + 40), ly = cam.y + Math.sin(a) * (r + 40) + 4, lab = MAP.ROOMS[q.room].name + ' · ' + Math.round(dd / 100) + 'מ׳';
+      ctx.strokeText(lab, lx, ly); ctx.fillText(lab, lx, ly);
+    });
   }
 
   // מצב חשיפה: קווי מעקב + תגיות תפקידים

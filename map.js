@@ -158,6 +158,46 @@
     });
     return out;
   }
+  // 52 משימות נוספות, כל אחת עם סוג משחק וערכת נושא מונפשת. המיקומים נקבעים אוטומטית בתוך כל חדר.
+  // kind: wires dial code switches simon sliders tapfill sortnum pairs catch timing pattern
+  // theme: wires gears bubbles pulse matrix radar stars sparks waves conveyor
+  const NEW_TASKS = [
+    ['U', 'כיול טורבינה', 'sliders', 'gears'], ['U', 'החלפת שמן מנוע', 'tapfill', 'gears'], ['U', 'בדיקת לחץ', 'timing', 'gears'],
+    ['M', 'כיול דופק', 'timing', 'pulse'], ['M', 'התאמת סוגי דם', 'pairs', 'pulse'], ['M', 'סידור תרופות', 'sortnum', 'pulse'], ['M', 'שחזור דנ"א', 'pattern', 'pulse'],
+    ['F', 'הכנת ארוחה', 'simon', 'conveyor'], ['F', 'ניקוי שולחנות', 'catch', 'bubbles'], ['F', 'מיון כלים', 'pairs', 'conveyor'], ['F', 'כיול מכונת קפה', 'sliders', 'sparks'], ['F', 'סידור מגשים', 'sortnum', 'conveyor'],
+    ['W', 'טעינת תותח', 'tapfill', 'sparks'], ['W', 'כיוון טווח', 'sliders', 'radar'], ['W', 'פירוק אסטרואידים', 'catch', 'stars'],
+    ['O', 'החלפת מסנן אוויר', 'switches', 'bubbles'], ['O', 'כיול לחץ חמצן', 'timing', 'bubbles'], ['O', 'השקיית עציצים', 'tapfill', 'bubbles'],
+    ['R', 'ייצוב הליבה', 'timing', 'sparks'], ['R', 'החלפת מוטות דלק', 'sortnum', 'sparks'], ['R', 'קירור צינורות', 'sliders', 'waves'], ['R', 'קוד שחרור', 'code', 'matrix'],
+    ['SE', 'סריקת מצלמות', 'pattern', 'radar'], ['SE', 'פענוח הקלטה', 'code', 'matrix'], ['SE', 'מעקב תנועה', 'catch', 'radar'], ['SE', 'כיבוי אזעקות', 'switches', 'radar'],
+    ['EL', 'חיבור כבלים ראשי', 'wires', 'wires'], ['EL', 'איזון מתח', 'sliders', 'wires'], ['EL', 'החלפת נתיכים', 'pairs', 'wires'], ['EL', 'הפעלת גנרטור', 'tapfill', 'wires'],
+    ['A', 'עדכון רשימת צוות', 'sortnum', 'matrix'], ['A', 'הזנת דוחות', 'code', 'matrix'], ['A', 'סידור מסמכים', 'pairs', 'matrix'], ['A', 'אישור כניסה', 'pattern', 'matrix'],
+    ['N', 'חישוב מסלול', 'sortnum', 'stars'], ['N', 'כיול ג\'יירו', 'timing', 'stars'], ['N', 'מעקב כוכבים', 'catch', 'stars'], ['N', 'עדכון מפת ניווט', 'pattern', 'stars'],
+    ['D', 'כיוון מדחף', 'sliders', 'gears'], ['D', 'הידוק ברגים', 'tapfill', 'gears'], ['D', 'בדיקת ציר', 'timing', 'gears'],
+    ['T', 'מיון ארגזים', 'pairs', 'conveyor'], ['T', 'סריקת ברקודים', 'catch', 'conveyor'], ['T', 'עדכון מלאי', 'sortnum', 'conveyor'], ['T', 'טעינת מלגזה', 'tapfill', 'conveyor'], ['T', 'נעילת מכולה', 'code', 'conveyor'],
+    ['C', 'כוונון תדר', 'sliders', 'waves'], ['C', 'פענוח הודעה', 'simon', 'waves'], ['C', 'חיבור לוויין', 'pattern', 'waves'],
+    ['SH', 'כיול מגן', 'timing', 'waves'], ['SH', 'טעינת קבלים', 'tapfill', 'sparks'], ['SH', 'סנכרון שכבות', 'sliders', 'sparks'],
+  ];
+  (function addTasks() {
+    let seed = 20261112;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const far = (x, y, list, d) => list.every(q => Math.hypot(q.x - x, q.y - y) >= d);
+    const fixed = [...VENTS, BUTTON, CAM_CONSOLE, ...SAB_POINTS.lights, ...SAB_POINTS.oxygen, ...SAB_POINTS.reactor];
+    for (const [room, name, kind, theme] of NEW_TASKS) {
+      const r = ROOMS[room];
+      // בוחרים מבין מועמדים את המקום הרחוק ביותר מכל המשימות והנקודות הקיימות (פיזור אחיד גם בחדרים קטנים)
+      let best = null, bestScore = -1;
+      for (let i = 0; i < 500; i++) {
+        const x = Math.round(r.x + 45 + rnd() * (r.w - 90)), y = Math.round(r.y + 65 + rnd() * (r.h - 105));
+        if (!walkable(x, y)) continue;
+        let dmin = 1e9;
+        for (const q of TASKS) dmin = Math.min(dmin, Math.hypot(q.x - x, q.y - y));
+        for (const q of fixed) dmin = Math.min(dmin, Math.hypot(q.x - x, q.y - y) * 1.15);
+        if (dmin > bestScore) { bestScore = dmin; best = { x, y }; }
+      }
+      if (!best) best = { x: Math.round(r.cx), y: Math.round(r.cy) };
+      TASKS.push({ room, x: best.x, y: best.y, name, kind, theme });
+    }
+  })();
   const MAP = { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path };
   if (typeof module !== 'undefined' && module.exports) module.exports = MAP;
   else root.MAP = MAP;
