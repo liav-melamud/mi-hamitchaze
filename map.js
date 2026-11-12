@@ -1,5 +1,7 @@
 // מפת "תחנת נוגה" – משותפת לשרת ולדפדפן
 (function (root) {
+  function build(variant) {
+  const small = variant === 'small';
   const ROOMS = {
     U: { name: 'מנוע עליון', x: 150, y: 80, w: 300, h: 240, c: '#4a3a32' },
     M: { name: 'מרפאה', x: 650, y: 80, w: 300, h: 240, c: '#2f4a4a' },
@@ -16,13 +18,18 @@
     C: { name: 'תקשורת', x: 1600, y: 1080, w: 300, h: 220, c: '#2d4a4f' },
     SH: { name: 'מגנים', x: 2150, y: 1040, w: 320, h: 260, c: '#3a3352' },
   };
+  // מפה קטנה: 7 חדרים עם טבעת הליכה סגורה (אבטחה ← מרפאה ← חדר אוכל ← ניהול ← מחסן ← חשמל ← אבטחה)
+  if (small) for (const k of ['U', 'W', 'O', 'D', 'C', 'SH', 'N']) delete ROOMS[k];
   for (const k in ROOMS) {
     const r = ROOMS[k];
     r.id = k; r.cx = r.x + r.w / 2; r.cy = r.y + r.h / 2;
   }
 
   const CW = 90;
-  const CORR = [
+  const CORR = small ? [
+    ['R', 'SE', 'h', 660], ['M', 'SE', 'v', 715], ['M', 'F', 'h', 200], ['F', 'A', 'v', 1500],
+    ['A', 'T', 'v', 1385], ['EL', 'T', 'h', 1160], ['SE', 'EL', 'v', 650],
+  ] : [
     ['U', 'M', 'h', 200], ['M', 'F', 'h', 200], ['F', 'W', 'h', 200], ['W', 'O', 'h', 220],
     ['O', 'N', 'v', 2450], ['U', 'R', 'v', 235], ['R', 'D', 'v', 235], ['R', 'SE', 'h', 660],
     ['M', 'SE', 'v', 715], ['F', 'A', 'v', 1500],
@@ -60,10 +67,18 @@
     { room: 'C', x: 1850, y: 1120, name: 'כוונון אנטנה', kind: 'dial' },
     { room: 'SH', x: 2420, y: 1250, name: 'הפעלת מגנים', kind: 'wires' },
   ];
+  if (small) for (let i = TASKS.length - 1; i >= 0; i--) if (!ROOMS[TASKS[i].room]) TASKS.splice(i, 1);
   const TASK_TIME = { hold: 2.5, scan: 6 };
 
   // רשת פתחי אוורור: שלוש רשתות נפרדות (מערב, מרכז, מזרח)
-  const VENTS = [
+  const VENTS = small ? [
+    { x: 90, y: 800, links: [1, 5] },     // 0 כור
+    { x: 740, y: 740, links: [0, 5] },    // 1 אבטחה
+    { x: 680, y: 290, links: [3, 4] },    // 2 מרפאה
+    { x: 1600, y: 100, links: [2, 4] },   // 3 חדר אוכל
+    { x: 1690, y: 790, links: [2, 3] },   // 4 ניהול
+    { x: 790, y: 1080, links: [0, 1] },   // 5 חשמל
+  ] : [
     { x: 400, y: 290, links: [1, 2] },   // 0 מנוע עליון
     { x: 90, y: 800, links: [0, 2] },    // 1 כור
     { x: 400, y: 1070, links: [0, 1] },  // 2 מנוע תחתון
@@ -79,7 +94,7 @@
   ];
 
   const BUTTON = { x: 1400, y: 230 };
-  const WORLD = { w: 2700, h: 1400 };
+  const WORLD = small ? { w: 1800, h: 1340 } : { w: 2700, h: 1400 };
   const R = 18;
 
   function walkable(x, y, r) {
@@ -144,8 +159,10 @@
   // נקודות תיקון לחבלות: חשמל (אחת), חמצן (שתיים), כור (שתיים)
   const SAB_POINTS = {
     lights: [{ x: 690, y: 1100, room: 'EL', name: 'לוח חשמל' }],
-    oxygen: [{ x: 2380, y: 260, room: 'O', name: 'מערכת חמצן' }, { x: 1400, y: 770, room: 'A', name: 'בקרת אוויר' }],
-    reactor: [{ x: 70, y: 780, room: 'R', name: 'ליבת הכור' }, { x: 210, y: 1240, room: 'D', name: 'קירור כור' }],
+    oxygen: small ? [{ x: 1190, y: 330, room: 'F', name: 'מערכת חמצן' }, { x: 1400, y: 770, room: 'A', name: 'בקרת אוויר' }]
+      : [{ x: 2380, y: 260, room: 'O', name: 'מערכת חמצן' }, { x: 1400, y: 770, room: 'A', name: 'בקרת אוויר' }],
+    reactor: small ? [{ x: 70, y: 780, room: 'R', name: 'ליבת הכור' }, { x: 1000, y: 1280, room: 'T', name: 'קירור כור' }]
+      : [{ x: 70, y: 780, room: 'R', name: 'ליבת הכור' }, { x: 210, y: 1240, room: 'D', name: 'קירור כור' }],
   };
   // מלבני הדלתות של חדר: כל המעברים שלו אל מסדרונות
   function doorRects(roomId) {
@@ -184,6 +201,7 @@
     const fixed = [...VENTS, BUTTON, CAM_CONSOLE, ...SAB_POINTS.lights, ...SAB_POINTS.oxygen, ...SAB_POINTS.reactor];
     for (const [room, name, kind, theme] of NEW_TASKS) {
       const r = ROOMS[room];
+      if (!r) continue; // חדר שלא קיים במפה הזו
       // בוחרים מבין מועמדים את המקום הרחוק ביותר מכל המשימות והנקודות הקיימות (פיזור אחיד גם בחדרים קטנים)
       let best = null, bestScore = -1;
       for (let i = 0; i < 500; i++) {
@@ -198,7 +216,10 @@
       TASKS.push({ room, x: best.x, y: best.y, name, kind, theme });
     }
   })();
-  const MAP = { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path };
+  return { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant };
+  }
+  const MAP = build('big'), SMALL = build('small');
+  MAP.byId = { big: MAP, small: SMALL };
   if (typeof module !== 'undefined' && module.exports) module.exports = MAP;
-  else root.MAP = MAP;
+  else { root.MAP = MAP; root.MAPS = MAP.byId; }
 })(this);

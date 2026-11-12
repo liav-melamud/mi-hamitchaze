@@ -247,6 +247,10 @@
   #quick button { padding: 5px 9px; font-size: 13px; }
   .screen .card { zoom: var(--ui, 1); }
   body.cb .vdot { font-size: 9px; line-height: 12px; text-align: center; color: #000; font-weight: 900; }
+  #raceBoard { position: absolute; top: 64px; left: 12px; background: var(--panel); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 12px; font-size: 13px; min-width: 190px; }
+  #raceBoard .rt { font-weight: 800; color: var(--accent); margin-bottom: 4px; }
+  #raceBoard .rr { display: flex; gap: 6px; align-items: center; padding: 1px 0; }
+  #raceBoard .rr b { margin-right: auto; }
   .vdots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 96px; }
   .vdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); display: inline-block; animation: popdot .35s ease-out backwards; }
   @keyframes popdot { from { transform: scale(0); } to { transform: scale(1); } }
@@ -319,6 +323,7 @@
 <canvas id="cv"></canvas>
 
 <div id="hud" class="hidden">
+  <div id="raceBoard" class="hidden"></div>
   <div id="taskbar">משימות הצוות <span id="tasktxt"></span><div class="bar"><i id="taskfill"></i></div></div>
   <div id="rolecard"><div id="rolename"></div><div id="roledesc"></div><ul id="tasklist"></ul></div>
   <div id="topleft">
@@ -419,6 +424,9 @@
       <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
+      <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option></select></label>
+      <label>יעד המרוץ (משימות) <select data-s="raceGoal"><option>6</option><option>10</option><option>15</option><option>20</option></select></label>
+      <label>מפה <select data-s="map"><option value="big">גדולה (14 חדרים)</option><option value="small">קטנה (7 חדרים, לקבוצות קטנות)</option></select></label>
       <label>רמת הבוטים <select data-s="botLevel"><option value="1">קלה (מתבלבלים)</option><option value="2">רגילה</option><option value="3">חכמה</option></select></label>
       <label>תפקידים חדשים <select data-s="newRoles"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
@@ -531,7 +539,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-151822'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-153804'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -847,7 +855,14 @@ window.addEventListener('beforeunload', e => { if (isHost && !DEMO && S && S.pha
 // ---------- קבלת מצב ----------
 function show(id, on) { $(id).classList.toggle('hidden', !on); }
 
+function switchMap(id) {
+  if (!window.MAPS || !window.MAPS[id] || window.MAP === window.MAPS[id]) return;
+  window.MAP = window.MAPS[id];
+  VIEW = null; buildSabMap();
+  if (tmOpen) closeTaskMap();
+}
 function onState(s) {
+  if (s.map) switchMap(s.map);
   S = s;
   $('#join').classList.add('hidden');
   for (const p of s.players) {
@@ -927,7 +942,7 @@ $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) { api
 document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 10 }, (_, i) => `<option>${i}</option>`).join('');
 const sendSettings = () => {
   const o = { type: 'settings' };
-  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = (el.dataset.s === 'confirm' || el.dataset.s === 'openVotes' || el.dataset.s === 'newRoles') ? el.value === '1' : +el.value; });
+  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : (el.dataset.s === 'confirm' || el.dataset.s === 'openVotes' || el.dataset.s === 'newRoles') ? el.value === '1' : +el.value; });
   api(o);
 };
 document.querySelectorAll('#settingsGrid select').forEach(el => el.onchange = sendSettings);
@@ -947,6 +962,7 @@ const ACTIONS = [
   { k: 'photo', ic: '📸', label: 'צלם', key: 'P' },
   { k: 'investigate', ic: '🔎', label: 'חקור', key: 'I' },
   { k: 'vanish', ic: '👻', label: 'היעלם', key: 'H', red: true },
+  { k: 'guard', ic: '🛡️', label: 'שמור', key: 'B' },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -968,8 +984,8 @@ function actionState(s) {
   st.use = { show: !me.spec, on: !inVent && (nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
-  st.kill = { show: alive && me.team === 'imp', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
+  st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
+  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
@@ -977,6 +993,7 @@ function actionState(s) {
   const closeP = s.players.some(p => p.id !== me.id && p.alive && !p.spec && D(pos, p) <= 160);
   st.photo = { show: alive && me.roleKey === 'photographer', on: me.photoCd === 0, label: me.photoCd ? 'צלם ' + me.photoCd : 'צלם' };
   st.investigate = { show: alive && me.roleKey === 'detective', on: me.investCd === 0 && closeP, label: me.investCd ? 'חקור ' + me.investCd : 'חקור' };
+  st.guard = { show: alive && me.roleKey === 'bodyguard', on: me.guardCd === 0 && closeP, label: me.guardCd ? 'שמור ' + me.guardCd : 'שמור' };
   st.vanish = { show: alive && me.roleKey === 'phantom', on: !!me.vanished || me.vanishCd === 0, label: me.vanished ? 'הופע' : (me.vanishCd ? 'היעלם ' + me.vanishCd : 'היעלם') };
   st.sab = { show: alive && me.team === 'imp', on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
@@ -1007,6 +1024,12 @@ function renderHud(s) {
   show('#workbar', me.work > 0);
   $('#workfill').style.width = Math.min(100, me.work * 100) + '%';
   show('#ghostBadge', !me.alive && !me.spec);
+  show('#raceBoard', !!s.race);
+  if (s.race) {
+    const m = Math.floor(s.race.left / 60), sc = s.race.left % 60;
+    $('#raceBoard').innerHTML = `<div class="rt">🏁 מרוץ משימות · יעד ${s.race.goal} · ${m}:${String(sc).padStart(2, '0')}</div>` +
+      s.race.board.map((r, i) => `<div class="rr">${['🥇', '🥈', '🥉', '4.', '5.'][i]} <span class="dot" style="background:${r.color}"></span>${esc(cs(r.color) + r.name)}<b>${r.n}</b></div>`).join('');
+  }
   const st = actionState(s);
   for (const b of $('#actions').children) {
     const a = st[b.dataset.a];
@@ -1095,7 +1118,7 @@ $('#chatIn').onkeydown = e => { if (e.key === 'Enter') sendChat(); e.stopPropaga
 
 // ---------- חבלות: מפת חבלות של התחנה שלנו, באייקונים ובעברית ----------
 let sabOpen = false, SCHEM_BASE = '';
-(function buildSabMap() {
+function buildSabMap() {
   const st = $('#sabStage'), W0 = MAP.WORLD.w, H0 = MAP.WORLD.h;
   const pc = (v, tot) => (v / tot * 100) + '%';
   let h = '';
@@ -1103,7 +1126,7 @@ let sabOpen = false, SCHEM_BASE = '';
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<div class="sroom" style="left:${pc(r.x, W0)};top:${pc(r.y, H0)};width:${pc(r.w, W0)};height:${pc(r.h, H0)}"><span>${r.name}</span></div>`; }
   SCHEM_BASE = h;
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<button class="sbtn sdoor" data-room="${k}" title="נעל דלתות ב${r.name}" style="left:${pc(r.cx, W0)};top:${pc(r.cy + r.h * 0.12, H0)}">🚪</button>`; }
-  const crit = [['reactor', 'R', '☢️', 'התחממות הכור'], ['oxygen', 'O', '💨', 'הפסקת חמצן'], ['lights', 'EL', '💡', 'הפלת החשמל']];
+  const crit = [['reactor', MAP.SAB_POINTS.reactor[0].room, '☢️', 'התחממות הכור'], ['oxygen', MAP.SAB_POINTS.oxygen[0].room, '💨', 'הפסקת חמצן'], ['lights', MAP.SAB_POINTS.lights[0].room, '💡', 'הפלת החשמל']];
   for (const [kind, rk, ic, title] of crit) { const r = MAP.ROOMS[rk]; h += `<button class="sbtn scrit" data-kind="${kind}" title="${title}" style="left:${pc(r.x + r.w, W0)};top:${pc(r.y, H0)}">${ic}</button>`; }
   st.innerHTML = h;
   st.onclick = e => {
@@ -1112,7 +1135,8 @@ let sabOpen = false, SCHEM_BASE = '';
     else api({ type: 'sab', kind: 'door', room: b.dataset.room });
     closeSabMap();
   };
-})();
+}
+buildSabMap();
 function updateSabMap(s) {
   const me = s.me, active = !!s.sab;
   $('#sabHint').textContent = active ? 'יש משבר פעיל – אפשר רק לנעול דלתות עד שיתוקן (כל חדר עם קירור של 20 שניות).' : me.sabCd > 0 ? `חבלה גדולה הבאה אפשרית בעוד ${me.sabCd} שניות.` : 'בחר חבלה: משבר גדול (אייקון אדום), או נעילת דלתות של חדרים (🚪) – אפשר כמה שרוצים, ולכל חדר 20 שניות קירור אחרי שהדלתות נפתחות.';
@@ -1229,6 +1253,7 @@ function renderEject(s) {
 }
 function renderEnd(s) {
   const w = s.winner;
+  if (w.team === 'race') $('#endTitle').innerHTML = '<span style="color:var(--accent)">🏁 המרוץ הסתיים!</span>'; else
   $('#endTitle').innerHTML = w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
   $('#endReason').textContent = w.reason;
   const roles = {};
@@ -1242,6 +1267,9 @@ function renderEnd(s) {
     $('#endAwards').innerHTML = `<div class="award"><b>⏱️ משך המשחק</b><span>${m}:${String(sc).padStart(2, '0')}</span></div>` + s.summary.awards.map(a => `<div class="award"><b>${a.icon} ${esc(a.title)}</b><span><i class="dot" style="background:${a.color}"></i> ${esc(a.name)} (${a.val})</span></div>`).join('');
     const ft = t => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
     $('#timeline').innerHTML = s.summary.events.map(e => `<div class="tl"><span class="tm">${ft(e.t)}</span><span>${esc(e.text)}</span></div>`).join('');
+  }
+  if (w.ranking) { // מרוץ: דירוג במקום תפקידים
+    $('#endlist').innerHTML = w.ranking.map((r, i) => `<div class="pl"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="dot" style="background:${r.color}"></span><span style="flex:1;text-align:right">${esc(cs(r.color) + r.name)}</span><span class="tag crew">${r.n} משימות</span></div>`).join('');
   }
   show('#lobbyBtn', s.me.host); show('#againBtn', s.me.host);
   show('#endWait', !s.me.host);
@@ -2183,8 +2211,8 @@ $('#quick').onclick = e => {
 };
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -2196,7 +2224,7 @@ function refreshKeyLabels() {
   for (const b of $('#actions').children) { const k = b.querySelector('.k'); if (k) k.textContent = keyLabel(KEYS[b.dataset.a]); }
   document.querySelectorAll('.keys b').forEach(b => { const arrow = { up: '↑', down: '↓', left: '←', right: '→' }[b.dataset.k]; b.textContent = keyLabel(KEYS[b.dataset.k]) + ' ' + arrow; });
   $('#keysHelp').innerHTML = `תזוזה <kbd>${keyLabel(KEYS.up)}${keyLabel(KEYS.left)}${keyLabel(KEYS.down)}${keyLabel(KEYS.right)}</kbd>/חצים · ` +
-    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
+    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
   $('#keysList').innerHTML = Object.keys(DEFAULT_KEYS).map(a =>
     `<div class="row"><span>${KEY_NAMES[a]}</span><button data-a="${a}" class="${capturing === a ? 'wait' : ''}">${capturing === a ? 'לחץ מקש…' : keyLabel(KEYS[a])}</button></div>`).join('');
 }
@@ -2254,7 +2282,7 @@ addEventListener('touchstart', e => {
   if (Math.min(...ys) < innerHeight * 0.2 && Math.max(...ys) > innerHeight * 0.8) secretToggle();
 }, { passive: true });
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;

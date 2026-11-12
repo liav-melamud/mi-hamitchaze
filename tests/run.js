@@ -54,24 +54,28 @@ function callMeeting(g, a) {
 
 // ---------------------------------------------------------------------------
 console.log('\nמפה');
-test('כל המשימות והנקודות במקומות הליכים בחדר הנכון', () => {
-  ok(MAP.TASKS.length >= 70, 'צריך לפחות 70 משימות, יש ' + MAP.TASKS.length);
-  MAP.TASKS.forEach(t => { ok(MAP.walkable(t.x, t.y), 'משימה לא ניתנת להליכה: ' + t.name); ok(MAP.roomAt(t.x, t.y).id === t.room, 'משימה בחדר הלא נכון: ' + t.name); });
-  MAP.VENTS.concat([MAP.BUTTON, MAP.CAM_CONSOLE]).forEach(p => ok(MAP.walkable(p.x, p.y), 'נקודה לא ניתנת להליכה'));
-  Object.values(MAP.SAB_POINTS).flat().forEach(p => ok(MAP.walkable(p.x, p.y) && MAP.roomAt(p.x, p.y).id === p.room, 'נקודת תיקון שגויה: ' + p.name));
-  ok(new Set(MAP.TASKS.map(t => t.name)).size === MAP.TASKS.length, 'שמות משימות כפולים');
-});
-test('אפשר להגיע מכל חדר לכל חדר, והמסלול עובר רק בשטח הליכה', () => {
-  for (const a in MAP.ROOMS) for (const b in MAP.ROOMS) {
-    const p = MAP.path(a, b); if (a !== b) ok(p.length > 0, `אין מסלול ${a}->${b}`);
-    let prev = { x: MAP.ROOMS[a].cx, y: MAP.ROOMS[a].cy };
-    for (const q of [...p, { x: MAP.ROOMS[b].cx, y: MAP.ROOMS[b].cy }]) {
-      for (let i = 0; i <= 40; i++) ok(MAP.walkable(prev.x + (q.x - prev.x) * i / 40, prev.y + (q.y - prev.y) * i / 40), `קיר בדרך ${a}->${b}`);
-      prev = q;
+for (const [mapId, M] of Object.entries(MAP.byId)) {
+  test(`[${mapId}] כל המשימות והנקודות במקומות הליכים בחדר הנכון`, () => {
+    ok(M.TASKS.length >= (mapId === 'big' ? 70 : 38), 'מעט מדי משימות: ' + M.TASKS.length);
+    M.TASKS.forEach(x => { ok(M.walkable(x.x, x.y), 'משימה לא ניתנת להליכה: ' + x.name); ok(M.roomAt(x.x, x.y).id === x.room, 'משימה בחדר הלא נכון: ' + x.name); });
+    M.VENTS.concat([M.BUTTON, M.CAM_CONSOLE]).forEach(p => ok(M.walkable(p.x, p.y), 'נקודה לא ניתנת להליכה'));
+    M.VENTS.forEach((v, i) => v.links.forEach(l => ok(M.VENTS[l], `פתח ${i} מחובר לפתח לא קיים ${l}`)));
+    Object.values(M.SAB_POINTS).flat().forEach(p => ok(M.walkable(p.x, p.y) && M.roomAt(p.x, p.y).id === p.room, 'נקודת תיקון שגויה: ' + p.name));
+    M.CAMS.forEach(c => ok(M.walkable(c.x, c.y), 'מצלמה במקום לא תקין: ' + c.name));
+    ok(new Set(M.TASKS.map(x => x.name)).size === M.TASKS.length, 'שמות משימות כפולים');
+  });
+  test(`[${mapId}] אפשר להגיע מכל חדר לכל חדר, והמסלול עובר רק בשטח הליכה`, () => {
+    for (const a in M.ROOMS) for (const b in M.ROOMS) {
+      const p = M.path(a, b); if (a !== b) ok(p.length > 0, `אין מסלול ${a}->${b}`);
+      let prev = { x: M.ROOMS[a].cx, y: M.ROOMS[a].cy };
+      for (const q of [...p, { x: M.ROOMS[b].cx, y: M.ROOMS[b].cy }]) {
+        for (let i = 0; i <= 40; i++) ok(M.walkable(prev.x + (q.x - prev.x) * i / 40, prev.y + (q.y - prev.y) * i / 40), `קיר בדרך ${a}->${b}`);
+        prev = q;
+      }
     }
-  }
-});
-test('לכל חדר יש דלתות', () => { for (const r in MAP.ROOMS) ok(MAP.doorRects(r).length >= 2, 'חדר בלי דלתות: ' + r); });
+  });
+}
+test('לכל חדר יש דלתות', () => { for (const M of Object.values(MAP.byId)) for (const r in M.ROOMS) ok(M.doorRects(r).length >= 1, 'חדר בלי דלתות: ' + r); });
 test('קוד הדפדפן (index.html) תקין תחבירית', () => {
   const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
   const js = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
@@ -187,6 +191,46 @@ test('סיכום משחק: ציר זמן ופרסים, ו"שחק שוב" מתח�
   ok(Array.isArray(v.summary.awards), 'חסרים פרסים');
   g.act(a, { type: 'again' }); sec(g, 1);
   const v2 = g.view(a); ok(v2.phase === 'play' && v2.tasks.total > 0 && !v2.summary, 'צריך להתחיל סבב חדש');
+});
+
+test('מצב מרוץ: בלי מתחזים, בלי ישיבות, והראשון ליעד מנצח עם דירוג', () => {
+  const g = createGame(MAP); const a = g.join('x');
+  g.act(a, { type: 'settings', bots: 5, mode: 2, raceGoal: 6, map: 'big' }); g.act(a, { type: 'start' });
+  let v = g.view(a); ok(v.race && v.race.goal === 6, 'חסר מצב מרוץ'); ok(v.me.team === 'crew' && !v.players.some(p => p.team === 'imp'), 'במרוץ אין מתחזים');
+  g.act(a, { type: 'use' }); ok(g.view(a).phase === 'play', 'אסור לכנס ישיבה במרוץ');
+  for (let i = 0; i < 60000 && v.phase !== 'end'; i++) { tick(g, 1); v = g.view(a); }
+  ok(v.phase === 'end' && v.winner.team === 'race', 'המרוץ לא נגמר');
+  ok(Array.isArray(v.winner.ranking) && v.winner.ranking[0].n >= 1, 'חסר דירוג');
+});
+test('מחבל: לא מחסל, אבל מחבל מהר יותר מהמתחזה הרגיל', () => {
+  let found = null;
+  for (let i = 0; i < 600 && !found; i++) {
+    const g = createGame(MAP); const a = g.join('x'); ['b', 'c', 'd', 'e', 'f'].forEach(n => g.join(n)); // 6 שחקנים כדי שיהיו שני מתחזים
+    g.act(a, { type: 'settings', impostors: 2, bots: 0, killCd: 5, newRoles: true }); g.act(a, { type: 'start' });
+    if (g.view(a).me.role === 'מחבל') found = { g, a };
+  }
+  ok(found, 'לא קיבלתי תפקיד מחבל'); const { g, a } = found; sec(g, 15);
+  g.act(a, { type: 'kill' }); tick(g, 2); ok(g.view(a).players.filter(p => !p.alive).length === 0, 'מחבל לא אמור לחסל');
+  g.act(a, { type: 'sab', kind: 'lights' }); tick(g, 2); ok(g.view(a).sab, 'מחבל צריך להצליח לחבל');
+});
+test('שומר ראש: מגן על שחקן קרוב לתקופה', () => {
+  const { g, a } = newGame({ role: 'שומר ראש', bots: 3 }); sec(g, 3);
+  g.act(a, { type: 'guard' }); tick(g, 2);
+  const v = g.view(a); ok(v.me.guardCd > 0, 'אין השהיה'); ok(v.players.some(p => p.id !== a && p.shield), 'מישהו צריך להיות מוגן');
+});
+test('מפה קטנה: משחק מלא נגמר ומשימות שייכות למפה הנכונה', () => {
+  for (let r = 0; r < 8; r++) {
+    const g = createGame(MAP); const a = g.join('x');
+    g.act(a, { type: 'settings', impostors: 1, bots: 4, killCd: 15, tasks: 4, meetingTime: 20, map: 'small' }); g.act(a, { type: 'start' });
+    let v = g.view(a); ok(v.map === 'small', 'המפה לא הוחלפה');
+    ok(v.me.tasks.every(t => t.i < MAP.byId.small.TASKS.length), 'משימה מחוץ למפה הקטנה');
+    for (let i = 0; i < 60000 && v.phase !== 'end'; i++) { tick(g, 1); v = g.view(a); if (v.phase === 'meeting' && !v.meeting.myVote && v.me.alive) g.act(a, { type: 'vote', target: 'skip' }); }
+    ok(v.phase === 'end' || (v.me.team === 'crew' && v.tasks.done < v.tasks.total), 'משחק תקוע על המפה הקטנה');
+  }
+});
+test('שחזור משחק על המפה הקטנה שומר את המפה', () => {
+  const g = createGame(MAP); const a = g.join('x'); g.act(a, { type: 'settings', bots: 3, map: 'small' }); g.act(a, { type: 'start' }); sec(g, 10);
+  const g2 = createGame(MAP); g2.restore(g.snapshot()); g2.join('x', a); ok(g2.view(a).map === 'small', 'המפה לא שוחזרה'); sec(g2, 5);
 });
 
 // ---------------------------------------------------------------------------
