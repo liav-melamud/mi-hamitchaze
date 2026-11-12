@@ -218,9 +218,10 @@ function completeTask(p, t) {
   t.done = true;
   if (team(p) === 'crew') taskDone++;
   p.stats.tasks++;
+  p.doneIdx = p.doneIdx || []; p.doneIdx.push(t.i); // כל משימה נעשית פעם אחת בלבד
   toast(p, '✔ ' + MAP.TASKS[t.i].name + ' הושלמה');
-  if (settings.mode === 2) { // מרוץ: מקבלים מיד משימה חדשה
-    const have = new Set(p.tasks.map(x => x.i));
+  if (settings.mode === 2) { // מרוץ: מקבלים מיד משימה חדשה שלא עשיתי עוד
+    const have = new Set(p.tasks.map(x => x.i).concat(p.doneIdx));
     const fresh = shuffle(MAP.TASKS.map((_, i) => i).filter(i => !have.has(i)))[0];
     p.tasks = p.tasks.filter(x => !x.done);
     if (fresh !== undefined) p.tasks.push({ i: fresh, done: false });
