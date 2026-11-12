@@ -522,6 +522,7 @@
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="config.js"></script>
 <script src="map.js"></script>
 <script src="engine.js"></script>
 <script>
@@ -539,8 +540,11 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-165159'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-165737'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
+// שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
+const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
+const peerOpts = c => Object.assign({ config: ICE }, SIGNAL ? { host: SIGNAL.host, port: SIGNAL.port || 443, path: '/', secure: true } : {}, c || {});
 function staleBanner() {
   if ($('#staleBar')) return;
   const d = document.createElement('div');
@@ -684,7 +688,7 @@ function hostGame(name, tries = 0, resume = null) {
   busy(true);
   ROOM = resume ? resume.room : makeCode();
   status(resume ? 'ממשיך את החדר ' + ROOM + '…' : 'יוצר חדר…');
-  peer = new Peer(PREFIX + ROOM, { config: ICE });
+  peer = new Peer(PREFIX + ROOM, peerOpts());
   peer.on('call', onCall);
   peer.on('open', () => { runEngine(name, false, resume); afterJoin(); setInterval(sendVoicePeers, 3000); });
   peer.on('connection', c => {
@@ -764,7 +768,7 @@ function joinGame(name, code, silent) {
   ROOM = code;
   try { if (peer) peer.destroy(); } catch (e) {}
   resetVoiceState();
-  const myPeer = peer = new Peer(undefined, { config: ICE });
+  const myPeer = peer = new Peer(undefined, peerOpts());
   peer.on('call', onCall);
   // שעון עצר: אם ניסיון ההתחברות נתקע בלי תשובה, מנסים שוב (או מודיעים למשתמש)
   const stuck = () => {
