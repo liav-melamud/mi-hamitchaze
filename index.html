@@ -134,6 +134,9 @@
   @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.06); } 100% { transform: none; opacity: 1; } }
   .vlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; margin-top: 10px; text-align: right; }
   .vrow { display: flex; align-items: center; gap: 6px; background: #151b2c; border-radius: 10px; padding: 6px 10px; font-size: 14px; }
+  .vdots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 96px; }
+  .vdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); display: inline-block; animation: popdot .35s ease-out backwards; }
+  @keyframes popdot { from { transform: scale(0); } to { transform: scale(1); } }
   .vote.talk { box-shadow: 0 0 0 3px #4ade80, 0 0 14px rgba(74,222,128,.5); }
   #micBtn { position: fixed; bottom: 16px; left: 70px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
   #ttsBtn { position: fixed; bottom: 16px; left: 124px; z-index: 40; height: 46px; padding: 0 12px; border-radius: 23px; font-size: 16px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
@@ -277,7 +280,7 @@
     </div>
     <p id="msub" class="sub" style="margin-top:6px"></p>
     <div id="mgrid"></div>
-    <div class="row" style="margin-bottom:12px"><button id="skipBtn">⏭ דלג על ההצבעה</button><span id="mstatus" class="sub" style="margin:0"></span></div>
+    <div class="row" style="margin-bottom:12px"><button id="skipBtn">⏭ דלג על ההצבעה</button><span id="skipDots" class="vdots"></span><span id="mstatus" class="sub" style="margin:0"></span></div>
     <div id="chatbox"></div>
     <div class="row"><input id="chatIn" maxlength="140" placeholder="כתוב הודעה…" style="flex:1" autocomplete="off"><button id="chatBtn">שלח</button></div>
   </div>
@@ -686,13 +689,14 @@ let meetSig = '', chatLen = -1;
 function renderMeeting(s) {
   const m = s.meeting, me = s.me;
   $('#mtitle').textContent = m.body ? '💀 דווחה גופה!' : '🚨 ישיבת חירום!';
-  $('#mtimer').textContent = m.t + 'ש׳';
+  $('#mtimer').textContent = m.reveal ? '🗳️' : m.t + 'ש׳';
   $('#msub').textContent = m.body ? `${m.by} מצא את הגופה של ${m.body}. מי עשה את זה?` : `${m.by} לחץ על כפתור החירום.`;
   const roles = {};
   s.players.forEach(p => { if (p.role) roles[p.id] = p; });
-  const canVote = me.alive && !me.spec && !m.myVote;
+  const canVote = me.alive && !me.spec && !m.myVote && !m.reveal;
+  const dots = id => (m.votes || []).filter(v => v.to === id).map(v => `<i class="vdot" style="background:${v.c}"></i>`).join('');
   const roster = s.roster.filter(p => !p.spec);
-  const sig = JSON.stringify([roster, m.voted, m.myVote, Object.keys(roles), s.settings.reveal]);
+  const sig = JSON.stringify([roster, m.voted, m.myVote, Object.keys(roles), s.settings.reveal, m.reveal, m.votes]);
   if (sig !== meetSig) {
     meetSig = sig;
     $('#mgrid').innerHTML = roster.map(p => {
@@ -700,10 +704,11 @@ function renderMeeting(s) {
       return `<button class="vote ${p.alive ? '' : 'dead'} ${m.myVote === p.id ? 'mine' : ''}" data-v="${p.id}" ${canVote && p.alive ? '' : 'disabled'}>
         <span class="dot" style="background:${p.color};width:22px;height:22px"></span>
         <span class="nm">${esc(p.name)}${p.id === me.id ? ' (אתה)' : ''}${r ? `<br><span class="tag ${r.team}">${esc(r.role)}</span>` : ''}</span>
-        ${m.voted.includes(p.id) ? '<span class="ok">✓ הצביע</span>' : ''}</button>`;
+        ${m.reveal ? `<span class="vdots">${dots(p.id)}</span>` : (m.voted.includes(p.id) ? '<span class="ok">✓ הצביע</span>' : '')}</button>`;
     }).join('');
     $('#skipBtn').disabled = !canVote;
-    $('#mstatus').textContent = me.alive ? (m.myVote ? (m.myVote === 'skip' ? 'בחרת לדלג' : 'ההצבעה שלך נקלטה') : 'לחץ על שחקן כדי להצביע נגדו') : 'רוחות לא מצביעות 👻';
+    $('#skipDots').innerHTML = m.reveal ? dots('skip') : '';
+    $('#mstatus').textContent = m.reveal ? 'סופרים את הקולות…' : me.alive ? (m.myVote ? (m.myVote === 'skip' ? 'בחרת לדלג' : 'ההצבעה שלך נקלטה') : 'לחץ על שחקן כדי להצביע נגדו') : 'רוחות לא מצביעות 👻';
     $('#chatIn').disabled = !me.alive;
   }
   if (s.chat.length !== chatLen) {

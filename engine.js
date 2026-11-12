@@ -306,7 +306,7 @@ function act(p, a) {
       break;
     }
     case 'vote': {
-      if (phase !== 'meeting' || !p.alive || p.spectator || meeting.votes[p.id]) return;
+      if (phase !== 'meeting' || meeting.reveal || !p.alive || p.spectator || meeting.votes[p.id]) return;
       if (a.target !== 'skip' && !(players[a.target] && players[a.target].alive)) return;
       meeting.votes[p.id] = a.target;
       break;
@@ -635,6 +635,10 @@ function tick() {
   } else if (phase === 'alert') {
     alertT -= dt;
     if (alertT <= 0) phase = 'meeting';
+  } else if (phase === 'meeting' && meeting.reveal) {
+    // מסך חשיפת ההצבעות: רואים מי הצביע למי לפני ההדחה
+    meeting.reveal -= dt;
+    if (meeting.reveal <= 0) resolveMeeting();
   } else if (phase === 'meeting') {
     meeting.t -= dt;
     list().filter(p => p.isBot).forEach(botMeeting);
@@ -644,7 +648,7 @@ function tick() {
       if (o && o.alive) say(o, q.text, true);
     }
     const voters = list().filter(p => p.alive && !p.spectator);
-    if (meeting.t <= 0 || voters.every(v => meeting.votes[v.id])) resolveMeeting();
+    if (meeting.t <= 0 || voters.every(v => meeting.votes[v.id])) { meeting.t = Math.max(0, meeting.t); meeting.reveal = settings.openVotes ? 5 : 1.2; }
   } else if (phase === 'eject') {
     eject.t -= dt;
     if (eject.t <= 0) endEject();
@@ -707,6 +711,8 @@ function viewFor(v) {
     out.meeting = {
       t: Math.ceil(meeting.t), by: by ? by.name : '', body: body ? body.name : null, room: meeting.room, bodyRoom: meeting.bodyRoom,
       voted: Object.keys(meeting.votes), myVote: meeting.votes[v.id] || null,
+      reveal: !!meeting.reveal,
+      votes: meeting.reveal && settings.openVotes ? Object.entries(meeting.votes).map(([id, to]) => ({ c: players[id] ? COLORS[players[id].color].c : '#888', to })) : null,
     };
   }
   if (phase === 'alert' && meeting) {
