@@ -156,7 +156,7 @@ function callMeeting(by, body) {
   chat = [];
   bodies = [];
   list().forEach(p => {
-    p.work = null; p.shapeAs = null; p.inVent = null;
+    p.work = null; p.shapeAs = null; p.inVent = null; p.cam = false;
     if (p.bot) {
       const T = settings.meetingTime;
       p.bot.chatAt = T - (2 + Math.random() * 8);
@@ -221,12 +221,15 @@ function act(p, a) {
       p.input = { dx, dy };
       break;
     }
+    case 'camoff': p.cam = false; break;
     case 'use': {
       if (phase !== 'play' || p.spectator) return;
       const t0 = p.tasks.filter(x => !x.done).map(x => ({ ...MAP.TASKS[x.i], ref: x }));
       const task = nearest(p, t0, USE_RANGE);
       if (p.inVent !== null) return;
       if (task) { p.work = { ref: task.ref, t: 0, mini: isMini(task.ref.i) }; return; }
+      // כיסא האבטחה: צופים במצלמות. תזוזה או לחיצה נוספת מסיימות את הצפייה
+      if (p.alive && dist(p, MAP.CAM_CONSOLE) < 80) { p.cam = !p.cam; p.work = null; return; }
       if (p.alive && dist(p, MAP.BUTTON) < 80) {
         if (p.emergencyUsed) return toast(p, 'כבר השתמשת בכפתור החירום');
         p.emergencyUsed = true;
@@ -239,7 +242,7 @@ function act(p, a) {
       const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null), KILL_RANGE);
       if (!tgt) return;
       if (tgt.shieldUntil > t) { p.killCd = 10; toast(p, '🛡 המטרה מוגנת על ידי מלאך שומר!'); return; }
-      tgt.alive = false; tgt.work = null;
+      tgt.alive = false; tgt.work = null; tgt.cam = false;
       bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color });
       p.x = tgt.x; p.y = tgt.y; p.killCd = settings.killCd;
       // בוטים שראו את החיסול זוכרים מי עשה את זה
@@ -644,7 +647,7 @@ function tick() {
           if (MAP.walkable(p.x, p.y + dy * step)) p.y += dy * step;
         }
         if (Math.abs(dx) > 0.1) p.dir = dx > 0 ? 1 : -1;
-        p.work = null;
+        p.work = null; p.cam = false;
       }
       if (p.work) {
         const tk = MAP.TASKS[p.work.ref.i];
@@ -718,7 +721,7 @@ function viewFor(v) {
     tasks: v.tasks.map(x => ({ name: MAP.TASKS[x.i].name, i: x.i, done: x.done })),
     killCd: Math.ceil(v.killCd), shiftCd: Math.ceil(v.shiftCd), shifted: !!v.shapeAs, gaCd: Math.ceil(v.gaCd),
     emergencyUsed: v.emergencyUsed, work: v.work && !v.work.mini ? v.work.t / taskTime(v.work.ref.i) : 0,
-    mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, host: v.id === hostId,
+    mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
     color: v.color,
   };
   const out = {
@@ -726,6 +729,7 @@ function viewFor(v) {
     bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c })),
     tasks: { done: taskDone, total: taskTotal },
     gusts: gusts.map(g => g.i),
+    camsOn: list().some(q => q.cam && q.alive),
     toast: v.toast.splice(0),
     roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat })),
     chat,

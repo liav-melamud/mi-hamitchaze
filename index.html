@@ -147,6 +147,7 @@
   body.touch #micBtn { bottom: auto; top: 12px; left: auto; right: calc(50% - 56px); }
   #staleBar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #b4590b; color: #fff; padding: 10px 14px; text-align: center; font-weight: 700; }
   #staleBar button { margin-right: 10px; background: #fff; color: #7a3a00; }
+  body.cams-on #rolecard, body.cams-on #taskbar, body.cams-on #topleft, body.cams-on #workbar, body.cams-on #tut { display: none !important; }
   #gearBtn { position: fixed; bottom: 16px; left: 16px; z-index: 40; width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 22px; background: rgba(32,40,64,.92); border: 2px solid #3a4870; }
   body.touch #gearBtn { bottom: auto; top: 12px; left: auto; right: 50%; transform: translateX(50%); }
   #keysPanel { z-index: 45; }
@@ -328,7 +329,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-130553'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-131027'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -578,6 +579,7 @@ function onState(s) {
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
   miniSync(s);
+  document.body.classList.toggle('cams-on', !!(s.me.cam && s.phase === 'play'));
   show('#micBtn', !DEMO);
   applyVoice();
   ttsSync(s);
@@ -648,7 +650,8 @@ function actionState(s) {
   const nearTask = me.tasks.some(t => !t.done && D(pos, MAP.TASKS[t.i]) <= 60);
   const nearBtn = alive && !me.emergencyUsed && D(pos, MAP.BUTTON) < 80;
   const inVent = me.inVent !== null && me.inVent !== undefined;
-  st.use = { show: !me.spec, on: !inVent && (nearTask || nearBtn), label: nearBtn && !nearTask ? 'חירום' : 'שימוש' };
+  const nearCam = alive && D(pos, MAP.CAM_CONSOLE) < 80;
+  st.use = { show: !me.spec, on: !inVent && (nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp', on: !inVent && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
@@ -1256,6 +1259,7 @@ addEventListener('keydown', e => {
     if (l !== undefined) api({ type: 'ventMove', to: l });
     return;
   }
+  if (e.code === 'Escape' && S && S.me.cam) { api({ type: 'camoff' }); return; }
   const act = actionForKey(e.code);
   if (act && !e.repeat) { doAction(act); return; }
   if (MOVE_CODES().includes(e.code)) { keys.add(e.code); sendInput(); e.preventDefault(); }
@@ -1645,6 +1649,23 @@ function drawMap(t) {
       ctx.lineCap = 'butt';
     }
   });
+  // מצלמות אבטחה על הקירות: נורה אדומה מהבהבת כשמישהו צופה
+  MAP.CAMS.forEach(c => {
+    if (!inV(c.mx - 40, c.my - 40, 80, 80)) return;
+    const on = !!(S && S.camsOn), blink = on && (Math.floor(t / 300) % 2 === 0);
+    box(c.mx - 11, c.my - 7, 22, 14, '#5b6577', '#1b1f28', 3, 4);
+    disc(c.mx + (c.mx < 700 && c.my === 430 ? 8 : 0), c.my, 5, '#0d1018', '#8fa0bd', 1.5);
+    ctx.fillStyle = on ? (blink ? '#ff2b2b' : '#5a1414') : '#2a3a2a';
+    ctx.beginPath(); ctx.arc(c.mx - 7, c.my - 4, 2.6, 0, Math.PI * 2); ctx.fill();
+    if (blink) { ctx.fillStyle = 'rgba(255,43,43,.25)'; ctx.beginPath(); ctx.arc(c.mx - 7, c.my - 4, 9, 0, Math.PI * 2); ctx.fill(); }
+  });
+  { // כיסא האבטחה: לחיצה על שימוש פותחת את המצלמות
+    const k = MAP.CAM_CONSOLE, pulse2 = 0.5 + 0.5 * Math.sin(t / 350);
+    if (inV(k.x - 50, k.y - 50, 100, 100)) {
+      disc(k.x, k.y, 24, `rgba(70,170,255,${0.15 + 0.2 * pulse2})`, `rgba(110,190,255,${0.5 + 0.4 * pulse2})`, 3);
+      ctx.fillStyle = '#fff'; ctx.font = '20px Arial'; ctx.textAlign = 'center'; ctx.fillText('🎥', k.x, k.y + 7);
+    }
+  }
   // כפתור חירום
   const pulse = 0.5 + 0.5 * Math.sin(t / 400);
   ctx.fillStyle = '#6b6f7c'; ctx.beginPath(); ctx.arc(MAP.BUTTON.x, MAP.BUTTON.y, 30, 0, Math.PI * 2); ctx.fill();
@@ -1665,6 +1686,50 @@ function drawMap(t) {
 
 const ROLE_COL = { imp: '#ff4d4d', crew: '#3be3ff' };
 
+// ---------- מסך מצלמות האבטחה: 4 תצוגות חיות עם אפקט ניטור ----------
+function drawCams(t) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#020403'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#9cffb4'; ctx.font = 'bold 18px Rubik, Arial'; ctx.textAlign = 'center';
+  ctx.fillText('🎥 מצלמות אבטחה – זוז או לחץ ESC כדי לצאת', W / 2, 36);
+  const tw = (W - 30) / 2, th = (H - 90) / 2;
+  MAP.CAMS.forEach((c, i) => {
+    const tx = 10 + (i % 2) * (tw + 10), ty = 56 + ((i / 2) | 0) * (th + 10);
+    const z = tw / 460;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(tx, ty, tw, th); ctx.clip();
+    ctx.setTransform(DPR * z, 0, 0, DPR * z, DPR * (tx + tw / 2 - c.x * z), DPR * (ty + th / 2 - c.y * z));
+    VIEW = { x0: c.x - tw / (2 * z) - 30, x1: c.x + tw / (2 * z) + 30, y0: c.y - th / (2 * z) - 30, y1: c.y + th / (2 * z) + 30 };
+    drawMap(t);
+    for (const b of S.bodies) if (b.x > VIEW.x0 && b.x < VIEW.x1 && b.y > VIEW.y0 && b.y < VIEW.y1) drawBody(b);
+    for (const p of S.players) {
+      if (p.spec || !p.alive || p.vent) continue;
+      const d = disp[p.id] || p;
+      if (d.x < VIEW.x0 || d.x > VIEW.x1 || d.y < VIEW.y0 || d.y > VIEW.y1) continue;
+      drawDrone(d.x, d.y, p.color, p.dir || 1, { hat: p.hat, scan: p.scan, shield: p.shield });
+      ctx.textAlign = 'center'; ctx.font = 'bold 13px Rubik, Arial'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
+      ctx.strokeText(p.name, d.x, d.y - 36); ctx.fillStyle = '#fff'; ctx.fillText(p.name, d.x, d.y - 36);
+    }
+    // אפקט מסך מעקב: גוון ירקרק, קווי סריקה, גרעיניות ורשת
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = 'rgba(30,90,50,.30)'; ctx.fillRect(tx, ty, tw, th);
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    for (let y = ty + (Math.floor(t / 60) % 3); y < ty + th; y += 3) ctx.fillRect(tx, y, tw, 1);
+    const g = ctx.createRadialGradient(tx + tw / 2, ty + th / 2, th * 0.3, tx + tw / 2, ty + th / 2, tw * 0.62);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.55)'); ctx.fillStyle = g; ctx.fillRect(tx, ty, tw, th);
+    ctx.fillStyle = 'rgba(255,255,255,.04)';
+    for (let k = 0; k < 40; k++) ctx.fillRect(tx + ((k * 7919 + Math.floor(t / 80) * 131) % tw), ty + ((k * 104729 + Math.floor(t / 80) * 17) % th), 2, 2);
+    ctx.restore();
+    ctx.strokeStyle = '#3aa86a'; ctx.lineWidth = 2; ctx.strokeRect(tx, ty, tw, th);
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(tx + 6, ty + 6, 190, 24);
+    ctx.fillStyle = '#9cffb4'; ctx.font = 'bold 14px Rubik, Arial'; ctx.textAlign = 'left';
+    ctx.fillText(`CAM ${i + 1} · ${c.name}`, tx + 12, ty + 23);
+    if (Math.floor(t / 500) % 2 === 0) { ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(tx + tw - 18, ty + 18, 6, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#ff9b9b'; ctx.font = 'bold 12px Arial'; ctx.fillText('REC', tx + tw - 58, ty + 22);
+  });
+  VIEW = null;
+}
+
 function frame(t) {
   requestAnimationFrame(frame);
   if (!S || S.phase !== 'play') {
@@ -1679,6 +1744,10 @@ function frame(t) {
     d.x += (p.x - d.x) * k; d.y += (p.y - d.y) * k;
   }
   const me = S.me, cam = myPos();
+  if (me.cam) {
+    for (const p of S.players) { const d = disp[p.id]; if (d) { const k = Math.min(1, dt * 14); d.x += (p.x - d.x) * k; d.y += (p.y - d.y) * k; } }
+    drawCams(t); return;
+  }
   const z = Math.max(0.55, Math.min(1.5, Math.min(W, H) / 720));
   const ox = W / 2 - cam.x * z, oy = H / 2 - cam.y * z;
   ctx.setTransform(DPR * z, 0, 0, DPR * z, DPR * ox, DPR * oy);

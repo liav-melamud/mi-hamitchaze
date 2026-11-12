@@ -133,7 +133,15 @@
   }
 
   VENTS.forEach(v => { const r = roomAt(v.x, v.y); v.room = r ? r.name : ''; });
-  const MAP = { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, walkable, roomAt, path };
+  // מצלמות אבטחה: (x,y) מרכז התצוגה, (mx,my) מיקום המצלמה על הקיר
+  const CAMS = [
+    { name: 'חדר אוכל', x: 1400, y: 230, mx: 1400, my: 80 },
+    { name: 'מסדרון מערבי', x: 430, y: 660, mx: 430, my: 623 },
+    { name: 'מסדרון מרפאה', x: 715, y: 430, mx: 673, my: 430 },
+    { name: 'ניהול', x: 1540, y: 700, mx: 1540, my: 578 },
+  ];
+  const CAM_CONSOLE = { x: 650, y: 660 };
+  const MAP = { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, walkable, roomAt, path };
   if (typeof module !== 'undefined' && module.exports) module.exports = MAP;
   else root.MAP = MAP;
 })(this);
