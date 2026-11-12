@@ -35,6 +35,43 @@ let hostId = null;
 let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true };
 let usedLines = new Set();
 let gusts = [], windT = 14;
+// חבלות: sab = משבר פעיל (חשמל/חמצן/כור), דלתות סגורות לפי חדר
+let sab = null, sabCd = 20, doorsUntil = {}, doorCd = 0;
+const SAB_TIME = 45, SAB_CD = 30, DOOR_TIME = 12, DOOR_CD = 14;
+const SAB_WIN = { oxygen: 'האוויר בתחנה נגמר!', reactor: 'הכור התפוצץ!' };
+const doorBlocked = (x, y) => {
+  const tN = now();
+  for (const rid in doorsUntil) {
+    if (doorsUntil[rid] <= tN) continue;
+    for (const d of MAP.doorRects(rid)) if (x > d.x - 18 && x < d.x + d.w + 18 && y > d.y - 18 && y < d.y + d.h + 18) return true;
+  }
+  return false;
+};
+function startSab(kind) {
+  if (sab || sabCd > 0) return;
+  sab = { type: kind, t: kind === 'lights' ? 0 : SAB_TIME, fixed: MAP.SAB_POINTS[kind].map(() => false) };
+  toastAll(kind === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל' : kind === 'oxygen' ? '💨 הפסקת חמצן! יש 45 שניות לתקן בשתי נקודות' : '☢️ הכור מתחמם! יש 45 שניות לקרר בשתי נקודות');
+}
+function fixSab(i) {
+  if (!sab || sab.fixed[i]) return;
+  sab.fixed[i] = true;
+  if (sab.fixed.every(Boolean)) { sab = null; sabCd = SAB_CD; toastAll('✅ התקלה תוקנה'); }
+}
+function closeDoors(roomId) {
+  const r = MAP.ROOMS[roomId];
+  if (!r || doorCd > 0 || (doorsUntil[roomId] || 0) > now()) return false;
+  doorsUntil[roomId] = now() + DOOR_TIME; doorCd = DOOR_CD;
+  // מי שעומד בתוך הדלת נדחף אל מרכז החדר
+  for (const q of list()) {
+    if (!q.alive || q.inVent !== null) continue;
+    if (doorBlocked(q.x, q.y)) {
+      const dx = r.cx - q.x, dy = r.cy - q.y, l = Math.hypot(dx, dy) || 1;
+      for (const k of [60, 90, 120]) { const nx = q.x + dx / l * k, ny = q.y + dy / l * k; if (MAP.walkable(nx, ny) && !doorBlocked(nx, ny)) { q.x = nx; q.y = ny; break; } }
+    }
+  }
+  toastAll('🚪 הדלתות ב' + r.name + ' ננעלו!');
+  return true;
+}
 let alertT = 0;
 let bodies = [];
 let meeting = null, eject = null, winner = null;
@@ -108,6 +145,7 @@ function startGame(by) {
     } else p.tasks = [];
   });
   bodies = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); gusts = []; windT = 10 + Math.random() * 8;
+  sab = null; sabCd = 20; doorsUntil = {}; doorCd = 0;
   settings.reveal = false;
   spawnAround(all);
   phase = 'play';
@@ -119,6 +157,7 @@ function backToLobby(by) {
   list().forEach(p => { p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
   spawnAround(list());
   phase = 'lobby'; bodies = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
+  sab = null; sabCd = 20; doorsUntil = {}; doorCd = 0;
 }
 
 function checkWin() {
@@ -156,7 +195,8 @@ function callMeeting(by, body) {
   chat = [];
   bodies = [];
   list().forEach(p => {
-    p.work = null; p.shapeAs = null; p.inVent = null; p.cam = false;
+    p.work = null; p.shapeAs = null; p.inVent = null; p.cam = false; p.sabWork = null;
+    doorsUntil = {};
     if (p.bot) {
       const T = settings.meetingTime;
       p.bot.chatAt = T - (2 + Math.random() * 8);
@@ -202,6 +242,7 @@ function endEject() {
   if (checkWin()) return;
   spawnAround(list().filter(p => p.alive));
   list().forEach(p => { if (team(p) === 'imp') p.killCd = Math.max(p.killCd, 15); });
+  sabCd = Math.max(sabCd, 12);
 }
 
 // ---------- פעולות ----------
@@ -222,15 +263,35 @@ function act(p, a) {
       break;
     }
     case 'camoff': p.cam = false; break;
+    case 'sab': {
+      if (phase !== 'play' || !p.alive || team(p) !== 'imp') return;
+      if (a.kind === 'door') { if (!closeDoors(a.room)) toast(p, 'הדלתות עדיין בהשהיה'); return; }
+      if (!['lights', 'oxygen', 'reactor'].includes(a.kind)) return;
+      if (sab || sabCd > 0) return toast(p, 'חבלה נוספת בעוד ' + Math.ceil(sabCd) + ' שניות');
+      startSab(a.kind);
+      break;
+    }
+    case 'sabfinish': {
+      if (!sab || !p.sabWork || p.sabWork.i !== Number(a.i) || p.sabWork.t < 1 || !p.alive) return;
+      const i = p.sabWork.i; p.sabWork = null; fixSab(i);
+      break;
+    }
     case 'use': {
       if (phase !== 'play' || p.spectator) return;
       const t0 = p.tasks.filter(x => !x.done).map(x => ({ ...MAP.TASKS[x.i], ref: x }));
       const task = nearest(p, t0, USE_RANGE);
       if (p.inVent !== null) return;
+      // נקודת תיקון של חבלה פעילה
+      if (sab && p.alive) {
+        const pts = MAP.SAB_POINTS[sab.type];
+        const idx = pts.findIndex((q, i) => !sab.fixed[i] && dist(p, q) < 70);
+        if (idx >= 0) { p.sabWork = { i: idx, t: 0 }; p.work = null; return; }
+      }
       if (task) { p.work = { ref: task.ref, t: 0, mini: isMini(task.ref.i) }; return; }
       // כיסא האבטחה: צופים במצלמות. תזוזה או לחיצה נוספת מסיימות את הצפייה
       if (p.alive && dist(p, MAP.CAM_CONSOLE) < 80) { p.cam = !p.cam; p.work = null; return; }
       if (p.alive && dist(p, MAP.BUTTON) < 80) {
+        if (sab && sab.type !== 'lights') return toast(p, 'אי אפשר לכנס ישיבה בזמן משבר!');
         if (p.emergencyUsed) return toast(p, 'כבר השתמשת בכפתור החירום');
         p.emergencyUsed = true;
         callMeeting(p, null);
@@ -281,7 +342,7 @@ function act(p, a) {
       const r = p.work.ref; p.work = null; completeTask(p, r);
       break;
     }
-    case 'cancel': p.work = null; break;
+    case 'cancel': p.work = null; p.sabWork = null; break;
     case 'hat': {
       if (phase !== 'lobby') return;
       const h = Number(a.hat);
@@ -410,8 +471,32 @@ function botTick(p, dt) {
     }
     return;
   }
+  // חבלה פעילה: בוטים מהצוות רצים לתקן, כל אחד לנקודה אחרת
+  if (!sab) { b.sabTarget = null; b.pressSab = false; }
+  else {
+    if (b.sabTarget != null && sab.fixed[b.sabTarget]) { b.sabTarget = null; b.pressSab = false; }
+    if (team(p) === 'crew' && p.alive && b.sabTarget == null && !p.sabWork && Math.random() < 0.03) {
+      const taken = new Set(list().filter(o => o.isBot && o.alive && o.id !== p.id && o.bot.sabTarget != null).map(o => o.bot.sabTarget));
+      const pts = MAP.SAB_POINTS[sab.type];
+      const idx = pts.findIndex((q, i) => !sab.fixed[i] && !taken.has(i));
+      if (idx >= 0) {
+        const h = MAP.roomAt(p.x, p.y);
+        b.sabTarget = idx; b.pressSab = true; b.wait = 0;
+        b.plan = [...(h ? MAP.path(h.id, pts[idx].room) : []), { x: pts[idx].x, y: pts[idx].y }];
+      }
+    }
+  }
+  if (team(p) === 'imp' && p.alive && !p.inVent) {
+    if (!sab && sabCd <= 0 && Math.random() < 0.0005) startSab(pick(['lights', 'lights', 'oxygen', 'reactor']));
+    else if (doorCd <= 0 && Math.random() < 0.0004) closeDoors(pick(Object.keys(MAP.ROOMS)));
+  }
   if (b.wait > 0) { b.wait -= dt; return; }
-  if (p.work) return;
+  if (p.work || p.sabWork) return;
+  if (!b.plan.length && b.pressSab) {
+    b.pressSab = false;
+    act(p, { type: 'use' });
+    return;
+  }
   if (!b.plan.length && b.pressButton) {
     b.pressButton = false;
     if (dist(p, MAP.BUTTON) < 90) act(p, { type: 'use' });
@@ -611,6 +696,12 @@ function tick() {
   last = t;
 
   if (phase === 'play') {
+    sabCd = Math.max(0, sabCd - dt); doorCd = Math.max(0, doorCd - dt);
+    for (const rid of Object.keys(doorsUntil)) if (doorsUntil[rid] <= t) delete doorsUntil[rid];
+    if (sab && sab.type !== 'lights') {
+      sab.t -= dt;
+      if (sab.t <= 0) { winner = { team: 'imp', reason: SAB_WIN[sab.type] }; phase = 'end'; settings.reveal = true; sab = null; }
+    }
     // רוח מפתחי האוורור: פעם בכמה שניות פתח אחד נושף ודוחף חלש
     windT -= dt;
     if (windT <= 0) { windT = 12 + Math.random() * 14; gusts.push({ i: Math.floor(Math.random() * MAP.VENTS.length), until: t + 3 }); }
@@ -643,11 +734,18 @@ function tick() {
           p.x = Math.max(0, Math.min(MAP.WORLD.w, p.x + dx * step));
           p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
         } else {
-          if (MAP.walkable(p.x + dx * step, p.y)) p.x += dx * step;
-          if (MAP.walkable(p.x, p.y + dy * step)) p.y += dy * step;
+          if (MAP.walkable(p.x + dx * step, p.y) && !doorBlocked(p.x + dx * step, p.y)) p.x += dx * step;
+          if (MAP.walkable(p.x, p.y + dy * step) && !doorBlocked(p.x, p.y + dy * step)) p.y += dy * step;
         }
         if (Math.abs(dx) > 0.1) p.dir = dx > 0 ? 1 : -1;
-        p.work = null; p.cam = false;
+        p.work = null; p.cam = false; p.sabWork = null;
+      }
+      if (p.sabWork) {
+        if (!sab || !p.alive) p.sabWork = null;
+        else {
+          p.sabWork.t += dt;
+          if (p.isBot && p.sabWork.t >= 3.5) { const i = p.sabWork.i; p.sabWork = null; fixSab(i); }
+        }
       }
       if (p.work) {
         const tk = MAP.TASKS[p.work.ref.i];
@@ -722,6 +820,8 @@ function viewFor(v) {
     killCd: Math.ceil(v.killCd), shiftCd: Math.ceil(v.shiftCd), shifted: !!v.shapeAs, gaCd: Math.ceil(v.gaCd),
     emergencyUsed: v.emergencyUsed, work: v.work && !v.work.mini ? v.work.t / taskTime(v.work.ref.i) : 0,
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
+    sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial' }[sab.type], i: v.sabWork.i } : null,
+    sabCd: Math.ceil(sabCd), doorCd: Math.ceil(doorCd),
     color: v.color,
   };
   const out = {
@@ -730,6 +830,8 @@ function viewFor(v) {
     tasks: { done: taskDone, total: taskTotal },
     gusts: gusts.map(g => g.i),
     camsOn: list().some(q => q.cam && q.alive),
+    sab: sab ? { type: sab.type, t: Math.ceil(sab.t), fixed: sab.fixed.slice() } : null,
+    doors: Object.keys(doorsUntil).filter(r => doorsUntil[r] > now()),
     toast: v.toast.splice(0),
     roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat })),
     chat,

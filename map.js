@@ -141,7 +141,24 @@
     { name: 'ניהול', x: 1540, y: 700, mx: 1540, my: 578 },
   ];
   const CAM_CONSOLE = { x: 650, y: 660 };
-  const MAP = { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, walkable, roomAt, path };
+  // נקודות תיקון לחבלות: חשמל (אחת), חמצן (שתיים), כור (שתיים)
+  const SAB_POINTS = {
+    lights: [{ x: 690, y: 1100, room: 'EL', name: 'לוח חשמל' }],
+    oxygen: [{ x: 2380, y: 260, room: 'O', name: 'מערכת חמצן' }, { x: 1400, y: 770, room: 'A', name: 'בקרת אוויר' }],
+    reactor: [{ x: 70, y: 780, room: 'R', name: 'ליבת הכור' }, { x: 210, y: 1240, room: 'D', name: 'קירור כור' }],
+  };
+  // מלבני הדלתות של חדר: כל המעברים שלו אל מסדרונות
+  function doorRects(roomId) {
+    const out = [];
+    CORRIDORS.forEach(c => {
+      if (c.a !== roomId && c.b !== roomId) return;
+      const A = ROOMS[c.a], B = ROOMS[c.b];
+      if (c.o === 'v') { const by = c.a === roomId ? A.y + A.h : B.y; out.push({ x: c.x, y: by - 14, w: c.w, h: 28 }); }
+      else { const bx = c.a === roomId ? A.x + A.w : B.x; out.push({ x: bx - 14, y: c.y, w: 28, h: c.h }); }
+    });
+    return out;
+  }
+  const MAP = { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path };
   if (typeof module !== 'undefined' && module.exports) module.exports = MAP;
   else root.MAP = MAP;
 })(this);

@@ -66,7 +66,7 @@
   #workbar { position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%); width: 240px; background: var(--panel); padding: 8px 12px; border-radius: 12px; text-align: center; font-size: 13px; }
   #vitals { position: absolute; top: 120px; left: 12px; background: var(--panel); border-radius: 14px; padding: 12px 14px; min-width: 200px; }
   #vitals div { display: flex; gap: 8px; align-items: center; padding: 3px 0; font-size: 14px; }
-  #toasts { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+  #toasts { position: fixed; top: 112px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
   #toasts div { background: rgba(10,12,20,.92); border: 1px solid var(--line); padding: 8px 14px; border-radius: 10px; font-size: 15px; animation: fade 3.2s forwards; }
   @keyframes fade { 0% { opacity: 0; transform: translateY(-6px); } 8%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
   #ghostBadge { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(80,90,120,.85); padding: 6px 14px; border-radius: 10px; font-size: 14px; }
@@ -135,6 +135,29 @@
   .vlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; margin-top: 10px; text-align: right; }
   .vrow { display: flex; align-items: center; gap: 6px; background: #151b2c; border-radius: 10px; padding: 6px 10px; font-size: 14px; }
   #nowSpeaking { background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.35); color: #c9f5da; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; font-size: 14px; }
+  .sws { display: flex; gap: 14px; justify-content: center; margin: 18px 0; direction: ltr; }
+  .sw { width: 52px; height: 100px; border-radius: 12px; background: #2a1a1a; border: 3px solid #5a2a2a; position: relative; padding: 0; }
+  .sw i { position: absolute; left: 6px; right: 6px; top: 8px; height: 40px; border-radius: 8px; background: #884444; transition: all .15s; }
+  .sw.on { background: #1a2a1a; border-color: #2a6a3a; }
+  .sw.on i { top: 48px; background: #4ade80; box-shadow: 0 0 12px #4ade80; }
+  .micHeard { background: rgba(255,214,70,.1); border: 1px solid rgba(255,214,70,.4); color: #ffe9a8; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; font-size: 14px; }
+  .lchat { height: 110px; overflow-y: auto; background: #0e1322; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+  .lchat p { margin: 3px 0; }
+  #sabStage { position: relative; width: 100%; aspect-ratio: 2700 / 1400; background: #07101f; border: 2px solid #2b4c7a; border-radius: 14px; overflow: hidden;
+    background-image: linear-gradient(rgba(60,120,200,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(60,120,200,.12) 1px, transparent 1px); background-size: 4% 8%; }
+  .scor { position: absolute; background: rgba(70,130,210,.22); border: 1px dashed rgba(110,170,255,.35); }
+  .sroom { position: absolute; background: rgba(40,90,160,.35); border: 2px solid #4a8fe0; border-radius: 6px; }
+  .sroom span { position: absolute; top: 3%; left: 0; right: 0; text-align: center; font-size: clamp(8px, 1.4vw, 14px); color: #bcd6ff; font-weight: 700; }
+  .sbtn { position: absolute; transform: translate(-50%, -50%); padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: clamp(12px, 2.2vw, 22px); }
+  .sdoor { width: clamp(24px, 3.6vw, 40px); height: clamp(24px, 3.6vw, 40px); background: #2a3a58; border: 2px solid #6aa0e8; }
+  .sdoor.closed { background: #7a1a1a; border-color: #ff6b6b; }
+  .scrit { width: clamp(34px, 5vw, 56px); height: clamp(34px, 5vw, 56px); background: #5a1a1a; border: 3px solid #ff4d4d; box-shadow: 0 0 14px rgba(255,77,77,.5); }
+  .sbtn:disabled { opacity: .35; box-shadow: none; }
+  #sabBanner { position: fixed; top: 58px; left: 50%; transform: translateX(-50%); z-index: 26; padding: 8px 16px; border-radius: 12px; font-weight: 800; text-align: center; max-width: calc(100vw - 24px); background: rgba(150,20,20,.92); border: 2px solid #ff6b6b; animation: sabblink 1s infinite; }
+  #sabBanner.amber { background: rgba(140,90,10,.92); border-color: #ffb547; animation: none; }
+  @keyframes sabblink { 50% { background: rgba(90,10,10,.92); } }
+  #sabFlash { position: fixed; inset: 0; z-index: 11; pointer-events: none; box-shadow: inset 0 0 140px rgba(255,0,0,.6); animation: sabflash 1s infinite; }
+  @keyframes sabflash { 50% { box-shadow: inset 0 0 40px rgba(255,0,0,.25); } }
   .vdots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 96px; }
   .vdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); display: inline-block; animation: popdot .35s ease-out backwards; }
   @keyframes popdot { from { transform: scale(0); } to { transform: scale(1); } }
@@ -242,6 +265,10 @@
     <div id="hats"></div>
     <b>שחקנים (<span id="pcount">0</span>)</b>
     <div id="plist"></div>
+    <b>צ'אט</b>
+    <div id="micHeardL" class="micHeard hidden"></div>
+    <div id="lobbyChat" class="lchat"></div>
+    <div class="row" style="margin:6px 0 12px"><input id="lobbyIn" maxlength="140" placeholder="כתוב הודעה… (או דבר אם המיקרופון דלוק)" style="flex:1" autocomplete="off"><button id="lobbySend">שלח</button></div>
     <b>הגדרות משחק</b>
     <div id="settingsGrid">
       <label>מתחזים <select data-s="impostors"><option>1</option><option>2</option><option>3</option></select></label>
@@ -267,6 +294,18 @@
   </div>
 </div>
 
+<!-- מפת חבלות (למתחזים) -->
+<div id="sabMap" class="screen hidden">
+  <div class="card" style="max-width:980px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">🛠️ מפת חבלות</h2><button id="sabClose">✕ סגור</button></div>
+    <p id="sabHint" class="sub" style="margin:6px 0 10px"></p>
+    <div id="sabStage"></div>
+    <p class="sub" style="font-size:13px;margin:10px 0 0">🚪 נעילת דלתות החדר ל-12 שניות · 💡 הפלת החשמל · 💨 הפסקת חמצן (45ש׳) · ☢️ התחממות הכור (45ש׳)</p>
+  </div>
+</div>
+<div id="sabBanner" class="hidden"></div>
+<div id="sabFlash" class="hidden"></div>
+
 <!-- הכרזה לפני ישיבה -->
 <div id="alert" class="screen hidden">
   <div id="alertBox">
@@ -286,6 +325,7 @@
     <p id="msub" class="sub" style="margin-top:6px"></p>
     <div id="mgrid"></div>
     <div class="row" style="margin-bottom:12px"><button id="skipBtn">⏭ דלג על ההצבעה</button><span id="skipDots" class="vdots"></span><span id="mstatus" class="sub" style="margin:0"></span></div>
+    <div id="micHeard" class="micHeard hidden"></div>
     <div id="nowSpeaking" class="hidden"></div>
     <div id="chatbox"></div>
     <div class="row"><input id="chatIn" maxlength="140" placeholder="כתוב הודעה…" style="flex:1" autocomplete="off"><button id="chatBtn">שלח</button></div>
@@ -329,7 +369,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-131027'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-131949'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -570,7 +610,7 @@ function onState(s) {
   if (s.phase === 'alert') renderAlert(s);
   show('#eject', s.phase === 'eject');
   show('#end', s.phase === 'end');
-  if (s.phase === 'lobby') renderLobby(s);
+  if (s.phase === 'lobby') { renderLobby(s); renderLobbyChat(s); }
   if (s.phase === 'play') renderHud(s);
   if (s.phase === 'meeting') renderMeeting(s);
   if (s.phase === 'eject') renderEject(s);
@@ -579,6 +619,7 @@ function onState(s) {
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
   miniSync(s);
+  renderSab(s);
   document.body.classList.toggle('cams-on', !!(s.me.cam && s.phase === 'play'));
   show('#micBtn', !DEMO);
   applyVoice();
@@ -633,6 +674,7 @@ const ACTIONS = [
   { k: 'shift', ic: '🎭', label: 'שנה צורה', key: 'F', red: true },
   { k: 'shield', ic: '🛡️', label: 'הגן', key: 'G' },
   { k: 'vitals', ic: '💓', label: 'סימנים', key: 'C' },
+  { k: 'sab', ic: '🛠️', label: 'חבלה', key: 'X', red: true },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -659,12 +701,14 @@ function actionState(s) {
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
+  st.sab = { show: alive && me.team === 'imp', on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
 }
 
 function doAction(k) {
   if (!S || S.phase !== 'play') return;
   if (k === 'vitals') { if (S.me.roleKey === 'scientist') { vitalsOpen = !vitalsOpen; renderHud(S); } return; }
+  if (k === 'sab') { if (S.me.alive && S.me.team === 'imp') openSabMap(); return; }
   const st = actionState(S)[k];
   if (st && st.show && st.on) api({ type: k });
 }
@@ -747,6 +791,46 @@ const sendChat = () => { const t = $('#chatIn').value.trim(); if (t) api({ type:
 $('#chatBtn').onclick = sendChat;
 $('#chatIn').onkeydown = e => { if (e.key === 'Enter') sendChat(); e.stopPropagation(); };
 
+// ---------- חבלות: מפת חבלות של התחנה שלנו, באייקונים ובעברית ----------
+let sabOpen = false;
+(function buildSabMap() {
+  const st = $('#sabStage'), W0 = MAP.WORLD.w, H0 = MAP.WORLD.h;
+  const pc = (v, tot) => (v / tot * 100) + '%';
+  let h = '';
+  for (const c of MAP.CORRIDORS) h += `<div class="scor" style="left:${pc(c.x, W0)};top:${pc(c.y, H0)};width:${pc(c.w, W0)};height:${pc(c.h, H0)}"></div>`;
+  for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<div class="sroom" style="left:${pc(r.x, W0)};top:${pc(r.y, H0)};width:${pc(r.w, W0)};height:${pc(r.h, H0)}"><span>${r.name}</span></div>`; }
+  for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<button class="sbtn sdoor" data-room="${k}" title="נעל דלתות ב${r.name}" style="left:${pc(r.cx, W0)};top:${pc(r.cy + r.h * 0.12, H0)}">🚪</button>`; }
+  const crit = [['reactor', 'R', '☢️', 'התחממות הכור'], ['oxygen', 'O', '💨', 'הפסקת חמצן'], ['lights', 'EL', '💡', 'הפלת החשמל']];
+  for (const [kind, rk, ic, title] of crit) { const r = MAP.ROOMS[rk]; h += `<button class="sbtn scrit" data-kind="${kind}" title="${title}" style="left:${pc(r.x + r.w, W0)};top:${pc(r.y, H0)}">${ic}</button>`; }
+  st.innerHTML = h;
+  st.onclick = e => {
+    const b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.dataset.kind) api({ type: 'sab', kind: b.dataset.kind });
+    else api({ type: 'sab', kind: 'door', room: b.dataset.room });
+    closeSabMap();
+  };
+})();
+function updateSabMap(s) {
+  const me = s.me, active = !!s.sab;
+  $('#sabHint').textContent = active ? 'יש משבר פעיל – אפשר רק לנעול דלתות עד שיתוקן.' : me.sabCd > 0 ? `חבלה גדולה הבאה אפשרית בעוד ${me.sabCd} שניות.` : 'בחר חבלה: משבר גדול (אייקון אדום) או נעילת דלתות של חדר (🚪).';
+  document.querySelectorAll('#sabStage .scrit').forEach(b => { b.disabled = active || me.sabCd > 0; });
+  document.querySelectorAll('#sabStage .sdoor').forEach(b => { const closed = (s.doors || []).includes(b.dataset.room); b.classList.toggle('closed', closed); b.disabled = closed || me.doorCd > 0; });
+}
+function openSabMap() { if (!S) return; sabOpen = true; updateSabMap(S); show('#sabMap', true); }
+function closeSabMap() { sabOpen = false; show('#sabMap', false); }
+$('#sabClose').onclick = closeSabMap;
+function renderSab(s) {
+  const act = s.phase === 'play' && s.sab;
+  show('#sabBanner', !!act); show('#sabFlash', !!act && s.sab.type !== 'lights');
+  if (act) {
+    const sb = s.sab, pts = MAP.SAB_POINTS[sb.type];
+    $('#sabBanner').classList.toggle('amber', sb.type === 'lights');
+    $('#sabBanner').textContent = sb.type === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל (חדר החשמל)'
+      : (sb.type === 'oxygen' ? '💨 הפסקת חמצן! ' : '☢️ הכור מתחמם! ') + sb.t + 'ש׳ — ' + pts.map((p, i) => (sb.fixed[i] ? '✅ ' : '⛔ ') + MAP.ROOMS[p.room].name).join(' · ');
+  }
+  if (sabOpen) { if (s.phase !== 'play' || !s.me.alive || s.me.team !== 'imp') closeSabMap(); else updateSabMap(s); }
+}
+
 // ---------- הכרזה: "X לחץ על כפתור החירום" / "X דיווח על גופה" ----------
 let alertSig = '';
 function renderAlert(s) {
@@ -827,21 +911,46 @@ $('#lobbyBtn').onclick = () => api({ type: 'lobby' });
 
 // ---------- מיני-משחקים במשימות ----------
 let miniOpen = null, miniLock = false;
+let miniKind = null, miniSabIdx = null;
 function miniSync(s) {
-  const want = s.phase === 'play' ? s.me.mini : null;
-  if (want === null || want === undefined) miniLock = false;
+  const wantTask = s.phase === 'play' ? s.me.mini : null;
+  const wantSab = s.phase === 'play' ? s.me.sabMini : null;
+  const has = (wantSab != null) || (wantTask !== null && wantTask !== undefined);
+  if (!has) miniLock = false;
   if (miniLock) return;
-  if (want !== null && want !== undefined && miniOpen === null) openMini(want);
-  else if ((want === null || want === undefined) && miniOpen !== null) { miniOpen = null; show('#mini', false); }
+  if (has && miniOpen === null) { if (wantSab) openSabMini(wantSab); else openMini(wantTask); }
+  else if (!has && miniOpen !== null) { miniOpen = null; show('#mini', false); }
 }
 function openMini(i) {
-  miniOpen = i;
+  miniOpen = i; miniSabIdx = null;
   const T = MAP.TASKS[i], b = $('#miniBody');
+  miniKind = T.kind;
   $('#miniTitle').textContent = T.name;
   show('#mini', true);
   if (T.kind === 'wires') buildWires(b);
   else if (T.kind === 'dial') buildDial(b);
   else buildCode(b);
+}
+const SAB_TITLES = { switches: '💡 החזרת החשמל', code: '💨 תיקון מערכת החמצן', dial: '☢️ קירור הכור' };
+function openSabMini(m) {
+  miniOpen = -1; miniSabIdx = m.i; miniKind = m.kind;
+  const b = $('#miniBody');
+  $('#miniTitle').textContent = SAB_TITLES[m.kind] || 'תיקון';
+  show('#mini', true);
+  if (m.kind === 'switches') buildSwitches(b);
+  else if (m.kind === 'dial') buildDial(b);
+  else buildCode(b);
+}
+function buildSwitches(b) {
+  const st = Array.from({ length: 5 }, () => Math.random() < 0.5);
+  if (st.every(Boolean)) st[Math.floor(Math.random() * 5)] = false;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">הדלק את כל המתגים כדי להחזיר את החשמל.</p><div class="sws">' +
+    st.map((v, i) => `<button class="sw ${v ? 'on' : ''}" data-i="${i}"><i></i></button>`).join('') + '</div>';
+  b.querySelector('.sws').onclick = e => {
+    const t = e.target.closest('.sw'); if (!t) return;
+    st[+t.dataset.i] = !st[+t.dataset.i]; t.classList.toggle('on', st[+t.dataset.i]);
+    if (st.every(Boolean)) miniDone();
+  };
 }
 function closeMini() {
   if (miniOpen === null) return;
@@ -849,10 +958,10 @@ function closeMini() {
   miniOpen = null; miniLock = true; show('#mini', false);
 }
 function miniDone() {
-  const i = miniOpen;
+  const i = miniOpen, sabI = miniSabIdx;
   miniLock = true;
   $('#miniBody').innerHTML = '<div class="big" style="color:var(--ok)">✔ הושלם!</div>';
-  setTimeout(() => { api({ type: 'finish', i }); miniOpen = null; show('#mini', false); }, 700);
+  setTimeout(() => { api(sabI !== null ? { type: 'sabfinish', i: sabI } : { type: 'finish', i }); miniOpen = null; show('#mini', false); }, 700);
 }
 $('#miniClose').onclick = closeMini;
 
@@ -917,7 +1026,7 @@ function buildCode(b) {
 
 function miniKey(e) {
   if (e.code === 'Escape') { closeMini(); return; }
-  if (!codeKey || MAP.TASKS[miniOpen].kind !== 'code') return;
+  if (!codeKey || miniKind !== 'code') return;
   if (/^(Digit|Numpad)[0-9]$/.test(e.code)) codeKey(e.code.slice(-1));
   else if (e.code === 'Backspace') codeKey('⌫');
   else if (e.code === 'Enter' || e.code === 'NumpadEnter') codeKey('✓');
@@ -1152,35 +1261,64 @@ refreshTts();
 // הדפדפן ממיר את מה שאתה אומר לטקסט, והבוטים מגיבים אליו כמו להודעה בצ'אט. פועל בישיבות כשהמיקרופון דלוק.
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, recWanted = false, botSpeakUntil = 0, recToast = false;
+let heardText = '', heardMsg = '', listening = false, heardMsgTimer = null;
+// שורת "מה שמעתי": מראה בזמן אמת מה הדפדפן מזהה, כדי שתדע שהבוטים באמת קולטים אותך
+function refreshHeard() {
+  const t = heardMsg || heardText || (listening ? '🎤 מקשיב… דבר עכשיו – מה ששמעתי יופיע כאן ואחר כך בצ\'אט' : '');
+  for (const id of ['#micHeard', '#micHeardL']) { const el = $(id); if (!el) continue; el.textContent = t; el.classList.toggle('hidden', !t); }
+}
+function flashHeardMsg(t) { heardMsg = t; refreshHeard(); clearTimeout(heardMsgTimer); heardMsgTimer = setTimeout(() => { heardMsg = ''; refreshHeard(); }, 7000); }
 function startRec() {
   if (!SR || rec || !recWanted) return;
-  rec = new SR(); rec.lang = 'he-IL'; rec.continuous = true; rec.interimResults = false;
+  rec = new SR(); rec.lang = 'he-IL'; rec.continuous = true; rec.interimResults = true;
+  rec.onstart = () => { listening = true; refreshHeard(); };
   rec.onresult = ev => {
+    let interim = '';
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
-      if (!ev.results[i].isFinal) continue;
-      const text = ev.results[i][0].transcript.trim();
+      const r = ev.results[i], text = r[0].transcript.trim();
+      if (!r.isFinal) { interim += text + ' '; continue; }
       // לא "לשמוע" את הבוטים שמדברים מהרמקולים
       if (!text || Date.now() < botSpeakUntil || (window.speechSynthesis && speechSynthesis.speaking)) continue;
       api({ type: 'chat', text: text.slice(0, 140), voice: true });
+      heardText = '';
     }
+    if (interim.trim() && !(window.speechSynthesis && speechSynthesis.speaking)) heardText = '🎤 שומע: ' + interim.trim();
+    refreshHeard();
   };
-  rec.onend = () => { rec = null; if (recWanted) setTimeout(startRec, 300); };
-  rec.onerror = ev => { if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') { recWanted = false; toast('אין הרשאה לזיהוי דיבור – הבוטים לא ישמעו אותך'); } };
+  rec.onend = () => { rec = null; listening = false; refreshHeard(); if (recWanted) setTimeout(startRec, 300); };
+  rec.onerror = ev => {
+    const msgs = { 'not-allowed': 'אין הרשאה לזיהוי דיבור – אשר מיקרופון בדפדפן', 'service-not-allowed': 'זיהוי הדיבור חסום בדפדפן הזה', 'audio-capture': 'לא נמצא מיקרופון', 'network': 'זיהוי דיבור דורש חיבור לאינטרנט' };
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') recWanted = false;
+    if (msgs[ev.error]) flashHeardMsg('⚠️ ' + msgs[ev.error]);
+  };
   try { rec.start(); } catch (e) { rec = null; }
 }
-function stopRec() { recWanted = false; if (rec) { try { rec.stop(); } catch (e) {} rec = null; } }
+function stopRec() { recWanted = false; listening = false; heardText = ''; if (rec) { try { rec.stop(); } catch (e) {} rec = null; } refreshHeard(); }
 function recSync(s) {
-  const want = micOn && s.phase === 'meeting' && s.me.alive && !!SR;
+  const want = micOn && (s.phase === 'meeting' || s.phase === 'lobby') && s.me.alive && !!SR;
   if (want && !recWanted) {
     recWanted = true; startRec();
-    if (!recToast) { recToast = true; toast('🎤 הבוטים מקשיבים לך (הדפדפן שולח את הדיבור לשירות זיהוי)'); }
+    if (!recToast) { recToast = true; toast('🎤 זיהוי דיבור פועל: מה שתגיד יופיע בצ\'אט (הדפדפן שולח את הדיבור לשירות זיהוי)'); }
   }
   if (!want && recWanted) stopRec();
 }
 
+// צ'אט הלובי (אותו מנגנון כמו בישיבה)
+let lobbyChatLen = -1;
+function renderLobbyChat(s) {
+  if (s.chat.length === lobbyChatLen) return;
+  lobbyChatLen = s.chat.length;
+  const box = $('#lobbyChat');
+  box.innerHTML = s.chat.map(c => `<p><span class="dot" style="background:${c.color};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub" style="margin:0">אין עדיין הודעות</p>';
+  box.scrollTop = 1e6;
+}
+const sendLobby = () => { const t = $('#lobbyIn').value.trim(); if (t) api({ type: 'chat', text: t }); $('#lobbyIn').value = ''; };
+$('#lobbySend').onclick = sendLobby;
+$('#lobbyIn').onkeydown = e => { if (e.key === 'Enter') sendLobby(); e.stopPropagation(); };
+
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -1192,7 +1330,7 @@ function refreshKeyLabels() {
   for (const b of $('#actions').children) { const k = b.querySelector('.k'); if (k) k.textContent = keyLabel(KEYS[b.dataset.a]); }
   document.querySelectorAll('.keys b').forEach(b => { const arrow = { up: '↑', down: '↓', left: '←', right: '→' }[b.dataset.k]; b.textContent = keyLabel(KEYS[b.dataset.k]) + ' ' + arrow; });
   $('#keysHelp').innerHTML = `תזוזה <kbd>${keyLabel(KEYS.up)}${keyLabel(KEYS.left)}${keyLabel(KEYS.down)}${keyLabel(KEYS.right)}</kbd>/חצים · ` +
-    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
+    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
   $('#keysList').innerHTML = Object.keys(DEFAULT_KEYS).map(a =>
     `<div class="row"><span>${KEY_NAMES[a]}</span><button data-a="${a}" class="${capturing === a ? 'wait' : ''}">${capturing === a ? 'לחץ מקש…' : keyLabel(KEYS[a])}</button></div>`).join('');
 }
@@ -1249,7 +1387,7 @@ addEventListener('touchstart', e => {
   if (Math.min(...ys) < innerHeight * 0.2 && Math.max(...ys) > innerHeight * 0.8) secretToggle();
 }, { passive: true });
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;
@@ -1259,6 +1397,7 @@ addEventListener('keydown', e => {
     if (l !== undefined) api({ type: 'ventMove', to: l });
     return;
   }
+  if (e.code === 'Escape' && sabOpen) { closeSabMap(); return; }
   if (e.code === 'Escape' && S && S.me.cam) { api({ type: 'camoff' }); return; }
   const act = actionForKey(e.code);
   if (act && !e.repeat) { doAction(act); return; }
@@ -1666,6 +1805,24 @@ function drawMap(t) {
       ctx.fillStyle = '#fff'; ctx.font = '20px Arial'; ctx.textAlign = 'center'; ctx.fillText('🎥', k.x, k.y + 7);
     }
   }
+  // דלתות נעולות
+  if (S && S.doors) for (const rid of S.doors) for (const d of MAP.doorRects(rid)) {
+    if (!inV(d.x - 20, d.y - 20, d.w + 40, d.h + 40)) continue;
+    ctx.fillStyle = '#b01e1e'; ctx.fillRect(d.x, d.y, d.w, d.h);
+    ctx.save(); ctx.beginPath(); ctx.rect(d.x, d.y, d.w, d.h); ctx.clip();
+    ctx.strokeStyle = '#f3c63a'; ctx.lineWidth = 6;
+    for (let k = -Math.max(d.w, d.h); k < Math.max(d.w, d.h) * 2; k += 14) { ctx.beginPath(); ctx.moveTo(d.x + k, d.y + d.h); ctx.lineTo(d.x + k + d.h, d.y); ctx.stroke(); }
+    ctx.restore();
+    ctx.strokeStyle = '#3a0808'; ctx.lineWidth = 3; ctx.strokeRect(d.x, d.y, d.w, d.h);
+  }
+  // נקודות תיקון של משבר פעיל
+  if (S && S.sab) MAP.SAB_POINTS[S.sab.type].forEach((q, i) => {
+    if (S.sab.fixed[i] || !inV(q.x - 70, q.y - 70, 140, 140)) return;
+    const pp = 0.5 + 0.5 * Math.sin(t / 180);
+    disc(q.x, q.y, 30 + pp * 6, 'rgba(255,60,60,.22)', '#ff4d4d', 3);
+    ctx.fillStyle = '#fff'; ctx.font = '26px Arial'; ctx.textAlign = 'center'; ctx.fillText({ lights: '💡', oxygen: '💨', reactor: '☢️' }[S.sab.type], q.x, q.y + 9);
+    ctx.font = 'bold 13px Rubik, Arial'; ctx.fillStyle = '#ffd0d0'; ctx.fillText(q.name, q.x, q.y - 42);
+  });
   // כפתור חירום
   const pulse = 0.5 + 0.5 * Math.sin(t / 400);
   ctx.fillStyle = '#6b6f7c'; ctx.beginPath(); ctx.arc(MAP.BUTTON.x, MAP.BUTTON.y, 30, 0, Math.PI * 2); ctx.fill();
@@ -1755,7 +1912,8 @@ function frame(t) {
   drawMap(t);
 
   const noDark = !me.alive || me.spec;
-  const vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
+  let vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
+  if (S.sab && S.sab.type === 'lights' && me.team !== 'imp') vision = 95;
   const reveal = S.settings.reveal || noDark;
   const inView = p => noDark || D(cam, disp[p.id] || p) <= vision;
 
