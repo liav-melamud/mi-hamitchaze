@@ -226,6 +226,9 @@
   .lights { display: grid; grid-template-columns: repeat(3, 76px); gap: 8px; justify-content: center; margin: 14px 0; }
   .lights button { height: 76px; border-radius: 16px; background: #1c2232; border: 3px solid #3a4870; padding: 0; }
   .lights button.on { background: #ffd646; border-color: #fff3b0; box-shadow: 0 0 22px rgba(255,214,70,.8); }
+  #mExtras { background: rgba(80,120,200,.12); border: 1px solid rgba(110,160,255,.35); border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; font-size: 13px; max-height: 120px; overflow-y: auto; }
+  #mExtras .ex { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 3px 0; }
+  #mExtras button { padding: 3px 10px; font-size: 12px; }
   .vdots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 96px; }
   .vdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); display: inline-block; animation: popdot .35s ease-out backwards; }
   @keyframes popdot { from { transform: scale(0); } to { transform: scale(1); } }
@@ -348,6 +351,7 @@
       <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
+      <label>תפקידים חדשים <select data-s="newRoles"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
     </div>
     <div id="hostSettings" class="row hidden" style="margin:12px 0">
@@ -355,7 +359,8 @@
     </div>
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
-      <b>תפקידים:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר (מגן אחרי מוות) · מתחזה · משנה צורה (מתחפש לאחרים)<br>
+      <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול)<br>
+      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה ל-8ש׳) · מרקיב (גופות מתפרקות)<br>
       <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
@@ -396,6 +401,7 @@
     <div class="row" style="margin-bottom:12px"><button id="skipBtn">⏭ דלג על ההצבעה</button><span id="skipDots" class="vdots"></span><span id="mstatus" class="sub" style="margin:0"></span></div>
     <div id="micHeard" class="micHeard hidden"></div>
     <div id="nowSpeaking" class="hidden"></div>
+    <div id="mExtras" class="hidden"></div>
     <div id="chatbox"></div>
     <div class="row"><input id="chatIn" maxlength="140" placeholder="כתוב הודעה…" style="flex:1" autocomplete="off"><button id="chatBtn">שלח</button></div>
   </div>
@@ -450,7 +456,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-142037'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-142628'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -732,7 +738,7 @@ function renderLobby(s) {
   show('#waitHost', !s.me.host);
   document.querySelectorAll('#settingsGrid select').forEach(el => {
     const k = el.dataset.s, v = s.settings[k];
-    el.value = (k === 'confirm' || k === 'openVotes') ? (v ? '1' : '0') : String(v);
+    el.value = (k === 'confirm' || k === 'openVotes' || k === 'newRoles') ? (v ? '1' : '0') : String(v);
     el.disabled = !s.me.host;
   });
 }
@@ -740,7 +746,7 @@ $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) api({
 document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 10 }, (_, i) => `<option>${i}</option>`).join('');
 const sendSettings = () => {
   const o = { type: 'settings' };
-  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = (el.dataset.s === 'confirm' || el.dataset.s === 'openVotes') ? el.value === '1' : +el.value; });
+  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = (el.dataset.s === 'confirm' || el.dataset.s === 'openVotes' || el.dataset.s === 'newRoles') ? el.value === '1' : +el.value; });
   api(o);
 };
 document.querySelectorAll('#settingsGrid select').forEach(el => el.onchange = sendSettings);
@@ -757,6 +763,9 @@ const ACTIONS = [
   { k: 'vitals', ic: '💓', label: 'סימנים', key: 'C' },
   { k: 'sab', ic: '🛠️', label: 'חבלה', key: 'X', red: true },
   { k: 'map', ic: '🗺️', label: 'מפה', key: 'Tab' },
+  { k: 'photo', ic: '📸', label: 'צלם', key: 'P' },
+  { k: 'investigate', ic: '🔎', label: 'חקור', key: 'I' },
+  { k: 'vanish', ic: '👻', label: 'היעלם', key: 'H', red: true },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -778,12 +787,16 @@ function actionState(s) {
   st.use = { show: !me.spec, on: !inVent && (nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
-  st.kill = { show: alive && me.team === 'imp', on: !inVent && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && ['impostor', 'shifter', 'engineer'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
+  st.kill = { show: alive && me.team === 'imp', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
+  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
   st.map = { show: true, on: true };
+  const closeP = s.players.some(p => p.id !== me.id && p.alive && !p.spec && D(pos, p) <= 160);
+  st.photo = { show: alive && me.roleKey === 'photographer', on: me.photoCd === 0, label: me.photoCd ? 'צלם ' + me.photoCd : 'צלם' };
+  st.investigate = { show: alive && me.roleKey === 'detective', on: me.investCd === 0 && closeP, label: me.investCd ? 'חקור ' + me.investCd : 'חקור' };
+  st.vanish = { show: alive && me.roleKey === 'phantom', on: !!me.vanished || me.vanishCd === 0, label: me.vanished ? 'הופע' : (me.vanishCd ? 'היעלם ' + me.vanishCd : 'היעלם') };
   st.sab = { show: alive && me.team === 'imp', on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
 }
@@ -846,7 +859,7 @@ function renderMeeting(s) {
   const roles = {};
   s.players.forEach(p => { if (p.role) roles[p.id] = p; });
   const canVote = me.alive && !me.spec && !m.myVote && !m.reveal;
-  const dots = id => (m.votes || []).filter(v => v.to === id).map(v => `<i class="vdot" style="background:${v.c}"></i>`).join('');
+  const dots = id => (m.votes || []).filter(v => v.to === id).map(v => `<i class="vdot" style="background:${v.c}"></i>`.repeat(v.w || 1)).join('');
   const roster = s.roster.filter(p => !p.spec);
   const sig = JSON.stringify([roster, m.voted, m.myVote, Object.keys(roles), s.settings.reveal, m.reveal, m.votes]);
   if (sig !== meetSig) {
@@ -863,11 +876,31 @@ function renderMeeting(s) {
     $('#mstatus').textContent = m.reveal ? 'סופרים את הקולות…' : me.alive ? (m.myVote ? (m.myVote === 'skip' ? 'בחרת לדלג' : 'ההצבעה שלך נקלטה') : 'לחץ על שחקן כדי להצביע נגדו') : 'רוחות לא מצביעות 👻';
     $('#chatIn').disabled = !me.alive;
   }
+  renderExtras(s);
   if (s.chat.length !== chatLen) {
     chatLen = s.chat.length;
     $('#chatbox').innerHTML = s.chat.filter(c => !c.hide || !ttsOn).map(c => `<p><span class="dot" style="background:${c.color};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub">אין עדיין הודעות</p>';
     $('#chatbox').scrollTop = 1e6;
   }
+}
+let exSig = '';
+function renderExtras(s) {
+  const me = s.me, photos = me.photos || [], notes = me.notes || [];
+  const sig = JSON.stringify([photos.map(p => p.room + p.names.join()), notes, me.alive]);
+  const box = $('#mExtras');
+  if (!me.alive || (!photos.length && !notes.length)) { box.classList.add('hidden'); exSig = ''; return; }
+  box.classList.remove('hidden');
+  if (sig === exSig) return;
+  exSig = sig;
+  box.innerHTML = '<b>🗂️ הראיות שלי:</b>' +
+    photos.map((p, i) => `<div class="ex"><span>📸 ${esc(p.room)}: ${esc(p.names.join(', ') || 'גופה')} · לפני ${p.ago}ש׳</span><button data-ph="${i}">הצג</button></div>`).join('') +
+    notes.map((n, i) => `<div class="ex"><span>${esc(n)}</span><button data-nt="${i}">הצג</button></div>`).join('');
+  box.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.ph !== undefined) { const p = photos[+b.dataset.ph]; api({ type: 'chat', text: `📸 צילמתי ב${p.room}: ${p.names.join(', ') || 'גופה'}` }); }
+    else if (b.dataset.nt !== undefined) api({ type: 'chat', text: notes[+b.dataset.nt] });
+    b.disabled = true;
+  };
 }
 $('#mgrid').onclick = e => { const b = e.target.closest('button'); if (b && !b.disabled) api({ type: 'vote', target: b.dataset.v }); };
 $('#skipBtn').onclick = () => api({ type: 'vote', target: 'skip' });
@@ -1006,7 +1039,7 @@ function renderEject(s) {
   if (e.votes) {
     const dot = c => `<span class="dot" style="background:${c}"></span>`;
     $('#ejectTxt').innerHTML += '<div class="vlist">' + e.votes.map(v =>
-      `<div class="vrow">${dot(v.c)}<span>${esc(v.n)}</span><b>←</b>${v.to === 'p' ? dot(v.tc) + '<span>' + esc(v.tn) + '</span>' : '<span class="sub" style="margin:0">' + (v.to === 'skip' ? 'דילג' : 'לא הצביע') + '</span>'}</div>`).join('') + '</div>';
+      `<div class="vrow">${dot(v.c)}<span>${esc(v.n)}${v.w > 1 ? ' ×2' : ''}</span><b>←</b>${v.to === 'p' ? dot(v.tc) + '<span>' + esc(v.tn) + '</span>' : '<span class="sub" style="margin:0">' + (v.to === 'skip' ? 'דילג' : 'לא הצביע') + '</span>'}</div>`).join('') + '</div>';
   }
 }
 function renderEnd(s) {
@@ -1869,8 +1902,8 @@ $('#lobbySend').onclick = sendLobby;
 $('#lobbyIn').onkeydown = e => { if (e.key === 'Enter') sendLobby(); e.stopPropagation(); };
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -1882,7 +1915,7 @@ function refreshKeyLabels() {
   for (const b of $('#actions').children) { const k = b.querySelector('.k'); if (k) k.textContent = keyLabel(KEYS[b.dataset.a]); }
   document.querySelectorAll('.keys b').forEach(b => { const arrow = { up: '↑', down: '↓', left: '←', right: '→' }[b.dataset.k]; b.textContent = keyLabel(KEYS[b.dataset.k]) + ' ' + arrow; });
   $('#keysHelp').innerHTML = `תזוזה <kbd>${keyLabel(KEYS.up)}${keyLabel(KEYS.left)}${keyLabel(KEYS.down)}${keyLabel(KEYS.right)}</kbd>/חצים · ` +
-    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
+    ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish'].map(a => `${KEY_NAMES[a]} <kbd>${keyLabel(KEYS[a])}</kbd>`).join(' · ');
   $('#keysList').innerHTML = Object.keys(DEFAULT_KEYS).map(a =>
     `<div class="row"><span>${KEY_NAMES[a]}</span><button data-a="${a}" class="${capturing === a ? 'wait' : ''}">${capturing === a ? 'לחץ מקש…' : keyLabel(KEYS[a])}</button></div>`).join('');
 }
@@ -1940,7 +1973,7 @@ addEventListener('touchstart', e => {
   if (Math.min(...ys) < innerHeight * 0.2 && Math.max(...ys) > innerHeight * 0.8) secretToggle();
 }, { passive: true });
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;
@@ -2029,6 +2062,12 @@ function drawDrone(x, y, color, dir, opts = {}) {
 
 function drawBody(b) {
   ctx.save(); ctx.translate(b.x, b.y);
+  if (b.rot) { // גופה של מרקיב: מתפרקת, ירוקה ועם בועות
+    const tt = performance.now() / 200;
+    ctx.fillStyle = 'rgba(120,255,90,.28)'; ctx.beginPath(); ctx.ellipse(0, 8, 30 + Math.sin(tt) * 3, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(160,255,120,.8)'; ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) { const ph = (tt * 0.3 + i / 4) % 1; ctx.beginPath(); ctx.arc(-14 + i * 10, 4 - ph * 22, 2 + (1 - ph) * 3, 0, Math.PI * 2); ctx.stroke(); }
+  }
   ctx.fillStyle = b.color; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.ellipse(0, 6, 20, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;

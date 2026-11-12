@@ -16,6 +16,11 @@ const ROLES = {
   angel: { name: 'מלאך שומר', team: 'crew', desc: 'אחרי שתמות תוכל להגן על שחקן מחיסול – לחץ G לידו.' },
   impostor: { name: 'מתחזה', team: 'imp', desc: 'חסל (Q) את אנשי הצוות בלי להיתפס. אפשר לזחול בפתחים (V).' },
   shifter: { name: 'משנה צורה', team: 'imp', desc: 'מתחזה שיכול להתחפש לשחקן הקרוב (F) ל-20 שניות.' },
+  photographer: { name: 'הצלם', team: 'crew', desc: 'צלם (P) שחקנים וגופות שלידך. בישיבה אפשר להציג את התמונות כראיה.' },
+  detective: { name: 'בלש', team: 'crew', desc: 'חקור (I) שחקן קרוב: תגלה אם הוא היה ליד זירת חיסול.' },
+  judge: { name: 'שופט', team: 'crew', desc: 'ההצבעה שלך בישיבה שווה קול כפול.' },
+  phantom: { name: 'נעלם', team: 'imp', desc: 'היעלם (H) ל-8 שניות: אף אחד לא רואה אותך, אבל אי אפשר לחסל בזמן ההיעלמות.' },
+  viper: { name: 'מרקיב', team: 'imp', desc: 'הגופות של מי שחיסלת מתפרקות אחרי 8 שניות, ואי אפשר לדווח עליהן.' },
   spectator: { name: 'צופה', team: 'none', desc: 'הצטרפת באמצע משחק – צפה עד הסבב הבא.' },
 };
 
@@ -36,7 +41,7 @@ const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
 let players = {};
 let phase = 'lobby';
 let hostId = null;
-let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2 };
+let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true };
 let usedLines = new Set();
 let gusts = [], windT = 14;
 // חבלות: sab = משבר פעיל (חשמל/חמצן/כור), דלתות סגורות לפי חדר
@@ -136,9 +141,11 @@ function startGame(by) {
 
   const nImp = Math.max(1, Math.min(settings.impostors, Math.floor((all.length - 1) / 2)));
   const imps = all.slice(0, nImp), crew = all.slice(nImp);
-  imps.forEach((p, i) => { p.role = (i === 0 && (nImp >= 2 || Math.random() < 0.5)) ? 'shifter' : 'impostor'; });
-  const specials = shuffle(['engineer', 'scientist', 'angel']);
-  crew.forEach((p, i) => { p.role = i < specials.length && crew.length > 1 ? specials[i] : 'crew'; });
+  const impPool = shuffle(settings.newRoles ? ['impostor', 'shifter', 'phantom', 'viper', 'impostor'] : ['impostor', 'shifter', 'impostor']);
+  imps.forEach((p, i) => { p.role = impPool[i % impPool.length]; });
+  const specials = shuffle(settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge'] : ['engineer', 'scientist', 'angel']);
+  const nSpecial = settings.newRoles ? Math.max(1, Math.round(crew.length * 0.7)) : specials.length;
+  crew.forEach((p, i) => { p.role = i < Math.min(specials.length, nSpecial) && crew.length > 1 ? specials[i] : 'crew'; });
 
   taskTotal = 0; taskDone = 0;
   // בקבוצה קטנה כל איש צוות מקבל יותר משימות, כדי שהצוות לא יסיים מהר מדי (לפחות 20 משימות בסך הכל)
@@ -146,6 +153,7 @@ function startGame(by) {
   all.forEach(p => {
     p.alive = true; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
+    p.photos = []; p.notes = []; p.photoCd = 0; p.investCd = 0; p.vanishUntil = 0; p.vanishCd = 0; p.nearKill = 0;
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
@@ -219,7 +227,7 @@ function callMeeting(by, body) {
 function resolveMeeting() {
   const voters = list().filter(p => p.alive && !p.spectator);
   const tally = {};
-  voters.forEach(v => { const t = meeting.votes[v.id]; if (t) tally[t] = (tally[t] || 0) + 1; });
+  voters.forEach(v => { const t = meeting.votes[v.id]; if (t) tally[t] = (tally[t] || 0) + (v.role === 'judge' ? 2 : 1); });
   let best = null, max = 0, tie = false;
   for (const k in tally) {
     if (tally[k] > max) { max = tally[k]; best = k; tie = false; }
@@ -238,7 +246,7 @@ function resolveMeeting() {
     eject.votes = voters.map(v => {
       const t = meeting.votes[v.id];
       const tp = t && t !== 'skip' ? players[t] : null;
-      return { n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
+      return { w: v.role === 'judge' ? 2 : 1, n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
     });
   }
   meeting = null;
@@ -272,6 +280,38 @@ function act(p, a) {
       break;
     }
     case 'camoff': p.cam = false; break;
+    case 'photo': {
+      if (phase !== 'play' || !p.alive || p.role !== 'photographer' || p.photoCd > 0 || p.inVent !== null) return;
+      const near = list().filter(o => o.id !== p.id && o.alive && !o.spectator && o.inVent === null && !(o.vanishUntil > t) && dist(o, p) < 330);
+      const bds = bodies.filter(b => dist(b, p) < 330);
+      if (!near.length && !bds.length) return toast(p, '📸 אין מה לצלם כאן');
+      const room = (MAP.roomAt(p.x, p.y) || {}).name || 'מסדרון';
+      const shown = o => (o.shapeAs && players[o.shapeAs] ? players[o.shapeAs] : o).name.replace(/^🤖\s*/, '');
+      p.photos.push({ t, room, names: near.map(shown), bodies: bds.length });
+      if (p.photos.length > 6) p.photos.shift();
+      p.photoCd = 25;
+      toast(p, '📸 צילמת ב' + room + ': ' + (near.map(shown).join(', ') || 'גופה'));
+      break;
+    }
+    case 'investigate': {
+      if (phase !== 'play' || !p.alive || p.role !== 'detective' || p.investCd > 0 || p.inVent !== null) return;
+      const tgt = nearest(p, list().filter(o => o.id !== p.id && o.alive && !o.spectator && o.inVent === null && !(o.vanishUntil > t)), 160);
+      if (!tgt) return toast(p, '🔎 התקרב לשחקן כדי לחקור אותו');
+      const nm = tgt.name.replace(/^🤖\s*/, '');
+      const text = tgt.nearKill > 0 ? `🔎 ${nm} היה ליד זירת חיסול` : `🔎 ${nm}: אין ראיות נגדו`;
+      p.notes.push(text); if (p.notes.length > 6) p.notes.shift();
+      p.investCd = 35;
+      toast(p, text);
+      break;
+    }
+    case 'vanish': {
+      if (phase !== 'play' || !p.alive || p.role !== 'phantom') return;
+      if (p.vanishUntil > t) { p.vanishUntil = 0; p.vanishCd = 25; toast(p, '👻 הופעת מחדש'); return; }
+      if (p.vanishCd > 0 || p.inVent !== null) return toast(p, 'היכולת בהשהיה');
+      p.vanishUntil = t + 8; p.work = null; p.cam = false;
+      toast(p, '👻 אתה נעלם ל-8 שניות');
+      break;
+    }
     case 'sab': {
       if (phase !== 'play' || !p.alive || team(p) !== 'imp') return;
       if (a.kind === 'door') { if (!closeDoors(a.room)) toast(p, 'הדלתות עדיין בהשהיה'); return; }
@@ -309,12 +349,15 @@ function act(p, a) {
     }
     case 'kill': {
       if (phase !== 'play' || !p.alive || team(p) !== 'imp' || p.killCd > 0 || p.inVent !== null) return;
+      if (p.vanishUntil > t) return toast(p, 'אי אפשר לחסל בזמן שאתה נעלם');
       const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null), KILL_RANGE);
       if (!tgt) return;
       if (tgt.shieldUntil > t) { p.killCd = 10; toast(p, '🛡 המטרה מוגנת על ידי מלאך שומר!'); return; }
       tgt.alive = false; tgt.work = null; tgt.cam = false;
-      bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color });
+      bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + 8 : 0 });
       p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor();
+      // לבלש: מי שהיה ליד הזירה נרשם כחשוד קל
+      list().forEach(q => { if (q.alive && !q.spectator && dist(q, tgt) < 700) q.nearKill = (q.nearKill || 0) + 1; });
       // בוטים שראו את החיסול זוכרים מי עשה את זה
       list().forEach(o => {
         if (o.bot && o.alive && o.id !== p.id && team(o) === 'crew' && dist(o, tgt) < 330) {
@@ -332,7 +375,7 @@ function act(p, a) {
       break;
     }
     case 'vent': {
-      if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer'].includes(p.role)) return;
+      if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer', 'phantom', 'viper'].includes(p.role)) return;
       if (p.inVent !== null) { p.inVent = null; return; } // יציאה מהפתח
       const v = nearest(p, MAP.VENTS, USE_RANGE);
       if (!v) return;
@@ -409,6 +452,7 @@ function act(p, a) {
       settings.confirm = a.confirm !== false;
       settings.openVotes = a.openVotes !== false;
       settings.taskLevel = Math.round(cl(a.taskLevel, 1, 3, 2));
+      settings.newRoles = a.newRoles !== false;
       break;
     case 'color': {
       if (phase !== 'lobby') return;
@@ -595,6 +639,11 @@ function acknowledge(sp, text) {
 }
 
 function analyze(sp, text) {
+  if (text.includes('📸') || text.includes('🔎')) { // ראיה מהצלם או הבלש: הבוטים מגיבים בקצרה
+    const b = shuffle(list().filter(o => o.isBot && o.alive && !o.spectator && o.id !== sp.id))[0];
+    if (b) queueSay(b, fresh(['תודה על הראיה, זה עוזר', 'וואו, טוב לדעת', 'נרשם. מי ראה עוד משהו?']), 1.6);
+    return;
+  }
   const room = roomIn(text);
   if (!room) return;
   const spN = bare(sp.name);
@@ -707,6 +756,7 @@ function tick() {
 
   if (phase === 'play') {
     sabCd = Math.max(0, sabCd - dt);
+    bodies = bodies.filter(b => !b.decayAt || b.decayAt > t);
     for (const rid of Object.keys(doorsUntil)) if (doorsUntil[rid] <= t) delete doorsUntil[rid];
     if (sab && sab.type !== 'lights') {
       sab.t -= dt;
@@ -731,6 +781,8 @@ function tick() {
       if (p.isBot) botTick(p, dt);
       if (phase !== 'play') break;
       p.killCd = Math.max(0, p.killCd - dt);
+      p.photoCd = Math.max(0, (p.photoCd || 0) - dt); p.investCd = Math.max(0, (p.investCd || 0) - dt); p.vanishCd = Math.max(0, (p.vanishCd || 0) - dt);
+      if (p.vanishUntil && t > p.vanishUntil) { p.vanishUntil = 0; p.vanishCd = 25; }
       p.shiftCd = Math.max(0, p.shiftCd - (p.shapeAs ? 0 : dt));
       p.gaCd = Math.max(0, p.gaCd - dt);
       if (p.shapeAs && (t > p.shapeUntil || !players[p.shapeAs])) { p.shapeAs = null; p.shiftCd = SHIFT_CD; }
@@ -810,11 +862,12 @@ function viewFor(v) {
   for (const p of list()) {
     if (phase === 'play' && !p.alive && v.alive && p.id !== v.id) continue; // רוחות נסתרות מהחיים
     if (p.inVent !== null && p.id !== v.id && !seeAll && !(team(v) === 'imp' && team(p) === 'imp')) continue; // בתוך פתח – בלתי נראה
+    if (p.vanishUntil > t && p.id !== v.id && team(v) !== 'imp' && !seeAll) continue; // נעלם – בלתי נראה
     const disp = p.shapeAs && players[p.shapeAs] ? players[p.shapeAs] : p;
     const o = {
       id: p.id, x: Math.round(p.x), y: Math.round(p.y), dir: p.dir, name: disp.name, color: COLORS[disp.color].c,
       alive: p.alive, spec: !!p.spectator, bot: p.isBot, work: p.work && !p.work.mini ? p.work.t / taskTime(p.work.ref.i) : 0, hat: disp.hat,
-      scan: p.work && MAP.TASKS[p.work.ref.i].kind === 'scan' ? 1 : 0, vent: p.inVent !== null ? 1 : 0,
+      scan: p.work && MAP.TASKS[p.work.ref.i].kind === 'scan' ? 1 : 0, vent: p.inVent !== null || p.vanishUntil > t ? 1 : 0,
     };
     if (p.shieldUntil > t) o.shield = 1;
     if (showRoles && p.role && (seeAll || p.id === v.id || (team(v) === 'imp' && team(p) === 'imp'))) {
@@ -832,11 +885,13 @@ function viewFor(v) {
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
     sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial' }[sab.type], i: v.sabWork.i } : null,
     sabCd: Math.ceil(sabCd),
+    photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t,
+    photos: (v.photos || []).map(ph => ({ ago: Math.round(t - ph.t), room: ph.room, names: ph.names, bodies: ph.bodies })), notes: (v.notes || []).slice(-6),
     color: v.color,
   };
   const out = {
     phase, me, players: ps, settings, hostId,
-    bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c })),
+    bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c, rot: b.decayAt ? 1 : 0 })),
     tasks: { done: taskDone, total: taskTotal },
     gusts: gusts.map(g => g.i),
     camsOn: list().some(q => q.cam && q.alive),
@@ -855,7 +910,7 @@ function viewFor(v) {
       t: Math.ceil(meeting.t), by: by ? by.name : '', body: body ? body.name : null, room: meeting.room, bodyRoom: meeting.bodyRoom,
       voted: Object.keys(meeting.votes), myVote: meeting.votes[v.id] || null,
       reveal: !!meeting.reveal,
-      votes: meeting.reveal && settings.openVotes ? Object.entries(meeting.votes).map(([id, to]) => ({ c: players[id] ? COLORS[players[id].color].c : '#888', to })) : null,
+      votes: meeting.reveal && settings.openVotes ? Object.entries(meeting.votes).map(([id, to]) => ({ w: players[id] && players[id].role === 'judge' ? 2 : 1, c: players[id] ? COLORS[players[id].color].c : '#888', to })) : null,
     };
   }
   if (phase === 'alert' && meeting) {
