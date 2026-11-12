@@ -456,7 +456,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-142628'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-143001'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -1731,7 +1731,8 @@ function callAll() {
   }
 }
 function onCall(c) {
-  try { c.answer(micOn && localStream ? localStream : undefined); } catch (e) { return; }
+  // אם כבר התקשרנו אליו (והוא שומע אותנו דרך השיחה שלנו), עונים בלי לשלוח עוד זרם קול – כך אין שליחה כפולה
+  try { c.answer(micOn && localStream && !vOut[c.peer] ? localStream : undefined); } catch (e) { return; }
   vCalls[c.peer] = vCalls[c.peer] || c;
   c.on('stream', st => attachRemote(c.peer, st));
   c.on('close', () => { if (vCalls[c.peer] === c) delete vCalls[c.peer]; });
@@ -1769,7 +1770,6 @@ async function toggleMic() {
     catch (e) { toast('אין גישה למיקרופון – אשר הרשאה בדפדפן ונסה שוב'); return; }
     micOn = true;
     watchTalk(localStream, 'me');
-    for (const k in vOut) delete vOut[k];
     callAll();
     toast(SR ? '🎙️ המיקרופון פעיל – החברים והבוטים שומעים אותך' : '🎙️ המיקרופון פעיל – החברים שומעים אותך (הבוטים לא שומעים דיבור בדפדפן הזה, נסה Chrome או Edge)');
   } else { micOn = false; }
