@@ -32,8 +32,9 @@ const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
 let players = {};
 let phase = 'lobby';
 let hostId = null;
-let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true };
+let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true };
 let usedLines = new Set();
+let gusts = [], windT = 14;
 let alertT = 0;
 let bodies = [];
 let meeting = null, eject = null, winner = null;
@@ -106,7 +107,7 @@ function startGame(by) {
       taskTotal += p.tasks.length;
     } else p.tasks = [];
   });
-  bodies = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set();
+  bodies = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); gusts = []; windT = 10 + Math.random() * 8;
   settings.reveal = false;
   spawnAround(all);
   phase = 'play';
@@ -142,16 +143,16 @@ function completeTask(p, t) {
 
 function callMeeting(by, body) {
   phase = 'alert'; alertT = 3.2; // מסך הכרזה לפני הישיבה
-  let room = 'מסדרון';
+  let room = 'מסדרון', bodyRoom = null;
   if (body) {
     const br = MAP.roomAt(body.x, body.y);
-    if (br) room = br.name;
+    if (br) { room = br.name; bodyRoom = br.name; }
     else { // גופה במסדרון: מציינים ליד איזה חדר
       const near = Object.values(MAP.ROOMS).sort((x, y) => dist(body, { x: x.cx, y: x.cy }) - dist(body, { x: y.cx, y: y.cy }))[0];
       room = 'מסדרון ליד ' + near.name;
     }
   }
-  meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0 };
+  meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {} };
   chat = [];
   bodies = [];
   list().forEach(p => {
@@ -183,6 +184,14 @@ function resolveMeeting() {
     ? { id: ej.id, name: ej.name, color: ej.color, role: settings.confirm ? ROLES[ej.role].name : null, team: settings.confirm ? team(ej) : null, tally, t: EJECT_TIME }
     : { id: null, tally, t: EJECT_TIME, tie };
   list().forEach(p => { if (p.bot && ej && (p.bot.sawKill === ej.id || p.bot.sawShift === ej.id)) p.bot.sawKill = p.bot.sawShift = null; });
+  // מי הצביע למי (אלא אם ההצבעות אנונימיות)
+  if (settings.openVotes) {
+    eject.votes = voters.map(v => {
+      const t = meeting.votes[v.id];
+      const tp = t && t !== 'skip' ? players[t] : null;
+      return { n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
+    });
+  }
   meeting = null;
   phase = 'eject';
 }
@@ -324,6 +333,7 @@ function act(p, a) {
       settings.tasks = Math.round(cl(a.tasks, 1, 8, 4));
       settings.meetingTime = Math.round(cl(a.meetingTime, 20, 180, 60));
       settings.confirm = a.confirm !== false;
+      settings.openVotes = a.openVotes !== false;
       break;
     case 'color': {
       if (phase !== 'lobby') return;
@@ -365,6 +375,12 @@ function botTick(p, dt) {
       const r = MAP.roomAt(p.x, p.y); if (r) b.lastRoom = r.name;
       list().forEach(o => { if (o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < 320) { const rr = MAP.roomAt(o.x, o.y); if (rr) b.seen[o.id] = rr.name; } });
     }
+    // רואים שני שחקנים זהים (משנה צורה) – בורחים, ולפעמים רצים לכפתור החירום
+    if (team(p) === 'crew' && !b.flee) {
+      const near = list().filter(o => o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < 330);
+      const fake = near.find(o => o.shapeAs && players[o.shapeAs] && players[o.shapeAs].alive && near.some(q => q.id === o.shapeAs));
+      if (fake) { b.sawShift = fake.id; b.flee = { from: fake.id, t: 4 + Math.random() * 2 }; b.plan = []; b.pressButton = !p.emergencyUsed && Math.random() < 0.6; }
+    }
     // מתחזה: חסל כשאין עדים
     if (team(p) === 'imp' && p.killCd <= 0) {
       const tgt = nearest(p, list().filter(o => o.alive && team(o) !== 'imp'), KILL_RANGE);
@@ -380,8 +396,23 @@ function botTick(p, dt) {
     }
   }
 
+  if (b.flee) {
+    b.flee.t -= dt;
+    const o = players[b.flee.from];
+    if (o) { const dx = p.x - o.x, dy = p.y - o.y, l = Math.hypot(dx, dy) || 1; p.input = { dx: dx / l, dy: dy / l, bot: true }; }
+    if (b.flee.t <= 0) {
+      b.flee = null; b.wait = 0;
+      if (b.pressButton) { const h = MAP.roomAt(p.x, p.y); b.plan = [...(h ? MAP.path(h.id, 'F') : []), { x: MAP.BUTTON.x, y: MAP.BUTTON.y }]; }
+    }
+    return;
+  }
   if (b.wait > 0) { b.wait -= dt; return; }
   if (p.work) return;
+  if (!b.plan.length && b.pressButton) {
+    b.pressButton = false;
+    if (dist(p, MAP.BUTTON) < 90) act(p, { type: 'use' });
+    return;
+  }
   if (!b.plan.length) {
     if (b.goal && b.goal.ref && !b.goal.ref.done && dist(p, b.goal) < USE_RANGE) {
       act(p, { type: 'use' }); b.goal = null; return;
@@ -413,7 +444,7 @@ function fresh(lines) {
 const fill = (tpl, o) => tpl.replace(/\{(\w)\}/g, (_, k) => o[k] || '');
 
 // מוסיף הודעה לצ'אט ומנתח אותה: מי הוזכר, מי ביקש לדלג
-function say(p, text) {
+function say(p, text, silent) {
   const e = { name: p.name, color: p.color, text, from: p.id, mentions: [] };
   if (meeting) {
     list().forEach(o => {
@@ -428,7 +459,70 @@ function say(p, text) {
     e.mentions.forEach(id => { const o = players[id]; if (o && o.bot && o.bot.replies < 2 && o.bot.replyAt < -1) o.bot.replyAt = meeting.t - (1.5 + Math.random() * 2.5); });
   }
   chat.push(e);
+  if (meeting && !silent && (!p.isBot || team(p) === 'imp')) analyze(p, text);
   if (chat.length > 60) chat.shift();
+}
+
+
+// ---------- ניתוח טענות: בוטים בודקים אליבי ומתנגשים בסתירות ----------
+const ALIASES = { 'קפיטריה': 'חדר אוכל', 'קפטריה': 'חדר אוכל', 'נשקייה': 'נשק' };
+function roomIn(text) {
+  for (const k in ALIASES) if (text.includes(k)) return ALIASES[k];
+  const names = Object.values(MAP.ROOMS).map(r => r.name).sort((a, b) => b.length - a.length);
+  return names.find(n => text.includes(n)) || null;
+}
+function queueSay(bot, text, delay) { meeting.queue.push({ id: bot.id, text, at: meeting.t - delay }); }
+
+function analyze(sp, text) {
+  const room = roomIn(text);
+  if (!room) return;
+  const spN = bare(sp.name);
+  const named = list().filter(o => o.id !== sp.id && bare(o.name).length >= 2 && text.includes(bare(o.name)));
+  const bots = shuffle(list().filter(o => o.isBot && o.alive && o.id !== sp.id && !o.spectator));
+  const killWord = /רצח|הרג|חיסל|חוסל|נרצח|גופה|מת /.test(text + ' ');
+  let d = 1.5;
+  const S = (n) => (meeting.suspect[sp.id] = (meeting.suspect[sp.id] || 0) + n);
+
+  if (killWord && named.length) {
+    const victim = named[0], vN = bare(victim.name);
+    if (meeting.body === victim.id && meeting.bodyRoom && meeting.bodyRoom !== room) {
+      // הטענה סותרת את המקום שבו נמצאה הגופה
+      const [a, b] = bots;
+      if (a) { queueSay(a, `אבל אני הייתי ב${room} ולא ראיתי שם שום גופה`, d); d += 1.6; }
+      if (b) { queueSay(b, `נכון, גם אני הייתי ב${room}. ${vN} נמצא ב${meeting.bodyRoom}`, d); d += 1.6; }
+      S(3);
+    } else if (victim.alive) {
+      const a = bots[0];
+      if (a) queueSay(a, `${vN} עומד כאן חי, אז מי רצח אותו בעצם?`, d);
+      S(2);
+    }
+  } else if (/הייתי/.test(text) && !named.length) {
+    // אליבי של הדובר עצמו: בוטים שראו אותו מאשרים או מכחישים
+    let n = 0;
+    for (const b of bots) {
+      const seen = b.bot.seen && b.bot.seen[sp.id];
+      if (!seen || n >= 2) continue;
+      if (seen === room) { queueSay(b, `נכון, ראיתי את ${spN} ב${room}`, d); S(-1); }
+      else { queueSay(b, `לא נכון, ראיתי את ${spN} ב${seen}, לא ב${room}`, d); S(2); }
+      d += 1.6; n++;
+    }
+  } else if (/ראיתי|היה/.test(text) && named.length) {
+    const x = named[0], xN = bare(x.name);
+    let n = 0;
+    for (const b of bots) {
+      const seen = b.bot.seen && b.bot.seen[x.id];
+      if (!seen || n >= 2) continue;
+      if (seen === room) queueSay(b, `נכון, גם אני ראיתי את ${xN} ב${room}`, d);
+      else { queueSay(b, `ראיתי את ${xN} ב${seen}, לא ב${room}`, d); S(1.5); }
+      d += 1.6; n++;
+    }
+  }
+  // מסקנה: מי ששיקר שוב ושוב נחשד כמתחזה
+  if ((meeting.suspect[sp.id] || 0) >= 3 && !meeting.accused[sp.id]) {
+    meeting.accused[sp.id] = true;
+    const c = bots[2] || bots[0];
+    if (c) queueSay(c, pick([`אז ${spN} משקר… זה אומר ש${spN} הוא המתחזה! תצביעו עליו!`, `ההסבר של ${spN} לא מסתדר. אני מצביע עליו`, `${spN} סותר את עצמו, חשוד מאוד`]), d + 0.5);
+  }
 }
 
 function botLine(p) {
@@ -469,8 +563,12 @@ function botMeeting(p) {
     if (team(p) === 'crew' && b.sawShift && ok(b.sawShift)) vote = b.sawShift;
     else if (team(p) === 'crew' && b.sawKill && ok(b.sawKill)) vote = b.sawKill;
     else {
-      const top = Object.entries(meeting.mentions).filter(([id]) => ok(id)).sort((x, y) => y[1] - x[1])[0];
-      if (top && top[1] >= 2 && Math.random() < 0.7) vote = top[0];
+      const score = {};
+      for (const id in meeting.mentions) score[id] = (score[id] || 0) + meeting.mentions[id];
+      for (const id in meeting.suspect) score[id] = (score[id] || 0) + meeting.suspect[id] * 1.5;
+      const top = Object.entries(score).filter(([id]) => ok(id)).sort((x, y) => y[1] - x[1])[0];
+      if (top && top[1] >= 3) vote = top[0];
+      else if (top && top[1] >= 2 && Math.random() < 0.7) vote = top[0];
       else if (top && team(p) === 'imp' && Math.random() < 0.6) vote = top[0];
       else if (meeting.skipTalk >= 2 || Math.random() < 0.5) vote = 'skip';
       else { const opts = list().filter(o => ok(o.id) && !o.spectator); vote = opts.length ? pick(opts).id : 'skip'; }
@@ -487,6 +585,21 @@ function tick() {
   last = t;
 
   if (phase === 'play') {
+    // רוח מפתחי האוורור: פעם בכמה שניות פתח אחד נושף ודוחף חלש
+    windT -= dt;
+    if (windT <= 0) { windT = 12 + Math.random() * 14; gusts.push({ i: Math.floor(Math.random() * MAP.VENTS.length), until: t + 3 }); }
+    gusts = gusts.filter(g => g.until > t);
+    for (const g of gusts) {
+      const v = MAP.VENTS[g.i];
+      for (const q of list()) {
+        if (!q.alive || q.spectator || q.inVent !== null) continue;
+        const dx = q.x - v.x, dy = q.y - v.y, l = Math.hypot(dx, dy);
+        if (l > 170 || l < 1) continue;
+        const f = 60 * (1 - l / 170) * dt;
+        const nx = q.x + dx / l * f, ny = q.y + dy / l * f;
+        if (MAP.walkable(nx, ny)) { q.x = nx; q.y = ny; }
+      }
+    }
     for (const p of list()) {
       if (p.isBot) botTick(p, dt);
       if (phase !== 'play') break;
@@ -525,6 +638,11 @@ function tick() {
   } else if (phase === 'meeting') {
     meeting.t -= dt;
     list().filter(p => p.isBot).forEach(botMeeting);
+    meeting.queue.sort((x, y) => y.at - x.at);
+    while (meeting.queue.length && meeting.t <= meeting.queue[0].at) {
+      const q = meeting.queue.shift(), o = players[q.id];
+      if (o && o.alive) say(o, q.text, true);
+    }
     const voters = list().filter(p => p.alive && !p.spectator);
     if (meeting.t <= 0 || voters.every(v => meeting.votes[v.id])) resolveMeeting();
   } else if (phase === 'eject') {
@@ -577,6 +695,7 @@ function viewFor(v) {
     phase, me, players: ps, settings, hostId,
     bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c })),
     tasks: { done: taskDone, total: taskTotal },
+    gusts: gusts.map(g => g.i),
     toast: v.toast.splice(0),
     roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat })),
     chat,
@@ -586,7 +705,7 @@ function viewFor(v) {
     const by = players[meeting.by];
     const body = meeting.body && players[meeting.body];
     out.meeting = {
-      t: Math.ceil(meeting.t), by: by ? by.name : '', body: body ? body.name : null,
+      t: Math.ceil(meeting.t), by: by ? by.name : '', body: body ? body.name : null, room: meeting.room, bodyRoom: meeting.bodyRoom,
       voted: Object.keys(meeting.votes), myVote: meeting.votes[v.id] || null,
     };
   }
