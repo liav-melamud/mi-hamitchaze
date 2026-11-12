@@ -1,7 +1,9 @@
 // שרת ההכוונה של "מי המתחזה?" – רץ בענן חינמי (Render).
 // 1) PeerJS: עוזר לשחקנים למצוא אחד את השני.
-// 2) /ice: נותן לכל שחקן פרטי שרת ממסר (TURN) של Cloudflare, כדי שהקול והמשחק יעברו גם בין מדינות ורשתות סלולריות.
-//    המפתחות נשמרים רק כאן (משתני סביבה ב-Render): CF_TURN_KEY_ID ו-CF_TURN_TOKEN. הם אף פעם לא נכנסים לאתר.
+// 2) /ice: נותן לכל שחקן פרטי שרת ממסר (TURN) – Metered או Cloudflare, כדי שהקול והמשחק יעברו גם בין מדינות ורשתות סלולריות.
+//    המפתחות נשמרים רק כאן (משתני סביבה ב-Render) ואף פעם לא נכנסים לאתר:
+//    Metered:    METERED_DOMAIN (למשל myapp.metered.live) ו-METERED_API_KEY
+//    Cloudflare: CF_TURN_KEY_ID ו-CF_TURN_TOKEN
 const http = require('http');
 const express = require('express');
 const { ExpressPeerServer } = require('peer');
@@ -16,9 +18,16 @@ app.get('/ice', async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Cache-Control', 'no-store');
   const id = process.env.CF_TURN_KEY_ID, token = process.env.CF_TURN_TOKEN;
-  if (!id || !token) return res.json({ iceServers: STUN, relay: false });
+  const mDomain = (process.env.METERED_DOMAIN || '').replace(/^https?:\/\//, '').replace(/\/.*$/, ''), mKey = process.env.METERED_API_KEY;
+  if (!(mDomain && mKey) && !(id && token)) return res.json({ iceServers: STUN, relay: false });
   try {
-    if (!cache || Date.now() - cache.t > 12 * 3600 * 1000) {
+    if (mDomain && mKey && (!cache || Date.now() - cache.t > 10 * 60 * 1000)) {
+      const r = await fetch(`https://${mDomain}/api/v1/turn/credentials?apiKey=${encodeURIComponent(mKey)}`);
+      if (!r.ok) throw new Error('metered ' + r.status);
+      const list = await r.json();
+      if (!Array.isArray(list) || !list.length) throw new Error('metered empty');
+      cache = { t: Date.now(), iceServers: list };
+    } else if (!(mDomain && mKey) && (!cache || Date.now() - cache.t > 12 * 3600 * 1000)) {
       const r = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${id}/credentials/generate-ice-servers`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
