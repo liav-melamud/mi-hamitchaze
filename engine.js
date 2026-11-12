@@ -152,7 +152,7 @@ function callMeeting(by, body) {
       room = 'מסדרון ליד ' + near.name;
     }
   }
-  meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {} };
+  meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {}, floor: Infinity };
   chat = [];
   bodies = [];
   list().forEach(p => {
@@ -311,6 +311,7 @@ function act(p, a) {
       meeting.votes[p.id] = a.target;
       break;
     }
+    case 'talk': p.talking = !!a.on; p.talkT = now(); break;
     case 'chat': {
       const text = String(a.text || '').trim().slice(0, 140);
       if (!text) return;
@@ -446,6 +447,7 @@ const fill = (tpl, o) => tpl.replace(/\{(\w)\}/g, (_, k) => o[k] || '');
 // מוסיף הודעה לצ'אט ומנתח אותה: מי הוזכר, מי ביקש לדלג
 function say(p, text, silent) {
   const e = { name: p.name, color: p.color, text, from: p.id, mentions: [] };
+  if (p.isBot && !IMPORTANT.test(text) && Math.random() < 0.8) e.hide = true;
   if (meeting) {
     list().forEach(o => {
       const n = bare(o.name);
@@ -471,7 +473,11 @@ function roomIn(text) {
   const names = Object.values(MAP.ROOMS).map(r => r.name).sort((a, b) => b.length - a.length);
   return names.find(n => text.includes(n)) || null;
 }
-function queueSay(bot, text, delay) { meeting.queue.push({ id: bot.id, text, at: meeting.t - delay }); }
+function queueSay(bot, text, delay) { meeting.queue.push({ id: bot.id, text, at: meeting.t - delay, silent: true }); }
+// משפט חשוב נכתב גם בצ'אט; שאר הדברים של הבוטים נשמעים בקול בלבד
+const IMPORTANT = /ראיתי|משנה צורה|מחסל|הרג|תצביעו|משקר|המתחזה|נמצא|לא נכון|נכון,|סותר|חשוד מאוד|מצאתי|הגופה/;
+const speechDur = text => 0.9 + String(text).length * 0.075;
+const humanTalking = () => list().some(p => !p.isBot && p.talking && now() - p.talkT < 6);
 
 function analyze(sp, text) {
   const room = roomIn(text);
@@ -549,13 +555,13 @@ function botMeeting(p) {
   const b = p.bot;
   if (!p.alive || p.spectator) return;
   const T = meeting.t;
-  if (T < b.chatAt) { b.chatAt = -999; say(p, botLine(p)); }
-  if (T < b.chat2At) { b.chat2At = -999; say(p, botLine(p)); }
+  if (T < b.chatAt) { b.chatAt = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
+  if (T < b.chat2At) { b.chat2At = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
   if (b.replyAt > -1 && T < b.replyAt) {
     b.replyAt = -999; b.replies++;
     const others = list().filter(o => o.alive && o.id !== p.id && !o.spectator);
     const m = others.length ? bare(pick(others).name) : '';
-    say(p, fill(fresh(['למה אני? הייתי ב{r}', 'זה לא אני! תבדקו את {m}', 'עשיתי משימות, תשאלו את {m}', 'אני? באמת? הייתי ב{r} כל הזמן', 'אם תדיחו אותי תפסידו 😤']), { r: b.lastRoom || 'חדר האוכל', m }));
+    meeting.queue.push({ id: p.id, silent: true, at: T, text: fill(fresh(['למה אני? הייתי ב{r}', 'זה לא אני! תבדקו את {m}', 'עשיתי משימות, תשאלו את {m}', 'אני? באמת? הייתי ב{r} כל הזמן', 'אם תדיחו אותי תפסידו 😤']), { r: b.lastRoom || 'חדר האוכל', m }) });
   }
   if (T < b.voteAt && !meeting.votes[p.id]) {
     const ok = id => players[id] && players[id].alive && id !== p.id && !(team(p) === 'imp' && team(players[id]) === 'imp');
@@ -642,10 +648,13 @@ function tick() {
   } else if (phase === 'meeting') {
     meeting.t -= dt;
     list().filter(p => p.isBot).forEach(botMeeting);
+    // תור דיבור: בוט מדבר רק כשאף אחד לא מדבר, ואחרי שמסיים לדבר הבא בתור ממתין רגע
     meeting.queue.sort((x, y) => y.at - x.at);
-    while (meeting.queue.length && meeting.t <= meeting.queue[0].at) {
+    const talking = humanTalking();
+    if (talking) meeting.floor = Math.min(meeting.floor, meeting.t - 0.9);
+    if (!talking && meeting.queue.length && meeting.t <= meeting.queue[0].at && meeting.t <= meeting.floor) {
       const q = meeting.queue.shift(), o = players[q.id];
-      if (o && o.alive) say(o, q.text, true);
+      if (o && o.alive) { say(o, q.text, q.silent); meeting.floor = meeting.t - speechDur(q.text); }
     }
     const voters = list().filter(p => p.alive && !p.spectator);
     if (meeting.t <= 0 || voters.every(v => meeting.votes[v.id])) { meeting.t = Math.max(0, meeting.t); meeting.reveal = settings.openVotes ? 5 : 1.2; }

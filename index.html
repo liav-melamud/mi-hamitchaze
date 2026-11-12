@@ -134,6 +134,7 @@
   @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.06); } 100% { transform: none; opacity: 1; } }
   .vlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; margin-top: 10px; text-align: right; }
   .vrow { display: flex; align-items: center; gap: 6px; background: #151b2c; border-radius: 10px; padding: 6px 10px; font-size: 14px; }
+  #nowSpeaking { background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.35); color: #c9f5da; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; font-size: 14px; }
   .vdots { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; max-width: 96px; }
   .vdot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); display: inline-block; animation: popdot .35s ease-out backwards; }
   @keyframes popdot { from { transform: scale(0); } to { transform: scale(1); } }
@@ -281,6 +282,7 @@
     <p id="msub" class="sub" style="margin-top:6px"></p>
     <div id="mgrid"></div>
     <div class="row" style="margin-bottom:12px"><button id="skipBtn">⏭ דלג על ההצבעה</button><span id="skipDots" class="vdots"></span><span id="mstatus" class="sub" style="margin:0"></span></div>
+    <div id="nowSpeaking" class="hidden"></div>
     <div id="chatbox"></div>
     <div class="row"><input id="chatIn" maxlength="140" placeholder="כתוב הודעה…" style="flex:1" autocomplete="off"><button id="chatBtn">שלח</button></div>
   </div>
@@ -713,7 +715,7 @@ function renderMeeting(s) {
   }
   if (s.chat.length !== chatLen) {
     chatLen = s.chat.length;
-    $('#chatbox').innerHTML = s.chat.map(c => `<p><span class="dot" style="background:${c.color};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub">אין עדיין הודעות</p>';
+    $('#chatbox').innerHTML = s.chat.filter(c => !c.hide || !ttsOn).map(c => `<p><span class="dot" style="background:${c.color};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub">אין עדיין הודעות</p>';
     $('#chatbox').scrollTop = 1e6;
   }
 }
@@ -1060,6 +1062,11 @@ async function toggleMic() {
   applyVoice();
 }
 $('#micBtn').onclick = toggleMic;
+let lastTalk = false, lastTalkSent = 0;
+setInterval(() => {
+  const mine = !!talking.me && micOn && !!ID;
+  if (mine !== lastTalk || (mine && Date.now() - lastTalkSent > 3000)) { lastTalk = mine; lastTalkSent = Date.now(); api({ type: 'talk', on: mine }); }
+}, 300);
 setInterval(() => {
   document.querySelectorAll('#mgrid .vote').forEach(b => {
     const pid = b.dataset.v; let on = false;
@@ -1073,21 +1080,35 @@ setInterval(() => {
 let ttsOn = true; try { ttsOn = localStorage.getItem('mm_tts') !== '0'; } catch (e) {}
 let spoken = 0;
 const hashStr = t => { let h = 0; for (const ch of String(t)) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
-const heVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^he/i.test(v.lang) || /hebrew|carmit|עברית/i.test(v.name)); } catch (e) { return []; } };
+const heVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^he/i.test(v.lang) || /hebrew|carmit|עברית|hila|avri/i.test(v.name)); } catch (e) { return []; } };
+// מדרגים קולות: קולות "טבעיים/נוירליים/אונליין" קודם, כי הם נשמעים הרבה פחות רובוטיים
+const rankVoice = v => { const n = v.name.toLowerCase(); let sc = 0; if (/natural|neural|online|premium|enhanced|wavenet|siri/.test(n)) sc += 10; if (/google|microsoft|apple|carmit|hila|avri/.test(n)) sc += 2; if (v.localService === false) sc += 1; return sc; };
+function bestVoices() {
+  const vs = heVoices().sort((x, y) => rankVoice(y) - rankVoice(x));
+  if (!vs.length) return [];
+  const top = rankVoice(vs[0]);
+  return vs.filter(v => rankVoice(v) >= top - 3);
+}
+try { speechSynthesis.onvoiceschanged = () => {}; speechSynthesis.getVoices(); } catch (e) {}
+let nowTimer = null;
 function speakBot(name, text) {
   if (!ttsOn || !('speechSynthesis' in window)) return;
-  const clean = String(text).replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').replace(/[()]/g, ' ').trim();
+  const clean = String(text).replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
   if (!clean) return;
-  const h = hashStr(String(name).replace(/[^\u0590-\u05FFa-z0-9]/gi, ''));
+  const h = hashStr(String(name).replace(/[^֐-׿a-z0-9]/gi, ''));
   const u = new SpeechSynthesisUtterance(clean);
   u.lang = 'he-IL';
-  const vs = heVoices(); if (vs.length) u.voice = vs[h % vs.length];
-  u.pitch = 0.6 + (h % 9) * 0.12;
-  u.rate = 0.95 + (h % 4) * 0.07;
+  const vs = bestVoices(); if (vs.length) u.voice = vs[h % vs.length];
+  // שינויים קטנים בלבד בגובה ובקצב: הבדל בין בוטים בלי להישמע כמו רובוט
+  u.pitch = 0.9 + (h % 7) * 0.05;
+  u.rate = 0.98 + (h % 4) * 0.04;
+  const cap = $('#nowSpeaking');
+  u.onstart = () => { clearTimeout(nowTimer); cap.textContent = '🗣️ ' + String(name).replace(/^🤖\s*/, '') + ': ' + clean; cap.classList.remove('hidden'); };
+  u.onend = () => { nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
   try { speechSynthesis.speak(u); } catch (e) {}
 }
 function ttsSync(s) {
-  if (s.phase !== 'meeting') { if (spoken) { spoken = 0; try { speechSynthesis.cancel(); } catch (e) {} } return; }
+  if (s.phase !== 'meeting') { $('#nowSpeaking').classList.add('hidden'); if (spoken) { spoken = 0; try { speechSynthesis.cancel(); } catch (e) {} } return; }
   if (s.chat.length < spoken) spoken = 0;
   for (; spoken < s.chat.length; spoken++) {
     const c = s.chat[spoken], r = s.roster.find(x => x.id === c.from);
@@ -1100,7 +1121,7 @@ $('#ttsBtn').onclick = () => {
   try { localStorage.setItem('mm_tts', ttsOn ? '1' : '0'); } catch (e) {}
   if (!ttsOn) { try { speechSynthesis.cancel(); } catch (e) {} }
   else { speakBot('בוט', 'שלום, אני מדבר!'); }
-  refreshTts();
+  refreshTts(); chatLen = -1;
 };
 refreshTts();
 
