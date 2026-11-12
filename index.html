@@ -545,18 +545,25 @@ const store = {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-170948'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261112-171455'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
-// מצב רשת: 'online' (דרך האינטרנט) או 'local' (שרת הבית, אותו Wi-Fi, בלי אינטרנט)
-let LOCAL = null; // פרטי שרת הבית, אם הדף נטען ממנו
-let NET = 'online';
-try { NET = localStorage.getItem('mm_net') === 'local' ? 'local' : 'online'; } catch (e) {}
+// מצב רשת: 'local' – כולם באותו Wi-Fi (בלי שום הגדרה); 'online' – חברים מרחוק (דרך שרת ההכוונה הפרטי)
+let LOCAL = null; // פרטי שרת בית, אם הדף נטען ממנו (לא חובה)
+let NET = 'local';
+try { NET = localStorage.getItem('mm_net') === 'online' ? 'online' : 'local'; } catch (e) {}
+const urlNet = new URLSearchParams(location.search).get('net');
+if (urlNet === 'local' || urlNet === 'online') NET = urlNet; // קישור מהמארח קובע את המצב
+// איזה שרת הכוונה משמש כל מצב (מחרוזת לזיהוי – אם שני המצבים על אותו שרת, אין טעם לנסות את השני)
+const brokerOf = m => m === 'online' && SIGNAL ? 'private' : m === 'local' && LOCAL && LOCAL.signal ? 'home' : 'public';
 const peerOpts = c => {
-  if (NET === 'local' && LOCAL)
+  const b = brokerOf(NET);
+  if (b === 'home')
     return Object.assign({ host: location.hostname, port: Number(location.port) || 80, path: LOCAL.signalPath || '/signal', secure: false, config: { iceServers: [] } }, c || {});
-  return Object.assign({ config: ICE }, SIGNAL ? { host: SIGNAL.host, port: SIGNAL.port || 443, path: '/', secure: true } : {}, c || {});
+  if (b === 'private')
+    return Object.assign({ config: ICE, host: SIGNAL.host, port: SIGNAL.port || 443, path: '/', secure: true }, c || {});
+  return Object.assign({ config: ICE }, c || {});
 };
 function staleBanner() {
   if ($('#staleBar')) return;
@@ -772,7 +779,7 @@ function giveUpReconnect() {
   reconnecting = false; guestCtx = null; netBar('');
   lost();
 }
-function joinGame(name, code, silent) {
+function joinGame(name, code, silent, flipped) {
   if (typeof Peer === 'undefined') return status('לא הצלחתי לטעון את ספריית החיבור – בדוק חיבור לאינטרנט');
   code = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length !== 4) return status('הקוד צריך להיות 4 תווים');
@@ -810,6 +817,12 @@ function joinGame(name, code, silent) {
   });
   peer.on('error', e => {
     if (reconnecting || silent) { scheduleRetry(); return; }
+    const other = NET === 'local' ? 'online' : 'local';
+    if (e.type === 'peer-unavailable' && !flipped && brokerOf(other) !== brokerOf(NET)) {
+      // אולי המארח בחר את המצב השני – מנסים גם שם
+      NET = other; renderNet();
+      return joinGame(name, code, silent, true);
+    }
     busy(false);
     status(e.type === 'peer-unavailable' ? 'לא נמצא חדר עם הקוד הזה' : 'שגיאת חיבור: ' + e.type);
   });
@@ -820,13 +833,13 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && re
 function afterJoin() {
   status('');
   let origin = location.origin;
-  if (NET === 'local' && LOCAL && /^(localhost|127\.)/.test(location.hostname) && LOCAL.addrs && LOCAL.addrs[0])
+  if (LOCAL && /^(localhost|127\.)/.test(location.hostname) && LOCAL.addrs && LOCAL.addrs[0])
     origin = location.protocol + '//' + LOCAL.addrs[0] + ':' + (location.port || LOCAL.port);
-  const link = origin + location.pathname + '?room=' + ROOM;
+  const link = origin + location.pathname + '?room=' + ROOM + '&net=' + NET;
   $('#netBadge').textContent = NET === 'local' ? '🏠 מקומי' : '🌐 אונליין';
   $('#roomCode').textContent = ROOM;
   $('#shareLink').textContent = link;
-  try { history.replaceState(null, '', '?room=' + ROOM); } catch (e) {}
+  try { history.replaceState(null, '', '?room=' + ROOM + '&net=' + NET); } catch (e) {}
 }
 
 function lost() {
@@ -853,13 +866,11 @@ function renderNet() {
   $('#netOnline').classList.toggle('primary', NET === 'online');
   $('#netLocal').classList.toggle('primary', NET === 'local');
   let h;
-  if (NET === 'online') h = 'משחקים דרך האינטרנט – עם חברים מכל מקום.';
-  else if (LOCAL && LOCAL.signal) h = 'כולם באותו Wi-Fi, בלי אינטרנט ובלי חשבון.' + (LOCAL.addrs && LOCAL.addrs[0] ? ' החברים נכנסים ל: ' + LOCAL.addrs[0] + ':' + (location.port || LOCAL.port) : '');
-  else h = 'מצב מקומי עובד כשפותחים את המשחק משרת הבית: במחשב בבית מריצים npm start, וכולם נכנסים לכתובת שהוא מציג.';
+  if (NET === 'local') h = 'כולם באותו Wi-Fi – פשוט יוצרים חדר ושולחים את הקוד.';
+  else h = 'חברים מרחוק, מכל מקום בעולם.';
   $('#netHint').textContent = h;
 }
 function setNet(m) {
-  if (m === 'local' && !(LOCAL && LOCAL.signal)) { NET = 'online'; renderNet(); $('#netHint').textContent = 'מצב מקומי עובד כשפותחים את המשחק משרת הבית: במחשב בבית מריצים npm start, וכולם נכנסים לכתובת שהוא מציג.'; return; }
   NET = m; try { localStorage.setItem('mm_net', m); } catch (e) {}
   renderNet();
 }
@@ -870,12 +881,8 @@ renderNet();
 const LOCAL_READY = location.protocol !== 'http:' ? Promise.resolve() : fetch('local.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
   if (!j) return;
   LOCAL = j;
-  let saved = null; try { saved = localStorage.getItem('mm_net'); } catch (e) {}
-  if (!saved && j.signal) NET = 'local';
-  if (NET === 'local' && !j.signal) NET = 'online';
   renderNet();
 }).catch(() => {});
-if (location.protocol !== 'http:' && NET === 'local') { NET = 'online'; renderNet(); }
 // המשך חדר שהייתי המארח שלו (אחרי נפילה, רענון או סגירה בטעות)
 (function () {
   try {
