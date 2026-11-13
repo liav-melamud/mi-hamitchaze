@@ -1,5 +1,11 @@
 // מנוע המשחק – רץ בדפדפן של המארח (או ב-Node)
 (function (root) {
+// "ראש תפוח אדמה" מפעיל את מצב האדמין, "אקסטרה ראש תפוח אדמה" מבטל. מחזיר true/false, או null אם זה לא המשפט.
+function adminPhrase(text) {
+  const t = String(text).replace(/[^\u0590-\u05FFa-z\s]/gi, ' ').replace(/\s+/g, ' ').toLowerCase();
+  if (!/ראש ?תפוח(י)? ?אדמה/.test(t)) return null;
+  return !/(אקסטרה|אקסטרא|אקסטרע|extra)/.test(t);
+}
 function createGame(MAP, opts) {
   const MAPS = MAP.byId || { big: MAP };
   opts = opts || {};
@@ -505,14 +511,14 @@ function act(p, a) {
     case 'chat': {
       const text = String(a.text || '').trim().slice(0, 140);
       if (!text) return;
+      // מצב אדמין (חשיפה): רק במשפט הסודי, בכתיבה או בדיבור, בכל שלב במשחק. המשפט עצמו לא מופיע בצ'אט.
+      const adm = adminPhrase(text);
+      if (adm !== null) { if (phase !== 'lobby') settings.reveal = adm; return; }
       if (phase === 'meeting' && !p.alive) return;
       if (phase !== 'meeting' && phase !== 'lobby') return;
       say(p, a.voice ? '🎙️ ' + text : text);
       break;
     }
-    case 'reveal':
-      if (phase !== 'lobby') settings.reveal = !settings.reveal;
-      break;
     case 'settings':
       if (p.id !== hostId || phase !== 'lobby') return;
       settings.impostors = Math.max(1, Math.min(5, Number(a.impostors) || 1));
@@ -1106,4 +1112,6 @@ function viewFor(v) {
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = createGame;
 else root.createGame = createGame;
+createGame.adminPhrase = adminPhrase;
+root.adminPhrase = adminPhrase;
 })(this);

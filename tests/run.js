@@ -298,5 +298,18 @@ test('אבטחה: אי אפשר להתחזות לשחקן אחר, והמפתח �
   ok(g.view(a).phase === 'lobby', 'קלט זבל שינה את המצב');
 });
 
+test('מצב אדמין: רק "ראש תפוח אדמה" מפעיל ו"אקסטרה ראש תפוח אדמה" מבטל, והמשפט לא מופיע בצ\'אט', () => {
+  const P = createGame.adminPhrase;
+  ok(P('ראש תפוח אדמה') === true && P('אני אומר: ראש תפוח אדמה!') === true && P('ראש תפוחי אדמה') === true, 'הפעלה לא זוהתה');
+  ok(P('אקסטרה ראש תפוח אדמה') === false && P('אקסטרא, ראש תפוח אדמה') === false, 'ביטול לא זוהה');
+  ok(P('תפוח אדמה') === null && P('ראש') === null && P('מי המתחזה?') === null, 'זיהוי שגוי');
+  const g = createGame(MAP); const a = g.join('x'); g.act(a, { type: 'settings', bots: 4 }); g.act(a, { type: 'start' }); sec(g, 3);
+  g.act(a, { type: 'reveal' }); ok(!g.view(a).settings.reveal, 'הפקודה הישנה עדיין מפעילה');
+  g.act(a, { type: 'chat', text: 'ראש תפוח אדמה', voice: true }); ok(g.view(a).settings.reveal === true, 'לא הופעל בזמן המשחק');
+  g.act(a, { type: 'chat', text: 'ראש תפוח אדמה' }); ok(g.view(a).settings.reveal === true, 'אמירה שנייה ביטלה במקום להשאיר');
+  ok(!g.view(a).chat.some(c => /תפוח/.test(c.text)), 'המשפט הסודי הופיע בצ\'אט');
+  g.act(a, { type: 'chat', text: 'אקסטרה ראש תפוח אדמה' }); ok(g.view(a).settings.reveal === false, 'לא בוטל');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

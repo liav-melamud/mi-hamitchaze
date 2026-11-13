@@ -546,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261113-075822'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261113-144230'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -2159,7 +2159,8 @@ function speakBot(name, text) {
   u.rate = 0.98 + (h % 4) * 0.04;
   const cap = $('#nowSpeaking');
   u.onstart = () => { clearTimeout(nowTimer); cap.textContent = '🗣️ ' + String(name).replace(/^🤖\s*/, '') + ': ' + clean; cap.classList.remove('hidden'); };
-  u.onend = () => { botSpeakUntil = Date.now() + 1200; nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
+  u.onend = () => { nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
+  botSaid.push({ t: Date.now(), w: new Set(normWords(clean)) });
   try { speechSynthesis.speak(u); } catch (e) {}
 }
 function ttsSync(s) {
@@ -2193,7 +2194,16 @@ window.__nsrEnd = () => { const r = window.__nsr; if (r && r.onend) r.onend(); }
 window.__nsrError = code => { const r = window.__nsr; if (r && r.onerror) r.onerror({ error: code }); };
 const IN_APP = /MiHamitchazeApp/.test(navigator.userAgent);
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition || (window.AndroidSpeech ? NativeSR : null);
-let rec = null, recWanted = false, botSpeakUntil = 0, recToast = false;
+let rec = null, recWanted = false, recToast = false;
+// מה שהבוטים אמרו לאחרונה – כדי לא "לשמוע" אותם מהרמקול, בלי לזרוק את מה שאתה אומר בזמן שבוט מדבר
+let botSaid = [];
+const normWords = t => String(t).replace(/[^\u0590-\u05FFa-z0-9\s]/gi, ' ').toLowerCase().split(/\s+/).filter(w => w.length >= 2);
+function isEcho(text) {
+  const w = normWords(text); if (!w.length) return true;
+  const now = Date.now(); botSaid = botSaid.filter(b => now - b.t < 20000);
+  return botSaid.some(b => w.filter(x => b.w.has(x)).length / w.length >= 0.6);
+}
+const canTalkNow = () => S && (S.phase === 'lobby' || (S.phase === 'meeting' && S.me.alive && !S.me.spec));
 let heardText = '', heardMsg = '', listening = false, heardMsgTimer = null;
 // שורת "מה שמעתי": מראה בזמן אמת מה הדפדפן מזהה, כדי שתדע שהבוטים באמת קולטים אותך
 function refreshHeard() {
@@ -2210,15 +2220,22 @@ function startRec() {
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
       const r = ev.results[i], text = r[0].transcript.trim();
       if (!r.isFinal) { interim += text + ' '; continue; }
-      // לא "לשמוע" את הבוטים שמדברים מהרמקולים
-      if (!text || Date.now() < botSpeakUntil || (window.speechSynthesis && speechSynthesis.speaking)) continue;
+      // לא "לשמוע" את הבוטים שמדברים מהרמקולים (לפי התוכן, לא לפי הזמן)
+      if (!text || isEcho(text)) continue;
+      if (typeof adminPhrase === 'function' && adminPhrase(text) !== null) { api({ type: 'chat', text: text.slice(0, 140), voice: true }); heardText = ''; continue; }
+      if (!canTalkNow()) continue; // בזמן המשחק מקשיבים רק למשפט הסודי
+      try { if (speechSynthesis.speaking) speechSynthesis.cancel(); } catch (e) {} // אתה מדבר – הבוט שותק
       api({ type: 'chat', text: text.slice(0, 140), voice: true });
       heardText = '';
       // מראים בבירור שהדיבור נשלח לצ'אט
       flashHeardMsg('✅ נשלח לצ\'אט: ' + text.slice(0, 140));
       toast('💬 נשלח לצ\'אט: ' + text.slice(0, 60) + (text.length > 60 ? '…' : ''));
     }
-    if (interim.trim() && !(window.speechSynthesis && speechSynthesis.speaking)) heardText = '🎤 שומע: ' + interim.trim();
+    if (interim.trim() && canTalkNow() && !isEcho(interim)) {
+      heardText = '🎤 שומע: ' + interim.trim();
+      // התחלת לדבר בזמן שבוט מדבר – עוצרים אותו כדי שישמעו אותך
+      if (normWords(interim).length >= 2) { try { if (speechSynthesis.speaking) speechSynthesis.cancel(); } catch (e) {} }
+    }
     refreshHeard();
   };
   rec.onend = () => { rec = null; listening = false; refreshHeard(); if (recWanted) setTimeout(startRec, 300); };
@@ -2231,7 +2248,7 @@ function startRec() {
 }
 function stopRec() { recWanted = false; listening = false; heardText = ''; if (rec) { try { rec.stop(); } catch (e) {} rec = null; } refreshHeard(); }
 function recSync(s) {
-  const want = micOn && (s.phase === 'meeting' || s.phase === 'lobby') && s.me.alive && !!SR;
+  const want = micOn && !!SR; // מקשיבים כל המשחק (בזמן המשחק – רק למשפט הסודי)
   if (want && !recWanted) {
     recWanted = true; startRec();
     if (!recToast) { recToast = true; toast('🎤 זיהוי דיבור פועל: מה שתגיד יופיע בצ\'אט (הדפדפן שולח את הדיבור לשירות זיהוי)'); }
@@ -2388,28 +2405,7 @@ function sendInput() {
   const sig = dx.toFixed(2) + ',' + dy.toFixed(2);
   if (sig !== lastIn && ID) { lastIn = sig; api({ type: 'input', dx, dy, assist: isTouch }); }
 }
-// קיצור סודי: מקשי צ+מ ביחד (המקשים M+N, בכל שפת מקלדת), או נגיעה בו-זמנית למעלה ולמטה במסך בטלפון.
-// מפעיל/מכבה את מצב החשיפה – וכשהוא פעיל כולם רואים אותו ומופיע שלט למעלה.
-const held = new Set();
-let lastSecret = 0;
-function secretToggle() {
-  const t = Date.now();
-  if (!S || S.phase === 'lobby' || t - lastSecret < 800) return;
-  lastSecret = t;
-  api({ type: 'reveal' });
-}
-addEventListener('keydown', e => {
-  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // לא להפעיל בזמן הקלדה בצ'אט
-  held.add(e.code);
-  if (held.has('KeyM') && held.has('KeyN')) secretToggle(); // צ + מ במקלדת עברית
-}, true);
-addEventListener('keyup', e => held.delete(e.code), true);
-addEventListener('blur', () => held.clear());
-addEventListener('touchstart', e => {
-  if (e.touches.length < 2) return;
-  const ys = [...e.touches].map(t => t.clientY);
-  if (Math.min(...ys) < innerHeight * 0.2 && Math.max(...ys) > innerHeight * 0.8) secretToggle();
-}, { passive: true });
+// מצב אדמין: רק במשפט הסודי בצ'אט או בדיבור (ראו adminPhrase במנוע). אין יותר קיצור מקשים או מגע.
 
 const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
