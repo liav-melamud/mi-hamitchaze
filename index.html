@@ -443,7 +443,7 @@
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול)<br>
-      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה ל-8ש׳) · מרקיב (גופות מתפרקות)<br>
+      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה ל-8ש׳) · מרקיב (גופות מתפרקות) · מחבל · רדוף (נועל דלת, מכבה אור בחדר, גורר גופות)<br>
       <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span> · קול: <span id="linkInfo">לא פעיל</span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
@@ -546,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261113-144230'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261113-162952'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1058,6 +1058,9 @@ const ACTIONS = [
   { k: 'investigate', ic: '🔎', label: 'חקור', key: 'I' },
   { k: 'vanish', ic: '👻', label: 'היעלם', key: 'H', red: true },
   { k: 'guard', ic: '🛡️', label: 'שמור', key: 'B' },
+  { k: 'hauntDoor', ic: '🚪', label: 'נעל דלת', key: 'J', red: true },
+  { k: 'hauntLight', ic: '💡', label: 'כבה אור', key: 'L', red: true },
+  { k: 'drag', ic: '🫳', label: 'גרור גופה', key: 'Z', red: true },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -1079,8 +1082,8 @@ function actionState(s) {
   st.use = { show: !me.spec, on: !inVent && (nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
-  st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
+  st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
+  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
@@ -1090,6 +1093,12 @@ function actionState(s) {
   st.investigate = { show: alive && me.roleKey === 'detective', on: me.investCd === 0 && closeP, label: me.investCd ? 'חקור ' + me.investCd : 'חקור' };
   st.guard = { show: alive && me.roleKey === 'bodyguard', on: me.guardCd === 0 && closeP, label: me.guardCd ? 'שמור ' + me.guardCd : 'שמור' };
   st.vanish = { show: alive && me.roleKey === 'phantom', on: !!me.vanished || me.vanishCd === 0, label: me.vanished ? 'הופע' : (me.vanishCd ? 'היעלם ' + me.vanishCd : 'היעלם') };
+  // רדוף: נעילה וכיבוי אור עובדים גם כרוח
+  const polt = !me.spec && me.roleKey === 'poltergeist';
+  const nearDoor = MAP.ROOMS && Object.keys(MAP.ROOMS).some(r => MAP.doorRects(r).some(d => D(pos, { x: d.x + d.w / 2, y: d.y + d.h / 2 }) <= 320));
+  st.hauntDoor = { show: polt, on: me.hauntDoorCd === 0 && nearDoor, label: me.hauntDoorCd ? 'נעל דלת ' + me.hauntDoorCd : 'נעל דלת' };
+  st.hauntLight = { show: polt, on: me.darkCd === 0 && !!MAP.roomAt(pos.x, pos.y), label: me.darkCd ? 'כבה אור ' + me.darkCd : 'כבה אור' };
+  st.drag = { show: polt && alive, on: me.dragging || (me.dragCd === 0 && !inVent && s.bodies.some(b => D(pos, b) <= 80)), label: me.dragging ? 'שחרר גופה' : (me.dragCd ? 'גרור ' + me.dragCd : 'גרור גופה') };
   st.sab = { show: alive && me.team === 'imp', on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
 }
@@ -2349,8 +2358,8 @@ $('#quick').onclick = e => {
 };
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB', hauntDoor: 'KeyJ', hauntLight: 'KeyL', drag: 'KeyZ' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)', hauntDoor: 'נעילת דלת (רדוף)', hauntLight: 'כיבוי אור בחדר (רדוף)', drag: 'גרירת גופה (רדוף)' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -2407,7 +2416,7 @@ function sendInput() {
 }
 // מצב אדמין: רק במשפט הסודי בצ'אט או בדיבור (ראו adminPhrase במנוע). אין יותר קיצור מקשים או מגע.
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard', 'hauntDoor', 'hauntLight', 'drag'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;
@@ -2884,6 +2893,17 @@ function drawMap(t) {
     ctx.restore();
     ctx.strokeStyle = '#3a0808'; ctx.lineWidth = 3; ctx.strokeRect(d.x, d.y, d.w, d.h);
   }
+  // דלת בודדת שהרדוף נעל: סגול עם פסים
+  if (S && S.hauntDoors) for (const d of S.hauntDoors) {
+    if (!inV(d.x - 20, d.y - 20, d.w + 40, d.h + 40)) continue;
+    ctx.fillStyle = '#4b1f7a'; ctx.fillRect(d.x, d.y, d.w, d.h);
+    ctx.save(); ctx.beginPath(); ctx.rect(d.x, d.y, d.w, d.h); ctx.clip();
+    ctx.strokeStyle = '#b98cff'; ctx.lineWidth = 5;
+    for (let k = -Math.max(d.w, d.h); k < Math.max(d.w, d.h) * 2; k += 14) { ctx.beginPath(); ctx.moveTo(d.x + k, d.y + d.h); ctx.lineTo(d.x + k + d.h, d.y); ctx.stroke(); }
+    ctx.restore();
+    ctx.strokeStyle = '#1e0838'; ctx.lineWidth = 3; ctx.strokeRect(d.x, d.y, d.w, d.h);
+    ctx.font = '18px Arial'; ctx.textAlign = 'center'; ctx.fillText('👻', d.x + d.w / 2, d.y + d.h / 2 + 6);
+  }
   // נקודות תיקון של משבר פעיל
   if (S && S.sab) MAP.SAB_POINTS[S.sab.type].forEach((q, i) => {
     if (S.sab.fixed[i] || !inV(q.x - 70, q.y - 70, 140, 140)) return;
@@ -2986,6 +3006,7 @@ function frame(t) {
   const noDark = !me.alive || me.spec;
   let vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
   if (S.sab && S.sab.type === 'lights' && me.team !== 'imp') vision = 95;
+  { const myRoom = MAP.roomAt(cam.x, cam.y); if (myRoom && (S.darkRooms || []).includes(myRoom.id) && me.team !== 'imp') vision = 95; } // חדר שהרדוף כיבה בו את האור
   const reveal = S.settings.reveal || noDark;
   const inView = p => noDark || D(cam, disp[p.id] || p) <= vision;
 

@@ -339,5 +339,46 @@ test('מחבל שנשאר המתחזה האחרון הופך למתחזה שיכ
   ok(g2.view(a).me.role === 'מתחזה', 'המחבל לא הפך למתחזה: ' + g2.view(a).me.role);
 });
 
+test('רדוף: נועל דלת אחת, מכבה אור בחדר, גורר גופה – ולא מחסל', () => {
+  const { g, a, ids } = newGame({ bots: 0, humans: 7, cfg: { impostors: 2 }, role: 'רדוף' }) // 7 שחקנים: אחרי חיסול אחד המשחק עוד לא נגמר;
+  const v0 = g.view(a); ok(v0.me.team === 'imp' && v0.me.roleKey === 'poltergeist', 'לא רדוף');
+  sec(g, 11); // השהיית פתיחה
+  const crew = ids.find(id => g.view(id).me.team === 'crew');
+  // לא מחסל
+  walkTo(g, a, me(g, crew)); g.act(a, { type: 'kill' }); tick(g, 2); ok(g.view(crew).me.alive, 'הרדוף חיסל');
+  // נעילת דלת: דלת אחת בלבד נעולה, ואי אפשר לעבור דרכה
+  g.act(a, { type: 'hauntDoor' }); tick(g, 1);
+  let v = g.view(a); ok(v.hauntDoors.length === 1, 'לא ננעלה דלת אחת: ' + v.hauntDoors.length); ok(v.doors.length === 0, 'נעלו חדר שלם במקום דלת אחת');
+  ok(v.me.hauntDoorCd > 0, 'אין השהיה');
+  g.act(a, { type: 'hauntDoor' }); tick(g, 1); ok(g.view(a).hauntDoors.length === 1, 'נעל שוב בלי השהיה');
+  sec(g, 9); ok(g.view(a).hauntDoors.length === 0, 'הדלת לא נפתחה אחרי 8 שניות');
+  // כיבוי אור בחדר שהוא נמצא בו
+  const room = MAP.roomAt(me(g, a).x, me(g, a).y);
+  ok(room, 'הרדוף לא בתוך חדר');
+  g.act(a, { type: 'hauntLight' }); tick(g, 1);
+  ok(g.view(crew).darkRooms.includes(room.id) && g.view(crew).darkRooms.length === 1, 'האור לא כבה רק בחדר הזה');
+  sec(g, 16); ok(g.view(a).darkRooms.length === 0, 'האור לא חזר אחרי 15 שניות');
+  // גרירת גופה: המתחזה השני מחסל, הרדוף גורר את הגופה למרחק קצר
+  const killer = ids.find(id => id !== a && g.view(id).me.team === 'imp');
+  for (let k = 0; k < 40 && g.view(crew).me.alive; k++) { walkTo(g, killer, me(g, crew)); g.act(killer, { type: 'kill' }); sec(g, 1); }
+  ok(!g.view(crew).me.alive, 'המתחזה השני לא הצליח לחסל');
+  const b0 = g.view(a).bodies[0];
+  walkTo(g, a, b0); g.act(a, { type: 'drag' }); tick(g, 1); ok(g.view(a).me.dragging, 'לא התחיל לגרור');
+  const here = MAP.roomAt(me(g, a).x, me(g, a).y);
+  const target = MAP.path(here.id, Object.keys(MAP.ROOMS).find(r => r !== here.id)).find(q => Math.hypot(q.x - b0.x, q.y - b0.y) > 100) || { x: b0.x + 150, y: b0.y };
+  for (let k = 0; k < 150; k++) { const p = me(g, a), dx = target.x - p.x, dy = target.y - p.y, l = Math.hypot(dx, dy) || 1; g.act(a, { type: 'input', dx: dx / l, dy: dy / l }); tick(g, 1); }
+  g.act(a, { type: 'input', dx: 0, dy: 0 }); tick(g, 2);
+  const b1 = g.view(a).bodies[0]; const moved = Math.hypot(b1.x - b0.x, b1.y - b0.y);
+  ok(moved > 40, 'הגופה לא זזה (' + Math.round(moved) + ')'); ok(moved <= 300, 'הגופה נגררה רחוק מדי');
+  ok(MAP.walkable(b1.x, b1.y), 'הגופה בתוך קיר');
+  sec(g, 7); ok(!g.view(a).me.dragging && g.view(a).me.dragCd > 0, 'הגרירה לא הסתיימה אחרי 6 שניות');
+});
+test('רדוף שנשאר המתחזה האחרון הופך למתחזה', () => {
+  const { g, a } = newGame({ bots: 6, cfg: { impostors: 2 }, role: 'רדוף' });
+  const sn = JSON.parse(g.snapshot()); sn.players[Object.values(sn.players).find(p => p.id !== a && ['impostor', 'shifter', 'phantom', 'viper', 'saboteur'].includes(p.role)).id].alive = false;
+  const g2 = createGame(MAP); g2.restore(JSON.stringify(sn)); g2.join('x', a); tick(g2, 3);
+  ok(g2.view(a).me.role === 'מתחזה', 'הרדוף לא הפך למתחזה: ' + g2.view(a).me.role);
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
