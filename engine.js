@@ -211,6 +211,15 @@ function backToLobby(by) {
 function raceRanking() {
   return list().filter(q => !q.spectator && q.stats).sort((x, y) => y.stats.tasks - x.stats.tasks).map(q => ({ name: nm(q), color: COLORS[q.color].c, n: q.stats.tasks }));
 }
+// המחבל לא מחסל. אם הוא נשאר המתחזה האחרון בחיים – הוא הופך למתחזה רגיל, אחרת אין גופות, אין ישיבות והמשחק נתקע
+function promoteSaboteur() {
+  if (phase !== 'play' && phase !== 'eject') return;
+  const liveImps = list().filter(q => q.alive && !q.spectator && team(q) === 'imp');
+  if (liveImps.length && liveImps.every(q => q.role === 'saboteur')) liveImps.forEach(q => {
+    q.role = 'impostor'; q.killCd = Math.max(q.killCd || 0, 10);
+    toast(q, '🔪 השותף שלך כבר לא כאן – עכשיו אתה מתחזה רגיל ויכול לחסל!');
+  });
+}
 function checkWin() {
   if (settings.mode === 2) { // מרוץ משימות: ניצחון בנקודות
     if (phase !== 'play') return false;
@@ -223,6 +232,7 @@ function checkWin() {
     return false;
   }
   if (phase !== 'play' && phase !== 'eject') return false;
+  promoteSaboteur();
   const alive = list().filter(p => p.alive && !p.spectator);
   const imps = alive.filter(p => team(p) === 'imp').length;
   const crew = alive.filter(p => team(p) === 'crew').length;
@@ -891,6 +901,7 @@ function botMeeting(p) {
 let last = now();
 function tick() {
   const t = now();
+  if (phase === 'play') promoteSaboteur();
   const dt = Math.min(0.1, t - last);
   last = t;
 

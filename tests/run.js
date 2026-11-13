@@ -8,6 +8,13 @@ const dir = fs.existsSync(path.join(root, 'engine.js')) ? root : path.join(root,
 const MAP = require(path.join(dir, 'map.js'));
 const createGame = require(path.join(dir, 'engine.js'));
 
+// אקראיות קבועה מראש (SEED): אותה הרצה נותנת תמיד אותה תוצאה, ואפשר לשחזר כישלון.
+// כל בדיקה מקבלת זרע משלה, כדי שהוספת בדיקה לא תשנה את האחרות.
+const BASE_SEED = Number(process.env.SEED) || 12345;
+let rs = BASE_SEED >>> 0;
+Math.random = () => { rs = (rs + 0x6D2B79F5) >>> 0; let t = rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const seedFor = name => { let h = BASE_SEED >>> 0; for (const ch of name) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0; return h; };
+
 // שעון מדומה: מריצים שעות משחק בשניות
 let fake = Date.now();
 Date.now = () => fake;
@@ -17,9 +24,11 @@ const sec = (g, s) => tick(g, Math.round(s * 30));
 let pass = 0, fail = 0;
 const failures = [];
 function test(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return; // ONLY=שם – להריץ רק בדיקה מסוימת
+  rs = seedFor(name);
   const t0 = process.hrtime.bigint();
   try { fn(); pass++; console.log('  ✓ ' + name + ` (${Number((process.hrtime.bigint() - t0) / 1000000n)}ms)`); }
-  catch (e) { fail++; failures.push(name); console.log('  ✗ ' + name + '\n      ' + (e && e.message)); }
+  catch (e) { fail++; failures.push(name); console.log('  ✗ ' + name + '\n      ' + (e && e.message) + `  (לשחזור: SEED=${BASE_SEED} node tests/run.js)`); }
 }
 const ok = (c, msg) => { if (!c) throw new Error(msg || 'assertion failed'); };
 
@@ -96,7 +105,9 @@ test('הצלם מצלם, והתמונה נשמרת עם השחקנים שבטו�
   const v = g.view(a); ok(v.me.photos.length === 1 && v.me.photos[0].names.length > 0, 'לא נשמרה תמונה'); ok(v.me.photoCd > 0, 'אין השהיה');
 });
 test('הבלש חוקר שחקן קרוב', () => {
-  const { g, a } = newGame({ role: 'בלש', bots: 3 }); sec(g, 3);
+  // שחקן אנושי שני עומד במקום, והבלש הולך אליו – לא תלוי בבוטים שמסתובבים
+  const { g, a, ids } = newGame({ role: 'בלש', bots: 3, humans: 2 }); sec(g, 3);
+  walkTo(g, a, me(g, ids[1]));
   g.act(a, { type: 'investigate' }); tick(g, 2);
   ok(g.view(a).me.notes.length === 1, 'לא נרשמה חקירה');
 });
@@ -173,7 +184,7 @@ test('שמירה ושחזור של משחק (מארח שנפל)', () => {
 });
 test('סיוע למגע: אצבע לא מדויקת מגיעה לכל חדר', () => {
   for (const room of Object.keys(MAP.ROOMS)) {
-    const { g, a } = newGame({ bots: 2 });
+    const { g, a } = newGame({ bots: 0, humans: 3 }); // בלי בוטים: אף אחד לא מחסל או נועל דלתות באמצע ההליכה
     const here = MAP.roomAt(me(g, a).x, me(g, a).y);
     const pts = [...MAP.path(here.id, room), { x: MAP.ROOMS[room].cx, y: MAP.ROOMS[room].cy }];
     for (const q of pts) { let reached = false; for (let k = 0; k < 500; k++) { const p = me(g, a), dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy); if (l < 14) { reached = true; break; } const e = 0.35 * Math.sin(k / 7); g.act(a, { type: 'input', dx: dx / l - dy / l * e, dy: dy / l + dx / l * e, assist: true }); tick(g, 1); } ok(reached, 'נתקע בדרך אל ' + room); }
@@ -214,7 +225,8 @@ test('מחבל: לא מחסל, אבל מחבל מהר יותר מהמתחזה ה
   g.act(a, { type: 'sab', kind: 'lights' }); tick(g, 2); ok(g.view(a).sab, 'מחבל צריך להצליח לחבל');
 });
 test('שומר ראש: מגן על שחקן קרוב לתקופה', () => {
-  const { g, a } = newGame({ role: 'שומר ראש', bots: 3 }); sec(g, 3);
+  const { g, a, ids } = newGame({ role: 'שומר ראש', bots: 3, humans: 2 }); sec(g, 3);
+  walkTo(g, a, me(g, ids[1]));
   g.act(a, { type: 'guard' }); tick(g, 2);
   const v = g.view(a); ok(v.me.guardCd > 0, 'אין השהיה'); ok(v.players.some(p => p.id !== a && p.shield), 'מישהו צריך להיות מוגן');
 });
@@ -255,11 +267,20 @@ test('מפה קטנה: אין חבלת כור', () => {
   ok(!g.view(a).sab, 'חבלת כור הופעלה במפה הקטנה');
 });
 test('מחבל: למשבר שלו 30 שניות במקום 45', () => {
+  let s = null;
+  for (let attempt = 0; attempt < 10 && !s; attempt++) {
   const { g, a } = newGame({ bots: 6, cfg: { impostors: 2 }, role: 'מחבל' });
   sec(g, 20); // ההשהיה של תחילת המשחק
-  if (g.view(a).sab) sec(g, 50); // אם בוט הספיק לחבל – מחכים שייגמר
-  g.act(a, { type: 'sab', kind: 'oxygen' });
-  const s = g.view(a).sab; ok(s && s.t <= 30, 'זמן המשבר של המחבל: ' + (s && s.t));
+  // מחכים לרגע שבו אפשר לחבל: בזמן משחק (לא בישיבה שבוט כינס), בלי משבר של בוט שכבר פעיל
+  for (let i = 0; i < 600 && !s; i++) {
+    const v = g.view(a);
+    if (v.phase === 'end' || !v.me.alive || v.me.role !== 'מחבל') break; // הודח, המשחק נגמר, או שהשותף הודח והוא הפך למתחזה – מנסים משחק חדש
+    if (v.phase === 'meeting' && !v.meeting.myVote) g.act(a, { type: 'vote', target: 'skip' });
+    if (v.phase === 'play' && !v.sab) { g.act(a, { type: 'sab', kind: 'oxygen' }); s = g.view(a).sab; }
+    sec(g, 1);
+  }
+  }
+  ok(s && s.t <= 30, 'זמן המשבר של המחבל: ' + (s && s.t));
 });
 test('30 משחקים מלאים נגמרים בלי שגיאות ובלי להיתקע', () => {
   const reasons = {};
@@ -309,6 +330,13 @@ test('מצב אדמין: רק "ראש תפוח אדמה" מפעיל ו"אקסט�
   g.act(a, { type: 'chat', text: 'ראש תפוח אדמה' }); ok(g.view(a).settings.reveal === true, 'אמירה שנייה ביטלה במקום להשאיר');
   ok(!g.view(a).chat.some(c => /תפוח/.test(c.text)), 'המשפט הסודי הופיע בצ\'אט');
   g.act(a, { type: 'chat', text: 'אקסטרה ראש תפוח אדמה' }); ok(g.view(a).settings.reveal === false, 'לא בוטל');
+});
+
+test('מחבל שנשאר המתחזה האחרון הופך למתחזה שיכול לחסל (אחרת המשחק נתקע)', () => {
+  const { g, a, ids } = newGame({ bots: 6, cfg: { impostors: 2 }, role: 'מחבל', humans: 1 });
+  const sn = JSON.parse(g.snapshot()); sn.players[Object.values(sn.players).find(p => p.id !== a && ['impostor', 'shifter', 'phantom', 'viper'].includes(p.role)).id].alive = false;
+  const g2 = createGame(MAP); g2.restore(JSON.stringify(sn)); g2.join('x', a); tick(g2, 3);
+  ok(g2.view(a).me.role === 'מתחזה', 'המחבל לא הפך למתחזה: ' + g2.view(a).me.role);
 });
 
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
