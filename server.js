@@ -24,14 +24,15 @@ function lanAddrs() {
 }
 
 const handler = (req, res) => {
-  const url = new URL(req.url, 'http://x');
+  let url; try { url = new URL(req.url, 'http://x'); } catch (e) { res.writeHead(400); return res.end(); }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   if (url.pathname === '/local.json') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify({ signal, signalPath: '/signal', port: PORT, addrs: lanAddrs() }));
   }
-  const file = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname.slice(1));
+  let file; try { file = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname.slice(1)); } catch (e) { res.writeHead(400); return res.end(); }
   const fp = path.join(PUB, path.normalize(file));
-  if (!fp.startsWith(PUB) || /(^|[\\/])(\.|node_modules|android)/.test(path.relative(PUB, fp))) { res.writeHead(403); return res.end(); }
+  if (file.includes('\0') || !(fp + path.sep).startsWith(PUB + path.sep) || /(^|[\\/])(\.|node_modules|android)/.test(path.relative(PUB, fp))) { res.writeHead(403); return res.end(); }
   fs.readFile(fp, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });

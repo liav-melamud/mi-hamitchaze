@@ -10,13 +10,24 @@ const { ExpressPeerServer } = require('peer');
 
 const port = process.env.PORT || 9000;
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+// מי רשאי לקבל פרטי ממסר: רק אתר המשחק (והרצה מקומית). אתרים אחרים לא יכולים לנצל את מכסת הממסר.
+const okOrigin = o => /^https:\/\/liav-melamud\.github\.io$/.test(o) || /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(o);
+const hits = new Map(); // הגבלת קצב: עד 120 בקשות בדקה מכל כתובת
+setInterval(() => hits.clear(), 60 * 1000).unref();
 const server = http.createServer(app);
 const STUN = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
 
 let cache = null; // פרטי ממסר תקפים ל-24 שעות; מחדשים כל 12
 app.get('/ice', async (req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
+  const origin = String(req.headers.origin || '');
   res.set('Cache-Control', 'no-store');
+  res.set('Vary', 'Origin');
+  if (!okOrigin(origin)) { res.set('Access-Control-Allow-Origin', '*'); return res.json({ iceServers: STUN, relay: false }); }
+  res.set('Access-Control-Allow-Origin', origin);
+  const n = (hits.get(req.ip) || 0) + 1; hits.set(req.ip, n);
+  if (n > 120) return res.status(429).json({ iceServers: STUN, relay: false });
   const id = process.env.CF_TURN_KEY_ID, token = process.env.CF_TURN_TOKEN;
   const mDomain = (process.env.METERED_DOMAIN || '').replace(/^https?:\/\//, '').replace(/\/.*$/, ''), mKey = process.env.METERED_API_KEY;
   if (!(mDomain && mKey) && !(id && token)) return res.json({ iceServers: STUN, relay: false });
@@ -45,5 +56,5 @@ app.get('/ice', async (req, res) => {
   }
 });
 
-app.use('/', ExpressPeerServer(server, { path: '/', allow_discovery: false, proxied: true, key: 'peerjs' }));
+app.use('/', ExpressPeerServer(server, { path: '/', allow_discovery: false, proxied: true, key: 'peerjs', concurrent_limit: 300 }));
 server.listen(port, () => console.log('PeerJS signaling on port ' + port));

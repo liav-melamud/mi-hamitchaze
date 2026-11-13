@@ -103,6 +103,11 @@ let taskTotal = 0, taskDone = 0;
 
 const now = () => Date.now() / 1000;
 const rid = () => Math.random().toString(36).slice(2, 10);
+// מפתח סודי לחזרה לחדר – רק השחקן עצמו והמארח מכירים אותו (המזהה הרגיל גלוי לכולם)
+const secretKey = () => {
+  try { const c = globalThis.crypto; if (c && c.getRandomValues) return Array.from(c.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join(''); } catch (e) {}
+  return rid() + rid() + rid() + rid();
+};
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -122,7 +127,7 @@ function freeColor() {
 function newPlayer(name, color, isBot) {
   const id = rid();
   const p = {
-    id, name: String(name || 'שחקן').slice(0, 14), color, isBot,
+    id, key: isBot ? null : secretKey(), name: String(name || 'שחקן').replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, '').slice(0, 14) || 'שחקן', color, isBot,
     x: MAP.BUTTON.x, y: MAP.BUTTON.y, dir: 1, alive: true, role: null, tasks: [],
     input: { dx: 0, dy: 0 }, work: null, killCd: 0, shiftCd: 0, shapeAs: null, shapeUntil: 0,
     shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * (HAT_COUNT - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
@@ -321,7 +326,7 @@ function nearest(p, arr, range) {
 }
 
 function act(p, a) {
-  if (!p) return;
+  if (!p || !a || typeof a !== 'object') return; // הודעה פגומה מהרשת לא מפילה את המשחק
   const t = now();
   switch (a.type) {
     case 'input': {
@@ -1095,7 +1100,9 @@ function viewFor(v) {
     for (const p of Object.values(players)) { p.conn = p.isBot; p.lastSeen = now(); p.input = { dx: 0, dy: 0 }; p.talking = false; }
     last = now();
   }
-  return { join, act: (id, a) => act(players[id], a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost, snapshot, restore, hasPlayer: id => !!players[id] };
+  return { join, act: (id, a) => act(typeof id === 'string' && Object.prototype.hasOwnProperty.call(players, id) ? players[id] : null, a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost, snapshot, restore, hasPlayer: id => !!players[id],
+    keyOf: id => players[id] ? players[id].key : null,
+    checkKey: (id, key) => !!(players[id] && players[id].key && typeof key === 'string' && players[id].key === key) };
 }
 if (typeof module !== 'undefined' && module.exports) module.exports = createGame;
 else root.createGame = createGame;

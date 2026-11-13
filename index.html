@@ -543,10 +543,10 @@ const store = {
   get(k) { try { return sessionStorage.getItem(k) || localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v, local) { try { (local ? localStorage : sessionStorage).setItem(k, v); } catch (e) {} },
 };
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261112-194839'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261113-075822'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -740,24 +740,31 @@ function hostGame(name, tries = 0, resume = null) {
   peer.on('call', onCall);
   peer.on('open', () => { runEngine(name, false, resume); afterJoin(); setInterval(sendVoicePeers, 3000); });
   peer.on('connection', c => {
+    let rateN = 0, rateT = 0; // הגנה מהצפה: עד 150 הודעות בשנייה מכל חיבור
     c.on('data', d => {
       if (!d || typeof d !== 'object') return;
+      const nowT = Date.now();
+      if (nowT - rateT > 1000) { rateT = nowT; rateN = 0; }
+      if (++rateN > 150) return;
       if (d.type === 'join') {
+        if (guests[c.peer]) return; // כל חיבור מצטרף פעם אחת בלבד
+        // חוזרים לדמות קיימת רק עם המפתח הסודי שלה – אי אפשר להתחזות לשחקן אחר לפי המזהה הגלוי שלו
+        if (!(typeof d.id === 'string' && d.id !== ID && engine.checkKey(d.id, d.key))) d.id = null;
         // חזרה עם אותו מזהה: אם נשאר חיבור ישן תקוע של אותו שחקן, מחליפים אותו בחדש
         if (d.id && d.id !== ID) {
           for (const [pr, g] of Object.entries(guests)) if (g.pid === d.id && pr !== c.peer) { try { g.conn.close(); } catch (e) {} delete guests[pr]; }
         }
-        const pid = engine.join(String(d.name || 'שחקן'), d.id === ID ? null : d.id);
+        const pid = engine.join(String(d.name || 'שחקן').slice(0, 30), d.id);
         if (!pid) { c.send({ type: 'full' }); setTimeout(() => { try { c.close(); } catch (e) {} }, 500); return; }
         engine.setConn(pid, true);
         guests[c.peer] = { conn: c, pid };
-        c.send({ type: 'joined', id: pid, room: ROOM, v: VERSION });
-        if (d.v && d.v !== VERSION && VERSION !== 'dev' && d.v !== 'dev') toast('⚠️ ' + String(d.name || 'חבר') + ' משתמש בגרסה אחרת של המשחק – כדאי שירענן');
+        c.send({ type: 'joined', id: pid, key: engine.keyOf(pid), room: ROOM, v: VERSION });
+        if (d.v && d.v !== VERSION && VERSION !== 'dev' && d.v !== 'dev') toast('⚠️ ' + String(d.name || 'חבר').slice(0, 14) + ' משתמש בגרסה אחרת של המשחק – כדאי שירענן');
         setTimeout(sendVoicePeers, 500);
         return;
       }
       const g = guests[c.peer];
-      if (g && g.pid) engine.act(g.pid, d);
+      if (g && g.pid) { try { engine.act(g.pid, d); } catch (e) { console.warn('הודעה פגומה מאורח', e); } }
     });
     c.on('close', () => { const g = guests[c.peer]; if (g) { engine.setConn(g.pid, false); delete guests[c.peer]; } });
   });
@@ -772,7 +779,7 @@ function hostGame(name, tries = 0, resume = null) {
 }
 
 // זיכרון של המזהה שלי בחדר (נשמר גם אחרי סגירת הלשונית), כדי לחזור לאותו מקום במשחק
-const rememberId = (room, id) => { ss.set('mm_id_' + room, id); try { localStorage.setItem('mm_id_' + room, JSON.stringify({ id, t: Date.now() })); } catch (e) {} };
+const rememberId = (room, id, key) => { const v = id + ':' + (key || ''); ss.set('mm_id_' + room, v); try { localStorage.setItem('mm_id_' + room, JSON.stringify({ id: v, t: Date.now() })); } catch (e) {} };
 const recallId = room => {
   const a = ss.get('mm_id_' + room); if (a) return a;
   try { const o = JSON.parse(localStorage.getItem('mm_id_' + room) || 'null'); if (o && Date.now() - o.t < 6 * 3600 * 1000) return o.id; } catch (e) {}
@@ -831,10 +838,10 @@ function joinGame(name, code, silent, flipped) {
     const myConn = peer.connect(PREFIX + ROOM, { reliable: true });
     conn = myConn;
     const wdConn = setTimeout(() => { if (conn === myConn && !myConn.open) stuck(); }, 8000);
-    myConn.on('open', () => { clearTimeout(wdConn); myConn.send({ type: 'join', name, id: recallId(ROOM), v: VERSION }); });
+    myConn.on('open', () => { clearTimeout(wdConn); const [rid0, rkey] = String(recallId(ROOM) || '').split(':'); myConn.send({ type: 'join', name, id: rid0 || null, key: rkey || null, v: VERSION }); });
     myConn.on('data', d => {
       if (d.type === 'joined') {
-        ID = d.id; rememberId(ROOM, ID);
+        ID = d.id; rememberId(ROOM, ID, d.key);
         if (reconnecting) { reconnecting = false; reconnectTries = 0; netBar(''); toast('✅ התחברת מחדש'); }
         afterJoin();
         if (d.v && d.v !== VERSION && d.v !== 'dev' && VERSION !== 'dev') staleBanner();
@@ -1014,10 +1021,10 @@ function renderLobby(s) {
   lobbySig = sig;
   $('#pcount').textContent = s.roster.length;
   $('#plist').innerHTML = s.roster.map(p =>
-    `<div class="pl"><span class="dot" style="background:${p.color}"></span><span>${esc(cs(p.color) + p.name)}</span>${p.id === s.hostId ? ' 👑' : ''}${p.id === s.me.id ? ' <span class="tag">אתה</span>' : ''}</div>`).join('');
+    `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span>${esc(cs(p.color) + p.name)}</span>${p.id === s.hostId ? ' 👑' : ''}${p.id === s.me.id ? ' <span class="tag">אתה</span>' : ''}</div>`).join('');
   const taken = new Set(s.roster.filter(p => p.id !== s.me.id).map(p => p.colorIdx));
   $('#colors').innerHTML = (s.colors || []).map((c, i) =>
-    `<button title="${c.n}" data-c="${i}" class="${i === s.me.color ? 'sel' : ''}" style="background:${c.c}" ${taken.has(i) ? 'disabled' : ''}></button>`).join('');
+    `<button title="${esc(c.n)}" data-c="${i}" class="${i === s.me.color ? 'sel' : ''}" style="background:${esc(c.c)}" ${taken.has(i) ? 'disabled' : ''}></button>`).join('');
   show('#hostSettings', s.me.host);
   show('#waitHost', !s.me.host);
   document.querySelectorAll('#settingsGrid select').forEach(el => {
@@ -1116,7 +1123,7 @@ function renderHud(s) {
   if (s.race) {
     const m = Math.floor(s.race.left / 60), sc = s.race.left % 60;
     $('#raceBoard').innerHTML = `<div class="rt">🏁 מרוץ משימות · יעד ${s.race.goal} · ${m}:${String(sc).padStart(2, '0')}</div>` +
-      s.race.board.map((r, i) => `<div class="rr">${['🥇', '🥈', '🥉', '4.', '5.'][i]} <span class="dot" style="background:${r.color}"></span>${esc(cs(r.color) + r.name)}<b>${r.n}</b></div>`).join('');
+      s.race.board.map((r, i) => `<div class="rr">${['🥇', '🥈', '🥉', '4.', '5.'][i]} <span class="dot" style="background:${esc(r.color)}"></span>${esc(cs(r.color) + r.name)}<b>${r.n}</b></div>`).join('');
   }
   const st = actionState(s);
   for (const b of $('#actions').children) {
@@ -1137,7 +1144,7 @@ function renderHud(s) {
   show('#vitals', vitalsOpen && s.vitals);
   if (vitalsOpen && s.vitals) {
     $('#vitals').innerHTML = '<b>💓 סימנים חיוניים</b>' + s.vitals.map(v =>
-      `<div><span class="dot" style="background:${v.color}"></span>${esc(v.name)} — ${v.alive ? '<span style="color:var(--ok)">חי</span>' : '<span style="color:var(--imp)">מת</span>'}</div>`).join('');
+      `<div><span class="dot" style="background:${esc(v.color)}"></span>${esc(v.name)} — ${v.alive ? '<span style="color:var(--ok)">חי</span>' : '<span style="color:var(--imp)">מת</span>'}</div>`).join('');
   }
 }
 
@@ -1151,16 +1158,16 @@ function renderMeeting(s) {
   const roles = {};
   s.players.forEach(p => { if (p.role) roles[p.id] = p; });
   const canVote = me.alive && !me.spec && !m.myVote && !m.reveal;
-  const dots = id => (m.votes || []).filter(v => v.to === id).map(v => `<i class="vdot" style="background:${v.c}">${COLOR_SYMS[v.c] && pref.cb ? COLOR_SYMS[v.c] : ''}</i>`.repeat(v.w || 1)).join('');
+  const dots = id => (m.votes || []).filter(v => v.to === id).map(v => `<i class="vdot" style="background:${esc(v.c)}">${COLOR_SYMS[v.c] && pref.cb ? COLOR_SYMS[v.c] : ''}</i>`.repeat(v.w || 1)).join('');
   const roster = s.roster.filter(p => !p.spec);
   const sig = JSON.stringify([roster, m.voted, m.myVote, Object.keys(roles), s.settings.reveal, m.reveal, m.votes]);
   if (sig !== meetSig) {
     meetSig = sig;
     $('#mgrid').innerHTML = roster.map(p => {
       const r = roles[p.id];
-      return `<button class="vote ${p.alive ? '' : 'dead'} ${m.myVote === p.id ? 'mine' : ''}" data-v="${p.id}" ${canVote && p.alive ? '' : 'disabled'}>
-        <span class="dot" style="background:${p.color};width:22px;height:22px"></span>
-        <span class="nm">${esc(cs(p.color) + p.name)}${p.id === me.id ? ' (אתה)' : ''}${r ? `<br><span class="tag ${r.team}">${esc(r.role)}</span>` : ''}</span>
+      return `<button class="vote ${p.alive ? '' : 'dead'} ${m.myVote === p.id ? 'mine' : ''}" data-v="${esc(p.id)}" ${canVote && p.alive ? '' : 'disabled'}>
+        <span class="dot" style="background:${esc(p.color)};width:22px;height:22px"></span>
+        <span class="nm">${esc(cs(p.color) + p.name)}${p.id === me.id ? ' (אתה)' : ''}${r ? `<br><span class="tag ${esc(r.team)}">${esc(r.role)}</span>` : ''}</span>
         ${m.reveal ? `<span class="vdots">${dots(p.id)}</span>` : (m.voted.includes(p.id) ? '<span class="ok">✓ הצביע</span>' : '')}</button>`;
     }).join('');
     $('#skipBtn').disabled = !canVote;
@@ -1169,13 +1176,13 @@ function renderMeeting(s) {
     $('#chatIn').disabled = !me.alive;
     $('#quick').style.display = me.alive ? '' : 'none';
     const sel = $('#suspSel'), prevSel = sel.value;
-    sel.innerHTML = '<option value="">חושד ב…</option>' + roster.filter(p => p.alive && p.id !== me.id).map(p => `<option value="${p.id}" data-n="${esc(p.name)}">${esc(cs(p.color) + p.name)}</option>`).join('');
+    sel.innerHTML = '<option value="">חושד ב…</option>' + roster.filter(p => p.alive && p.id !== me.id).map(p => `<option value="${esc(p.id)}" data-n="${esc(p.name)}">${esc(cs(p.color) + p.name)}</option>`).join('');
     sel.value = prevSel;
   }
   renderExtras(s);
   if (s.chat.length !== chatLen) {
     chatLen = s.chat.length;
-    $('#chatbox').innerHTML = s.chat.filter(c => !c.hide || !ttsOn).map(c => `<p><span class="dot" style="background:${c.color};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub">אין עדיין הודעות</p>';
+    $('#chatbox').innerHTML = s.chat.filter(c => !c.hide || !ttsOn).map(c => `<p><span class="dot" style="background:${esc(c.color)};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub">אין עדיין הודעות</p>';
     $('#chatbox').scrollTop = 1e6;
   }
 }
@@ -1189,7 +1196,7 @@ function renderExtras(s) {
   if (sig === exSig) return;
   exSig = sig;
   box.innerHTML = '<b>🗂️ הראיות שלי:</b>' +
-    photos.map((p, i) => `<div class="ex"><span>📸 ${esc(p.room)}: ${esc(p.names.join(', ') || 'גופה')} · לפני ${p.ago}ש׳</span><button data-ph="${i}">הצג</button></div>`).join('') +
+    photos.map((p, i) => `<div class="ex"><span>📸 ${esc(p.room)}: ${esc(p.names.join(', ') || 'גופה')} · לפני ${esc(p.ago)}ש׳</span><button data-ph="${i}">הצג</button></div>`).join('') +
     notes.map((n, i) => `<div class="ex"><span>${esc(n)}</span><button data-nt="${i}">הצג</button></div>`).join('');
   box.onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -1329,12 +1336,12 @@ function renderEject(s) {
   const e = s.eject;
   const votes = e.tally ? Object.values(e.tally).reduce((a, b) => a + b, 0) : 0;
   $('#ejectTxt').innerHTML = e.id
-    ? `<div style="font-size:64px">🚀</div><div class="big"><span class="dot" style="background:${e.color};width:26px;height:26px"></span> ${esc(e.name)} הודח</div>
+    ? `<div style="font-size:64px">🚀</div><div class="big"><span class="dot" style="background:${esc(e.color)};width:26px;height:26px"></span> ${esc(e.name)} הודח</div>
        ${e.team === null || e.team === undefined ? '' : `<p style="font-size:20px">${esc(e.name)} `}${e.team === null || e.team === undefined ? '' : e.team === 'imp' ? '<b style="color:var(--imp)">היה ' + esc(e.role) + '!</b>' : '<b style="color:var(--crew)">לא היה מתחזה</b> (' + esc(e.role) + ')'}</p>`
     : `<div style="font-size:64px">🤷</div><div class="big">אף אחד לא הודח</div><p class="sub">${e.tie ? 'תיקו בהצבעה' : 'רוב בחר לדלג'}</p>`;
   $('#ejectTxt').innerHTML += `<p class="sub">${votes} קולות</p>`;
   if (e.votes) {
-    const dot = c => `<span class="dot" style="background:${c}"></span>`;
+    const dot = c => `<span class="dot" style="background:${esc(c)}"></span>`;
     $('#ejectTxt').innerHTML += '<div class="vlist">' + e.votes.map(v =>
       `<div class="vrow">${dot(v.c)}<span>${esc(v.n)}${v.w > 1 ? ' ×2' : ''}</span><b>←</b>${v.to === 'p' ? dot(v.tc) + '<span>' + esc(v.tn) + '</span>' : '<span class="sub" style="margin:0">' + (v.to === 'skip' ? 'דילג' : 'לא הצביע') + '</span>'}</div>`).join('') + '</div>';
   }
@@ -1348,16 +1355,16 @@ function renderEnd(s) {
   s.players.forEach(p => roles[p.id] = p);
   $('#endlist').innerHTML = s.roster.filter(p => !p.spec).map(p => {
     const r = roles[p.id] || {};
-    return `<div class="pl"><span class="dot" style="background:${p.color}"></span><span style="flex:1;text-align:right">${esc(p.name)}${p.alive ? '' : ' 💀'}</span><span class="tag ${r.team || ''}">${esc(r.role || '')}</span></div>`;
+    return `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span style="flex:1;text-align:right">${esc(p.name)}${p.alive ? '' : ' 💀'}</span><span class="tag ${esc(r.team || '')}">${esc(r.role || '')}</span></div>`;
   }).join('');
   if (s.summary) {
     const m = Math.floor(s.summary.duration / 60), sc = s.summary.duration % 60;
-    $('#endAwards').innerHTML = `<div class="award"><b>⏱️ משך המשחק</b><span>${m}:${String(sc).padStart(2, '0')}</span></div>` + s.summary.awards.map(a => `<div class="award"><b>${a.icon} ${esc(a.title)}</b><span><i class="dot" style="background:${a.color}"></i> ${esc(a.name)} (${a.val})</span></div>`).join('');
+    $('#endAwards').innerHTML = `<div class="award"><b>⏱️ משך המשחק</b><span>${m}:${String(sc).padStart(2, '0')}</span></div>` + s.summary.awards.map(a => `<div class="award"><b>${esc(a.icon)} ${esc(a.title)}</b><span><i class="dot" style="background:${esc(a.color)}"></i> ${esc(a.name)} (${esc(a.val)})</span></div>`).join('');
     const ft = t => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
     $('#timeline').innerHTML = s.summary.events.map(e => `<div class="tl"><span class="tm">${ft(e.t)}</span><span>${esc(e.text)}</span></div>`).join('');
   }
   if (w.ranking) { // מרוץ: דירוג במקום תפקידים
-    $('#endlist').innerHTML = w.ranking.map((r, i) => `<div class="pl"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="dot" style="background:${r.color}"></span><span style="flex:1;text-align:right">${esc(cs(r.color) + r.name)}</span><span class="tag crew">${r.n} משימות</span></div>`).join('');
+    $('#endlist').innerHTML = w.ranking.map((r, i) => `<div class="pl"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="dot" style="background:${esc(r.color)}"></span><span style="flex:1;text-align:right">${esc(cs(r.color) + r.name)}</span><span class="tag crew">${esc(r.n)} משימות</span></div>`).join('');
   }
   show('#lobbyBtn', s.me.host); show('#againBtn', s.me.host);
   show('#endWait', !s.me.host);
@@ -1439,7 +1446,7 @@ $('#miniClose').onclick = closeMini;
 function buildWires(b) {
   const cols = ['#e53935', '#1e63d6', '#f2d22e', '#e83fd0'];
   const L = shuffle(cols.slice()), R = shuffle(cols.slice());
-  const btns = arr => arr.map(c => `<button data-c="${c}" style="background:${c}"></button>`).join('');
+  const btns = arr => arr.map(c => `<button data-c="${c}" style="background:${esc(c)}"></button>`).join('');
   b.innerHTML = `<p class="sub" style="margin:8px 0 0">חבר כל כבל לכבל באותו צבע: לחץ על כבל משמאל ואז על הכבל המתאים מימין.</p>
     <div class="wires"><svg></svg><div class="wcol l">${btns(L)}</div><div class="wcol r">${btns(R)}</div></div>`;
   const box = b.querySelector('.wires'), svg = box.querySelector('svg');
@@ -1612,7 +1619,7 @@ const alive = tk => tk === miniToken && miniOpen !== null;
 function buildSimon(b, tk) {
   const cols = ['#e53935', '#1e63d6', '#22a34a', '#f2d22e'];
   const seq = Array.from({ length: 4 }, () => Math.floor(Math.random() * 4));
-  b.innerHTML = '<p class="sub" id="smMsg" style="margin:8px 0">צפה ברצף, ואז חזור עליו</p><div class="simon">' + cols.map((c, i) => `<button data-i="${i}" style="background:${c};color:${c}"></button>`).join('') + '</div>';
+  b.innerHTML = '<p class="sub" id="smMsg" style="margin:8px 0">צפה ברצף, ואז חזור עליו</p><div class="simon">' + cols.map((c, i) => `<button data-i="${i}" style="background:${esc(c)};color:${c}"></button>`).join('') + '</div>';
   const pads = [...b.querySelectorAll('.simon button')], msg = $('#smMsg');
   let inp = 0, ready = false;
   const flash = i => { pads[i].classList.add('lit'); setTimeout(() => pads[i].classList.remove('lit'), 380); };
@@ -2033,6 +2040,7 @@ function sendVoicePeers() {
 function setPeers(list) {
   vPeerMap = {};
   list.forEach(([pr, pid]) => { vPeerMap[pr] = pid; });
+  for (const pr of Object.keys(vWaiting)) if (pr in vPeerMap) { const c = vWaiting[pr]; delete vWaiting[pr]; answerCall(c); }
   callAll();
   applyVoice();
 }
@@ -2050,7 +2058,17 @@ function callAll() {
     } catch (e) { delete vOut[pr]; }
   }
 }
+// עונים לשיחת קול רק ממי שנמצא בחדר (לפי הרשימה של המארח) – זר שמנחש את קוד החדר לא יכול להאזין
+const vWaiting = {};
 function onCall(c) {
+  if (!(c.peer in vPeerMap)) {
+    vWaiting[c.peer] = c;
+    setTimeout(() => { if (vWaiting[c.peer] === c) { delete vWaiting[c.peer]; try { c.close(); } catch (e) {} } }, 15000);
+    return;
+  }
+  answerCall(c);
+}
+function answerCall(c) {
   // אם כבר התקשרנו אליו (והוא שומע אותנו דרך השיחה שלנו), עונים בלי לשלוח עוד זרם קול – כך אין שליחה כפולה
   try { c.answer(micOn && localStream && !vOut[c.peer] ? localStream : undefined); } catch (e) { return; }
   vCalls[c.peer] = vCalls[c.peer] || c;
@@ -2227,7 +2245,7 @@ function renderLobbyChat(s) {
   if (s.chat.length === lobbyChatLen) return;
   lobbyChatLen = s.chat.length;
   const box = $('#lobbyChat');
-  box.innerHTML = s.chat.map(c => `<p><span class="dot" style="background:${c.color};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub" style="margin:0">אין עדיין הודעות</p>';
+  box.innerHTML = s.chat.map(c => `<p><span class="dot" style="background:${esc(c.color)};width:10px;height:10px"></span> <b>${esc(c.name)}:</b> ${esc(c.text)}</p>`).join('') || '<p class="sub" style="margin:0">אין עדיין הודעות</p>';
   box.scrollTop = 1e6;
 }
 const sendLobby = () => { const t = $('#lobbyIn').value.trim(); if (t) api({ type: 'chat', text: t }); $('#lobbyIn').value = ''; };

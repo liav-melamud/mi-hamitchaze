@@ -280,5 +280,23 @@ test('30 משחקים מלאים נגמרים בלי שגיאות ובלי לה�
   console.log('      תוצאות: ' + JSON.stringify(reasons));
 });
 
+test('אבטחה: אי אפשר להתחזות לשחקן אחר, והמפתח הסודי לא נשלח לאף אחד', () => {
+  const g = createGame(MAP); const a = g.join('מארח'); const b = g.join('חבר');
+  ok(typeof g.keyOf(b) === 'string' && g.keyOf(b).length >= 16, 'אין מפתח סודי');
+  ok(g.keyOf(a) !== g.keyOf(b), 'מפתחות זהים');
+  ok(g.checkKey(b, g.keyOf(b)), 'המפתח הנכון נדחה');
+  ok(!g.checkKey(b, 'x') && !g.checkKey(b, undefined) && !g.checkKey(b, null) && !g.checkKey(b, g.keyOf(a)) && !g.checkKey('nope', 'x'), 'מפתח שגוי התקבל');
+  for (const id of [a, b]) ok(!JSON.stringify(g.view(id)).includes(g.keyOf(a)) && !JSON.stringify(g.view(id)).includes(g.keyOf(b)), 'המפתח דלף למצב שנשלח לשחקנים');
+  const g2 = createGame(MAP); g2.restore(g.snapshot()); ok(g2.checkKey(b, g.keyOf(b)), 'המפתח לא נשמר בשחזור');
+  // אורח לא יכול לשנות הגדרות או להתחיל משחק, ושם ארוך/עם תווי בקרה מנוקה
+  g.act(b, { type: 'settings', bots: 9 }); g.act(b, { type: 'start' });
+  ok(g.view(a).phase === 'lobby' && g.view(a).settings.bots !== 9, 'אורח שינה הגדרות או התחיל משחק');
+  const c = g.join('א'.repeat(200) + '\u202e'); ok(g.view(c).roster.find(p => p.id === c).name.length <= 14, 'שם ארוך מדי');
+  g.act(b, { type: 'chat', text: '<img src=x onerror=alert(1)>'.repeat(50) }); ok(g.view(a).chat.slice(-1)[0].text.length <= 142, 'הודעת צ\'אט ארוכה מדי');
+  for (const junk of [null, 5, 'x', {}, { type: 'vote', target: {} }, { type: 'ventMove', to: 'a' }, { type: 'color', color: 1e9 }, { type: '__proto__' }, { type: 'hat', hat: -5 }]) g.act(b, junk);
+  g.act('constructor', { type: 'start' }); g.act('__proto__', { type: 'start' });
+  ok(g.view(a).phase === 'lobby', 'קלט זבל שינה את המצב');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
