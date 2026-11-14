@@ -231,6 +231,27 @@ test('מתחזה בוט (רמה חכמה) הולך אחרי שחקן שמסתו�
     if (d0 - d1 > 150 || ++tried >= 3) { ok(d0 - d1 > 150, `המתחזה לא התקרב לשחקן הבודד (${Math.round(d0)} → ${Math.round(d1)})`); break; }
   }
 });
+test('הליצן: מופיע רק כשההגדרה דלוקה, ואם מדיחים אותו – הוא מנצח', () => {
+  for (let i = 0; i < 40; i++) { const { g, a } = newGame({ bots: 6, cfg: { jester: false } }); ok(!g.view(a).players.some(p => p.role === 'הליצן') && g.view(a).me.role !== 'הליצן', 'ליצן הופיע כשההגדרה כבויה'); }
+  const { g, a } = newGame({ role: 'הליצן', bots: 6, cfg: { jester: true } });
+  ok(g.view(a).me.team === 'jester' && g.view(a).me.tasks.length === 0, 'לליצן לא אמורות להיות משימות');
+  callMeeting(g, a);
+  // כולם מצביעים על הליצן
+  place(g, sn => { Object.values(sn.players).filter(p => p.alive).forEach(p => { sn.meeting.votes[p.id] = a; }); });
+  let v; for (let i = 0; i < 30 * 20; i++) { tick(g, 1); v = g.view(a); if (v.phase === 'end') break; }
+  ok(v.phase === 'end' && v.winner.team === 'jester', 'הליצן הודח אבל לא ניצח: ' + v.phase);
+});
+test('הליצן: אם מדלגים עליו המשחק ממשיך, והוא נספר כמו איש צוות מול המתחזים', () => {
+  const { g, a } = newGame({ role: 'הליצן', bots: 6, cfg: { jester: true } });
+  callMeeting(g, a);
+  place(g, sn => { Object.values(sn.players).filter(p => p.alive).forEach(p => { sn.meeting.votes[p.id] = 'skip'; }); });
+  let v; for (let i = 0; i < 30 * 20; i++) { tick(g, 1); v = g.view(a); if (v.phase === 'play') break; }
+  ok(v.phase === 'play', 'המשחק לא המשיך אחרי דילוג: ' + v.phase);
+  // 1 מתחזה + ליצן + 1 צוות בחיים: המשחק לא נגמר (הליצן נספר מול המתחזה)
+  place(g, sn => { const ps = Object.values(sn.players); const imp = ps.find(p => ['impostor', 'shifter', 'phantom', 'viper'].includes(p.role)); let keep = 1;
+    ps.forEach(p => { if (p.id === a || p.id === imp.id) return; if (keep-- > 0) { p.alive = true; p.role = 'crew'; } else p.alive = false; }); });
+  tick(g, 2); ok(g.view(a).phase === 'play', 'המתחזים ניצחו מוקדם מדי – הליצן לא נספר');
+});
 test('דלתות: כמה חדרים ביחד, ואחרי הפתיחה קירור של 20 שניות לכל חדר', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4 }); sec(g, 3);
   ['F', 'M', 'U'].forEach(r => g.act(a, { type: 'sab', kind: 'door', room: r })); tick(g, 3);

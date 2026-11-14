@@ -36,6 +36,13 @@
   .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #26304a; color: var(--muted); }
   .tag.imp { background: rgba(255,77,77,.18); color: var(--imp); }
   .tag.crew { background: rgba(59,227,255,.14); color: var(--crew); }
+  .tag.jester { background: rgba(255,159,28,.18); color: #ff9f1c; }
+  #clownWeek { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-weight: 800; font-size: 17px; text-align: center; color: #1a1300;
+    background: linear-gradient(90deg, #ff9f1c, #ffd23f, #ff6bcb, #ff9f1c); background-size: 300% 100%; animation: clownbg 6s linear infinite; }
+  #clownWeek small { display: block; font-weight: 600; font-size: 13px; margin-top: 2px; }
+  @keyframes clownbg { to { background-position: 300% 0; } }
+  #jesterVideo { margin: 10px auto; width: 100%; max-width: 480px; }
+  #jesterVideo iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; display: block; }
 
   /* לובי */
   #plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
@@ -374,6 +381,7 @@
   <div class="card" style="max-width:420px">
     <h1>מי <span>המתחזה</span>?</h1>
     <p class="sub">משחק חשיפה חברתי עם חברים – תחנת החלל נוגה</p>
+    <div id="clownWeek" class="hidden">🤡 עונת הליצן – לשבוע בלבד! 🤡<small>תפקיד חדש: הליצן. לא צוות ולא מתחזה – אם מדיחים אותו, הוא מנצח!</small></div>
     <div id="netPick" class="row" style="gap:8px;margin-bottom:6px">
       <button id="netOnline" class="netBtn" style="flex:1">🌐 אונליין</button>
       <button id="netLocal" class="netBtn" style="flex:1">🏠 מקומי</button>
@@ -435,6 +443,7 @@
       <label>מפה <select data-s="map"><option value="big">גדולה (14 חדרים)</option><option value="small">קטנה (7 חדרים, לקבוצות קטנות)</option></select></label>
       <label>רמת הבוטים <select data-s="botLevel"><option value="1">קלה (מתבלבלים)</option><option value="2">רגילה</option><option value="3">חכמה</option></select></label>
       <label>תפקידים חדשים <select data-s="newRoles"><option value="1">כן</option><option value="0">לא</option></select></label>
+      <label>🤡 הליצן <select data-s="jester"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
     </div>
     <div id="hostSettings" class="row hidden" style="margin:12px 0">
@@ -443,6 +452,7 @@
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול)<br>
+      <b>🤡 לבד:</b> הליצן – לא צוות ולא מתחזה. מנצח אם מדיחים אותו בישיבה (אפשר לכבות בהגדרות)<br>
       <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה ל-8ש׳) · מרקיב (גופות מתפרקות) · מחבל · רדוף (נועל דלת, מכבה אור בחדר, גורר גופות)<br>
       <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span> · קול: <span id="linkInfo">לא פעיל</span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
@@ -519,6 +529,7 @@
   <div class="card center">
     <div id="endTitle" class="big"></div>
     <p id="endReason" class="sub"></p>
+    <div id="jesterVideo" class="hidden"></div>
     <div id="endAwards" class="awards"></div>
     <div id="endlist"></div>
     <details id="endTimeline" open><summary style="cursor:pointer;margin:6px 0">📜 ציר הזמן של המשחק</summary><div id="timeline"></div></details>
@@ -546,7 +557,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261114-095446'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261114-191102'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -638,7 +649,7 @@ function getName() {
 // מריץ את מנוע המשחק בדפדפן הזה (מארח או דמו)
 function runEngine(name, demo, resume) {
   isHost = true;
-  engine = createGame(MAP, { demo });
+  engine = createGame(MAP, { demo, jester: clownWeek() });
   if (resume && resume.snapshot) { try { engine.restore(resume.snapshot); } catch (e) { console.warn('restore failed', e); } }
   ID = engine.join(name, resume && resume.pid);
   if (resume && resume.snapshot) engine.setHost(ID);
@@ -982,7 +993,7 @@ function onState(s) {
   if (s.phase === 'play') renderHud(s);
   if (s.phase === 'meeting') renderMeeting(s);
   if (s.phase === 'eject') renderEject(s);
-  if (s.phase === 'end') renderEnd(s);
+  if (s.phase === 'end') renderEnd(s); else jesterVideo(false);
   if (s.phase !== 'play' && joy.active) window.__joyEnd && window.__joyEnd();
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
@@ -1029,15 +1040,16 @@ function renderLobby(s) {
   show('#waitHost', !s.me.host);
   document.querySelectorAll('#settingsGrid select').forEach(el => {
     const k = el.dataset.s, v = s.settings[k];
-    el.value = (k === 'confirm' || k === 'openVotes' || k === 'newRoles') ? (v ? '1' : '0') : String(v);
+    el.value = BOOL_S.includes(k) ? (v ? '1' : '0') : String(v);
     el.disabled = !s.me.host;
   });
 }
 $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) { api({ type: 'color', color: +b.dataset.c }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.color = +b.dataset.c; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
 document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 16 }, (_, i) => `<option>${i}</option>`).join('');
+const BOOL_S = ['confirm', 'openVotes', 'newRoles', 'jester'];
 const sendSettings = () => {
   const o = { type: 'settings' };
-  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : (el.dataset.s === 'confirm' || el.dataset.s === 'openVotes' || el.dataset.s === 'newRoles') ? el.value === '1' : +el.value; });
+  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : BOOL_S.includes(el.dataset.s) ? el.value === '1' : +el.value; });
   api(o);
 };
 document.querySelectorAll('#settingsGrid select').forEach(el => el.onchange = sendSettings);
@@ -1118,10 +1130,10 @@ function renderHud(s) {
   const me = s.me;
   $('#rolecard').classList.toggle('imp', me.team === 'imp');
   $('#rolename').textContent = me.spec ? 'צופה' : (me.alive ? '' : '👻 ') + 'התפקיד שלך: ' + me.role;
-  $('#rolename').style.color = me.team === 'imp' ? 'var(--imp)' : 'var(--crew)';
+  $('#rolename').style.color = me.team === 'imp' ? 'var(--imp)' : me.team === 'jester' ? '#ff9f1c' : 'var(--crew)';
   $('#roledesc').textContent = me.desc;
   const mates = me.team === 'imp' ? s.players.filter(p => p.team === 'imp' && p.id !== me.id) : [];
-  $('#tasklist').innerHTML = me.team === 'imp'
+  $('#tasklist').innerHTML = me.team === 'jester' ? '<li>🤡 גרום להם להדיח אותך בישיבה – ואז אתה מנצח!</li><li>אל תמות: אם מחסלים אותך, הפסדת.</li>' : me.team === 'imp'
     ? '<li>חסל את אנשי הצוות או השווה את מספרם.</li>' + (mates.length ? '<li>שותפים: ' + mates.map(p => esc(p.realName || p.name)).join(', ') + '</li>' : '')
     : me.tasks.map(t => `<li class="${t.done ? 'done' : ''}">${esc(t.name)}</li>`).join('');
   $('#tasktxt').textContent = `(${s.tasks.done}/${s.tasks.total})`;
@@ -1342,13 +1354,30 @@ function renderAlert(s) {
   ctx = saved;
 }
 
+// ---------- הליצן ----------
+// עונת הליצן: שבוע אחד (14–21 בנובמבר 2026). בשבוע הזה יש באנר במסך הפתיחה והליצן דלוק כברירת מחדל
+const CLOWN_FROM = new Date(2026, 10, 14), CLOWN_TO = new Date(2026, 10, 21, 23, 59, 59);
+function clownWeek() { const d = new Date(); return d >= CLOWN_FROM && d <= CLOWN_TO; }
+show('#clownWeek', clownWeek());
+// כשהליצן מנצח: מתנגן השיר עם הווידאו (יוטיוב, בלי עוגיות מעקב). יוצאים מהמסך – המוזיקה נעצרת
+const JESTER_VIDEO = 'DyJpRcLsVAY';
+function jesterVideo(on) {
+  const box = $('#jesterVideo'); if (!box) return;
+  if (!on) { if (box.innerHTML) { box.innerHTML = ''; show('#jesterVideo', false); } return; }
+  if (box.innerHTML) return;
+  try { speechSynthesis.cancel(); } catch (e) {}
+  box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${JESTER_VIDEO}?autoplay=1&rel=0&playsinline=1" title="השיר של הליצן" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
+    + `<p class="sub" style="margin:6px 0 0"><a href="https://www.youtube.com/watch?v=${JESTER_VIDEO}" target="_blank" rel="noopener" style="color:#ff9f1c">▶ לא מתנגן? פתח ביוטיוב</a></p>`;
+  show('#jesterVideo', true);
+}
+
 // ---------- הדחה וסיום ----------
 function renderEject(s) {
   const e = s.eject;
   const votes = e.tally ? Object.values(e.tally).reduce((a, b) => a + b, 0) : 0;
   $('#ejectTxt').innerHTML = e.id
     ? `<div style="font-size:64px">🚀</div><div class="big"><span class="dot" style="background:${esc(e.color)};width:26px;height:26px"></span> ${esc(e.name)} הודח</div>
-       ${e.team === null || e.team === undefined ? '' : `<p style="font-size:20px">${esc(e.name)} `}${e.team === null || e.team === undefined ? '' : e.team === 'imp' ? '<b style="color:var(--imp)">היה ' + esc(e.role) + '!</b>' : '<b style="color:var(--crew)">לא היה מתחזה</b> (' + esc(e.role) + ')'}</p>`
+       ${e.team === null || e.team === undefined ? '' : `<p style="font-size:20px">${esc(e.name)} `}${e.team === null || e.team === undefined ? '' : e.jester ? '<b style="color:#ff9f1c">היה הליצן! 🤡 והליצן ניצח…</b>' : e.team === 'imp' ? '<b style="color:var(--imp)">היה ' + esc(e.role) + '!</b>' : '<b style="color:var(--crew)">לא היה מתחזה</b> (' + esc(e.role) + ')'}</p>`
     : `<div style="font-size:64px">🤷</div><div class="big">אף אחד לא הודח</div><p class="sub">${e.tie ? 'תיקו בהצבעה' : 'רוב בחר לדלג'}</p>`;
   $('#ejectTxt').innerHTML += `<p class="sub">${votes} קולות</p>`;
   if (e.votes) {
@@ -1360,7 +1389,8 @@ function renderEject(s) {
 function renderEnd(s) {
   const w = s.winner;
   if (w.team === 'race') $('#endTitle').innerHTML = '<span style="color:var(--accent)">🏁 המרוץ הסתיים!</span>'; else
-  $('#endTitle').innerHTML = w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
+  $('#endTitle').innerHTML = w.team === 'jester' ? '<span style="color:#ff9f1c">🤡 הליצן ניצח! 🤡</span>' : w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
+  jesterVideo(w.team === 'jester');
   $('#endReason').textContent = w.reason;
   const roles = {};
   s.players.forEach(p => roles[p.id] = p);

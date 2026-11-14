@@ -34,6 +34,7 @@ const ROLES = {
   bodyguard: { name: 'שומר ראש', team: 'crew', desc: 'הגן (B) על שחקן קרוב ל-20 שניות: ניסיון חיסול שלו ייכשל, ותקבל התראה.' },
   saboteur: { name: 'מחבל', team: 'imp', desc: 'אתה לא מחסל – אתה מומחה חבלות: חבלה כל 15 שניות (במקום 30), למשברים שלך יש רק 30 שניות לתיקון (במקום 45), ונועל דלתות עם חצי זמן המתנה. עוזר לשותף שלך לנצח.' },
   poltergeist: { name: 'רדוף', team: 'imp', desc: 'אתה לא מחסל – אתה רוח רפאים ששולטת בתחנה: נעל דלת אחת (J) ל-8 שניות, כבה את האור בחדר שאתה נמצא בו (L) ל-15 שניות, וגרור גופה (Z) למקום מחבוא. לכלוא קורבן בחדר חשוך בשביל השותף שלך. נעילה וכיבוי אור עובדים גם אחרי שאתה מת.' },
+  jester: { name: 'הליצן', team: 'jester', desc: 'אתה לא צוות ולא מתחזה 🤡 המטרה שלך: שידיחו אותך בישיבה! אם מצביעים עליך ומדיחים אותך – אתה מנצח לבד והמשחק נגמר. תתנהג קצת חשוד, אבל לא יותר מדי. אין לך משימות. אם מחסלים אותך – הפסדת.' },
   spectator: { name: 'צופה', team: 'none', desc: 'הצטרפת באמצע משחק – צפה עד הסבב הבא.' },
 };
 
@@ -54,7 +55,7 @@ const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
 let players = {};
 let phase = 'lobby';
 let hostId = null;
-let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, raceGoal: 10 };
+let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, raceGoal: 10, jester: !!(opts && opts.jester) };
 let usedLines = new Set();
 let lastMistake = null; // ישיבה קודמת: מי דחף להדיח איש צוות
 let gusts = [], windT = 14;
@@ -184,6 +185,8 @@ function startGame(by) {
   const specials = shuffle(settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard'] : ['engineer', 'scientist', 'angel']);
   const nSpecial = settings.newRoles ? Math.max(1, Math.round(crew.length * 0.7)) : specials.length;
   crew.forEach((p, i) => { p.role = !race && i < Math.min(specials.length, nSpecial) && crew.length > 1 ? specials[i] : 'crew'; });
+  // הליצן (אפשר לכבות בהגדרות): אחד מהצוות הופך לליצן, רק כשיש מספיק שחקנים
+  if (settings.jester && !race && crew.length >= 3 && all.length >= 5) crew[Math.floor(Math.random() * crew.length)].role = 'jester';
 
   events = []; gameStartT = now(); ev('start', '🚀 המשחק התחיל');
   taskTotal = 0; taskDone = 0;
@@ -242,7 +245,7 @@ function checkWin() {
   promoteSaboteur();
   const alive = list().filter(p => p.alive && !p.spectator);
   const imps = alive.filter(p => team(p) === 'imp').length;
-  const crew = alive.filter(p => team(p) === 'crew').length;
+  const crew = alive.filter(p => team(p) === 'crew' || team(p) === 'jester').length;
   let w = null;
   if (imps === 0) w = { team: 'crew', reason: 'כל המתחזים הודחו!' };
   else if (taskTotal > 0 && taskDone >= taskTotal) w = { team: 'crew', reason: 'הצוות השלים את כל המשימות!' };
@@ -333,7 +336,7 @@ function resolveMeeting() {
   voters.forEach(v => { const tg = meeting.votes[v.id]; if (tg && tg !== 'skip' && players[tg]) { if (team(players[tg]) === 'imp') v.stats.goodVotes++; else v.stats.badVotes++; } });
   ev('eject', ej ? `🚀 ${nm(ej)} הודח (היה ${ROLES[ej.role].name})` : (tie ? '🤝 תיקו בהצבעה – אף אחד לא הודח' : '⏭ ההצבעה דילגה – אף אחד לא הודח'));
   eject = ej
-    ? { id: ej.id, name: ej.name, color: ej.color, role: settings.confirm ? ROLES[ej.role].name : null, team: settings.confirm ? team(ej) : null, tally, t: EJECT_TIME }
+    ? { id: ej.id, name: ej.name, color: ej.color, role: settings.confirm || ej.role === 'jester' ? ROLES[ej.role].name : null, team: settings.confirm || ej.role === 'jester' ? team(ej) : null, jester: ej.role === 'jester', tally, t: EJECT_TIME }
     : { id: null, tally, t: EJECT_TIME, tie };
   list().forEach(p => { if (p.bot && ej && (p.bot.sawKill === ej.id || p.bot.sawShift === ej.id)) p.bot.sawKill = p.bot.sawShift = null; });
   list().forEach(p => { if (p.bot && p.bot.sawVent && (!players[p.bot.sawVent.id] || (ej && p.bot.sawVent.id === ej.id))) p.bot.sawVent = null; });
@@ -352,8 +355,14 @@ function resolveMeeting() {
 }
 
 function endEject() {
+  const jw = eject && eject.jester && players[eject.id] ? players[eject.id] : null;
   eject = null;
   phase = 'play';
+  // הליצן הודח – הוא מנצח לבד והמשחק נגמר
+  if (jw) {
+    winner = { team: 'jester', reason: `🤡 ${jw.name} היה הליצן – הדחתם אותו, והוא ניצח!`, jester: jw.id };
+    phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); return;
+  }
   if (checkWin()) return;
   spawnAround(list().filter(p => p.alive));
   list().forEach(p => { if (team(p) === 'imp') p.killCd = Math.max(p.killCd, 15); });
@@ -611,6 +620,7 @@ function act(p, a) {
       settings.openVotes = a.openVotes !== false;
       settings.taskLevel = Math.round(cl(a.taskLevel, 1, 3, 2));
       settings.newRoles = a.newRoles !== false;
+      settings.jester = !!a.jester;
       settings.botLevel = Math.round(cl(a.botLevel, 1, 3, 2));
       settings.map = a.map === 'small' ? 'small' : 'big';
       settings.mode = a.mode === 2 ? 2 : 1;
@@ -671,7 +681,7 @@ function botGoal(p) {
     // כמו שחקן אמיתי: בדרך כלל המשימה הקרובה, לפעמים אחרת
     const byDist = todo.slice().sort((x, y) => dist(p, MAP.TASKS[x.i]) - dist(p, MAP.TASKS[y.i]));
     const tk = Math.random() < (settings.botLevel === 1 ? 0.4 : 0.75) ? byDist[0] : pick(todo); target = { ...MAP.TASKS[tk.i], ref: tk };
-  } else if (team(p) === 'imp' && p.alive && MAP.TASKS.length && Math.random() < 0.6) {
+  } else if (team(p) !== 'crew' && p.alive && MAP.TASKS.length && Math.random() < 0.6) {
     const tk = MAP.TASKS[Math.floor(Math.random() * MAP.TASKS.length)];
     target = { x: tk.x, y: tk.y, room: tk.room, fake: true };
   } else {
@@ -986,6 +996,8 @@ function botLine(p) {
 }
 function botLine0(p) {
   const b = p.bot, name = id => players[id] ? bare(players[id].name) : '';
+  // בוט ליצן רוצה שיחשדו בו
+  if (p.role === 'jester' && Math.random() < 0.7) return fresh(['אולי זה אני, אולי לא 😏', 'אני לא חייב להגיד לכם איפה הייתי', 'נו, תצביעו עליי אם אתם כל כך בטוחים', 'הייתי ליד הגופה… במקרה', 'אני לא מתכוון להסביר את עצמי', 'למה כולם מסתכלים עליי? 🤭']);
   const alive = id => players[id] && players[id].alive;
   const myRoom = b.lastRoom || 'חדר האוכל';
   if (team(p) === 'crew' && b.sawShift && alive(b.sawShift)) return fill(fresh(['ראיתי את {n} משנה צורה! הוא מתחזה!', '{n} התחפש למישהו אחר מול העיניים שלי! תצביעו עליו', 'אני בטוח ב-100%: {n} הוא משנה צורה']), { n: name(b.sawShift) });
