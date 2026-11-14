@@ -152,6 +152,27 @@ test('חבלות: חמצן מחייב שתי נקודות, ואם לא מתקנ�
   ok(g.view(a).sab && g.view(a).sab.type === 'oxygen', 'חבלה לא התחילה');
   sec(g, 50); const v = g.view(a); ok(v.phase === 'end' && /האוויר/.test(v.winner.reason), 'צריך להפסיד בגלל חמצן: ' + v.phase);
 });
+test('שחקן אנושי מתקן חבלה: כפתור השימוש נדלק בנקודת התיקון, והתיקון עובד', () => {
+  // הכפתור במסך (actionState מתוך index.html) – פעם הוא לא נדלק בנקודות התיקון, ורק בוטים יכלו לתקן
+  const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+  const src = html.match(/function actionState\(s\) \{[\s\S]*?\n\}\n/)[0];
+  let pos = null;
+  const actionState = new Function('MAP', 'meP', 'D', src + '; return actionState;')(MAP, () => pos, (a, b) => Math.hypot(a.x - b.x, a.y - b.y));
+  const { g, ids } = newGame({ bots: 0, humans: 3, cfg: { tasks: 1, newRoles: false } });
+  const imp = ids.find(i => g.view(i).me.team === 'imp'), crew = ids.find(i => g.view(i).me.team === 'crew');
+  sec(g, 21); g.act(imp, { type: 'sab', kind: 'oxygen' }); tick(g, 2);
+  ok(g.view(crew).sab, 'חבלה לא התחילה');
+  MAP.SAB_POINTS.oxygen.forEach((q, i) => {
+    walkTo(g, crew, q);
+    const v = g.view(crew); pos = me(g, crew);
+    const st = actionState(v);
+    ok(st.use.on, 'כפתור השימוש כבוי ליד נקודת התיקון ' + q.name);
+    g.act(crew, { type: 'use' }); tick(g, 2);
+    ok(g.view(crew).me.sabMini && g.view(crew).me.sabMini.i === i, 'לא נפתח מסך התיקון');
+    sec(g, 1.2); g.act(crew, { type: 'sabfinish', i }); tick(g, 1);
+  });
+  ok(!g.view(crew).sab, 'החבלה לא תוקנה');
+});
 test('דלתות: כמה חדרים ביחד, ואחרי הפתיחה קירור של 20 שניות לכל חדר', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4 }); sec(g, 3);
   ['F', 'M', 'U'].forEach(r => g.act(a, { type: 'sab', kind: 'door', room: r })); tick(g, 3);

@@ -546,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261114-093228'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261114-093506'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1079,7 +1079,9 @@ function actionState(s) {
   const nearBtn = alive && !me.emergencyUsed && D(pos, MAP.BUTTON) < 80;
   const inVent = me.inVent !== null && me.inVent !== undefined;
   const nearCam = alive && D(pos, MAP.CAM_CONSOLE) < 80;
-  st.use = { show: !me.spec, on: !inVent && (nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
+  // נקודת תיקון של חבלה (אותו מרחק כמו במנוע: 70)
+  const nearSab = alive && !!s.sab && MAP.SAB_POINTS[s.sab.type].some((q, i) => !s.sab.fixed[i] && D(pos, q) < 68);
+  st.use = { show: !me.spec, on: !inVent && (nearSab || nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearSab ? '🔧 תקן' : nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
