@@ -546,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261114-093506'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261114-095446'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -2156,24 +2156,52 @@ function bestVoices() {
   return vs.filter(v => rankVoice(v) >= top - 3);
 }
 try { speechSynthesis.onvoiceschanged = () => {}; speechSynthesis.getVoices(); } catch (e) {}
+// הופך משפט כתוב לדיבור טבעי: בלי אימוג'י, מספרים במילים, הפסקות קטנות במקום מקפים ושלוש נקודות
+function speechText(t) {
+  return String(t)
+    .replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, '').replace(/🤖/g, '')
+    .replace(/100%/g, 'מאה אחוז').replace(/(\d+)%/g, '$1 אחוז')
+    .replace(/\s*[–—]\s*|\s+-\s+/g, ', ').replace(/(^|\s)([בלמהוש])-/g, '$1$2').replace(/…|\.\.\./g, ', ')
+    .replace(/[()"]/g, ' ').replace(/!{2,}/g, '!').replace(/\s*,\s*,/g, ',')
+    .replace(/\s+/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '').trim();
+}
+// מילות פתיחה כמו של אנשים אמיתיים (רק לפעמים, ולכל בוט סגנון משלו)
+const FILLERS = [['אממ'], ['תקשיבו'], ['רגע'], ['אוקיי'], ['בעצם'], ['כאילו'], ['טוב'], ['יאללה']];
+// לכל בוט קול משלו: מחלקים את הקולות הקיימים לפי סדר ההופעה, כדי ששני בוטים לא יישמעו אותו דבר
+const botVoice = {};
+function voiceFor(name, vs) {
+  if (!(name in botVoice)) botVoice[name] = Object.keys(botVoice).length;
+  return vs.length ? vs[botVoice[name] % vs.length] : null;
+}
 let nowTimer = null;
 function speakBot(name, text) {
   if (!ttsOn || !('speechSynthesis' in window)) return;
-  const clean = String(text).replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
-  if (!clean) return;
-  const h = hashStr(String(name).replace(/[^֐-׿a-z0-9]/gi, ''));
-  const u = new SpeechSynthesisUtterance(clean);
-  u.lang = 'he-IL';
-  const vs = bestVoices(); if (vs.length) u.voice = vs[h % vs.length];
-  // שינויים קטנים בלבד בגובה ובקצב: הבדל בין בוטים בלי להישמע כמו רובוט
-  u.pitch = 0.9 + (h % 7) * 0.05;
-  u.rate = 0.98 + (h % 4) * 0.04;
-  const cap = $('#nowSpeaking');
-  u.onstart = () => { clearTimeout(nowTimer); cap.textContent = '🗣️ ' + String(name).replace(/^🤖\s*/, '') + ': ' + clean; cap.classList.remove('hidden'); };
-  u.onend = () => { said.end = Date.now(); nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
+  let clean = speechText(text);
+  if (!clean || !/[֐-׿a-z0-9]/i.test(clean)) return;
+  const key = String(name).replace(/[^֐-׿a-z0-9]/gi, ''), h = hashStr(key);
+  const excited = /!/.test(text), question = /\?/.test(text);
+  // מילת פתיחה: לא במשפט נרגש (שם מדברים ישר לעניין)
+  if (!excited && clean.length > 12 && Math.random() < 0.3) clean = FILLERS[(h + Math.floor(Math.random() * 3)) % FILLERS.length][0] + ', ' + clean;
+  const vs = bestVoices(), voice = voiceFor(key, vs);
+  // שינוי קטן בגובה ובקצב לכל בוט, ועוד קצת לפי הרגש של המשפט
+  const basePitch = 0.88 + (h % 7) * 0.045, baseRate = 0.97 + (h % 5) * 0.035;
+  // מפצלים למשפטים: כל משפט נאמר עם הנגינה שלו והפסקה קצרה ביניהם
+  const parts = clean.match(/[^.!?]+[.!?]*/g) || [clean];
   const said = { t: Date.now(), end: Infinity, w: normWords(clean) }; botSaid.push(said);
-  u.onerror = () => { said.end = Date.now(); };
-  try { speechSynthesis.speak(u); } catch (e) {}
+  const cap = $('#nowSpeaking');
+  parts.forEach((part, k) => {
+    const u = new SpeechSynthesisUtterance(part.trim());
+    u.lang = 'he-IL'; if (voice) u.voice = voice;
+    const ex = /!/.test(part) || (excited && k === 0), q = /\?/.test(part);
+    u.pitch = Math.min(1.4, basePitch + (ex ? 0.08 : 0) + (q ? 0.04 : 0));
+    u.rate = Math.min(1.25, baseRate * (ex ? 1.08 : q ? 0.97 : 1) * (part.length > 60 ? 1.04 : 1));
+    if (k === 0) u.onstart = () => { clearTimeout(nowTimer); cap.textContent = '🗣️ ' + String(name).replace(/^🤖\s*/, '') + ': ' + String(text).replace(/^🤖\s*/, ''); cap.classList.remove('hidden'); };
+    if (k === parts.length - 1) {
+      u.onend = () => { said.end = Date.now(); nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
+      u.onerror = () => { said.end = Date.now(); };
+    }
+    try { speechSynthesis.speak(u); } catch (e) {}
+  });
 }
 function ttsSync(s) {
   if (s.phase !== 'meeting') { $('#nowSpeaking').classList.add('hidden'); if (spoken) { spoken = 0; try { speechSynthesis.cancel(); } catch (e) {} } return; }
@@ -2246,7 +2274,6 @@ function startRec() {
       if (isEcho(text)) { flashHeardMsg('🔈 זה נשמע כמו הבוט מהרמקול – לא נשלח. כדאי אוזניות'); continue; }
       if (typeof adminPhrase === 'function' && adminPhrase(text) !== null) { api({ type: 'chat', text: text.slice(0, 140), voice: true }); heardText = ''; continue; }
       if (!canTalkNow()) continue; // בזמן המשחק מקשיבים רק למשפט הסודי
-      try { if (speechSynthesis.speaking) speechSynthesis.cancel(); } catch (e) {} // אתה מדבר – הבוט שותק
       api({ type: 'chat', text: text.slice(0, 140), voice: true });
       heardText = '';
       // מראים בבירור שהדיבור נשלח לצ'אט
@@ -2254,9 +2281,7 @@ function startRec() {
       toast('💬 נשלח לצ\'אט: ' + text.slice(0, 60) + (text.length > 60 ? '…' : ''));
     }
     if (interim.trim() && canTalkNow() && !isEcho(interim)) {
-      heardText = '🎤 שומע: ' + interim.trim();
-      // התחלת לדבר בזמן שבוט מדבר – עוצרים אותו כדי שישמעו אותך
-      if (normWords(interim).length >= 2) { try { if (speechSynthesis.speaking) speechSynthesis.cancel(); } catch (e) {} }
+      heardText = '🎤 שומע: ' + interim.trim(); // לא קוטעים בוט באמצע משפט; הבא בתור מחכה שתסיים
     }
     refreshHeard();
   };

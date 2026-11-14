@@ -173,6 +173,64 @@ test('שחקן אנושי מתקן חבלה: כפתור השימוש נדלק ב
   });
   ok(!g.view(crew).sab, 'החבלה לא תוקנה');
 });
+// בוטים חכמים: מצבים מסודרים בעזרת snapshot/restore
+const place = (g, fn) => { const sn = JSON.parse(g.snapshot()); fn(sn); g.restore(JSON.stringify(sn)); };
+const crewBots = (sn) => Object.values(sn.players).filter(p => p.isBot && p.alive && !['impostor', 'shifter', 'phantom', 'viper', 'saboteur', 'poltergeist'].includes(p.role));
+test('בוט שראה מישהו בפתח אוורור מספר על זה ומצביע עליו', () => {
+  const { g, a } = newGame({ role: 'מתחזה', bots: 4, cfg: { botLevel: 2 } }); sec(g, 1);
+  const V = MAP.VENTS[0]; let wid;
+  place(g, sn => { const h = sn.players[a]; h.x = V.x; h.y = V.y; const w = crewBots(sn)[0]; wid = w.id; w.x = V.x + 70; w.y = V.y; });
+  g.act(a, { type: 'vent' }); g.act(a, { type: 'vent' });
+  ok(JSON.parse(g.snapshot()).players[wid].bot.sawVent.id === a, 'הבוט לא זכר את הפתח');
+  callMeeting(g, a);
+  let sn; for (let i = 0; i < 3000; i++) { tick(g, 1); sn = JSON.parse(g.snapshot()); if (!sn.meeting || sn.meeting.votes[wid]) break; }
+  ok(sn.meeting && sn.meeting.votes[wid] === a, 'הבוט לא הצביע על מי שראה בפתח');
+  ok(sn.chat.some(c => c.from === wid && /פתח/.test(c.text)), 'הבוט לא סיפר שראה פתח אוורור');
+});
+test('בוט זוכר מי היה איתו בזמן החיסול (נקי) ומי היה ליד הגופה', () => {
+  const { g, a } = newGame({ role: 'מתחזה', bots: 5, cfg: { botLevel: 2 } }); sec(g, 21);
+  const R = Object.values(MAP.ROOMS), A = R[0], B = R.sort((x, y) => Math.hypot(y.cx - A.cx, y.cy - A.cy) - Math.hypot(x.cx - A.cx, x.cy - A.cy))[0];
+  let v, w1, w2, w3;
+  place(g, sn => {
+    const cb = crewBots(sn); [v, w1, w2, w3] = cb.map(p => p.id);
+    [v, w1, w2, w3].forEach(id => { sn.players[id].role = 'crew'; sn.players[id].shieldUntil = 0; }); // בלי שומר ראש שיגן על הקורבן
+    const set = (p, x, y) => { p.x = x; p.y = y; if (p.bot) { p.bot.plan = []; p.bot.wait = 30; } };
+    set(sn.players[a], A.cx, A.cy); set(sn.players[v], A.cx + 20, A.cy);
+    set(sn.players[w3], A.cx - 60, A.cy + 30); // עד לחיסול? לא – רואה רק אחר כך
+    set(sn.players[w1], B.cx, B.cy); set(sn.players[w2], B.cx + 30, B.cy);
+    sn.players[a].killCd = 0;
+    // שאר הבוטים רחוק, כדי שלא יפריעו
+    Object.values(sn.players).filter(p => p.isBot && ![v, w1, w2, w3].includes(p.id)).forEach(p => set(p, B.cx - 40, B.cy + 40));
+  });
+  sec(g, 2.5); g.act(a, { type: 'kill' }); tick(g, 1);
+  { const q = JSON.parse(g.snapshot()); ok(q.bodies.length === 1 || (q.meeting && q.meeting.body === v), 'החיסול לא קרה'); }
+  sec(g, 1.5); if (!JSON.parse(g.snapshot()).meeting) g.act(a, { type: 'report' }); tick(g, 2); // העד הקרוב אולי כבר דיווח בעצמו
+  const sn = JSON.parse(g.snapshot()), b1 = sn.players[w1].bot, b3 = sn.players[w3] && sn.players[w3].alive ? sn.players[w3].bot : null;
+  ok(sn.meeting, 'אין ישיבה');
+  ok(b1.alibi.includes(w2), 'בוט לא זכר שהחבר שלו היה איתו בזמן החיסול');
+  ok(!b1.nearBody.includes(w2), 'חבר עם אליבי נחשב "ליד הגופה"');
+  if (b3) ok(b3.nearBody.includes(a), 'בוט שהיה בחדר לא זכר שהמתחזה היה ליד הגופה');
+  ok((sn.meeting.suspect[w2] || 0) < 0, 'אליבי לא מוריד חשד');
+});
+test('מתחזה בוט (רמה חכמה) הולך אחרי שחקן שמסתובב לבד', () => {
+  let tried = 0;
+  for (;;) {
+    const { g, a } = newGame({ bots: 3, cfg: { botLevel: 3, newRoles: false } });
+    if (g.view(a).me.team !== 'crew') continue;
+    sec(g, 1);
+    const R = Object.values(MAP.ROOMS), A = R[0], B = R.find(r => Math.hypot(r.cx - A.cx, r.cy - A.cy) > 500 && Math.hypot(r.cx - A.cx, r.cy - A.cy) < 850);
+    if (!B) throw new Error('אין חדר מתאים');
+    let imp;
+    place(g, sn => {
+      const h = sn.players[a]; h.x = A.cx; h.y = A.cy;
+      Object.values(sn.players).filter(p => p.isBot).forEach(p => { p.x = B.cx; p.y = B.cy; p.bot.plan = []; p.bot.wait = 0; if (['impostor', 'shifter'].includes(p.role)) { imp = p.id; p.killCd = 3; p.role = 'impostor'; } else p.bot.wait = 60; });
+    });
+    const d0 = Math.hypot(me(g, imp).x - A.cx, me(g, imp).y - A.cy);
+    sec(g, 4);
+    const d1 = Math.hypot(me(g, imp).x - A.cx, me(g, imp).y - A.cy);
+    if (d0 - d1 > 150 || ++tried >= 3) { ok(d0 - d1 > 150, `המתחזה לא התקרב לשחקן הבודד (${Math.round(d0)} → ${Math.round(d1)})`); break; }
+  }
+});
 test('דלתות: כמה חדרים ביחד, ואחרי הפתיחה קירור של 20 שניות לכל חדר', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4 }); sec(g, 3);
   ['F', 'M', 'U'].forEach(r => g.act(a, { type: 'sab', kind: 'door', room: r })); tick(g, 3);

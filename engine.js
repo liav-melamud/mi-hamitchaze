@@ -56,6 +56,7 @@ let phase = 'lobby';
 let hostId = null;
 let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, raceGoal: 10 };
 let usedLines = new Set();
+let lastMistake = null; // ישיבה קודמת: מי דחף להדיח איש צוות
 let gusts = [], windT = 14;
 // חבלות: sab = משבר פעיל (חשמל/חמצן/כור), דלתות סגורות לפי חדר
 let sab = null, sabCd = 20, doorsUntil = {}, doorCool = {};
@@ -198,7 +199,7 @@ function startGame(by) {
       taskTotal += p.tasks.length;
     } else p.tasks = [];
   });
-  bodies = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); gusts = []; windT = 10 + Math.random() * 8;
+  bodies = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); lastMistake = null; gusts = []; windT = 10 + Math.random() * 8;
   sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {};
   settings.reveal = false;
   spawnAround(all);
@@ -278,6 +279,19 @@ function callMeeting(by, body) {
   }
   by.stats.reports++; ev('meeting', body ? `📢 ${nm(by)} דיווח על הגופה של ${players[body.id] ? nm(players[body.id]) : 'שחקן'} (${room})` : `🚨 ${nm(by)} כינס ישיבת חירום`);
   meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {}, floor: Infinity };
+  // זיכרון של הבוטים: מי היה ליד הגופה, מי היה איתם (נקי), מי נראה בפתח אוורור, ומי טעה בסבב הקודם
+  const addS = (id, n) => { if (players[id]) meeting.suspect[id] = (meeting.suspect[id] || 0) + n; };
+  list().forEach(o => {
+    if (!o.bot) return;
+    o.bot.nearBody = []; o.bot.alibi = [];
+    if (!o.alive || o.spectator) return;
+    if (body) recallKill(o, body, bodyRoom);
+    if (team(o) !== 'crew') return;
+    o.bot.nearBody.forEach(id => addS(id, 1.2));
+    o.bot.alibi.forEach(id => addS(id, -2));
+    if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addS(o.bot.sawVent.id, 3);
+  });
+  if (lastMistake) lastMistake.by.forEach(id => addS(id, 0.8));
   chat = [];
   bodies = [];
   // ישיבה פותחת את כל הדלתות, ולכל חדר שנפתח מתחיל זמן קירור
@@ -294,7 +308,10 @@ function callMeeting(by, body) {
       p.bot.chat2At = pe === 'chatty' ? T - (10 + Math.random() * 8) : (pe === 'quiet' ? -999 : (Math.random() < 0.5 ? T - (12 + Math.random() * 12) : -999));
       p.bot.chat3At = pe === 'chatty' ? T - (22 + Math.random() * 10) : -999;
       p.bot.voteAt = T - (Math.min(T - 5, (pe === 'aggressive' ? 10 : 16) + Math.random() * 18));
-      p.bot.replies = 0; p.bot.replyAt = -999; p.bot.shared = false;
+      // מי שראה משהו חשוב מדבר מוקדם, גם אם הוא שקט מטבעו
+      const b0 = p.bot, ev0 = team(p) === 'crew' && p.alive && (b0.sawKill || b0.sawShift || b0.sawVent || (b0.nearBody && b0.nearBody.length));
+      if (ev0) b0.chatAt = T - (1.5 + Math.random() * 3);
+      p.bot.replies = 0; p.bot.replyAt = -999; p.bot.shared = false; p.bot.saidVent = p.bot.saidNear = p.bot.saidAlibi = p.bot.saidMistake = false;
     }
   });
 }
@@ -319,6 +336,9 @@ function resolveMeeting() {
     ? { id: ej.id, name: ej.name, color: ej.color, role: settings.confirm ? ROLES[ej.role].name : null, team: settings.confirm ? team(ej) : null, tally, t: EJECT_TIME }
     : { id: null, tally, t: EJECT_TIME, tie };
   list().forEach(p => { if (p.bot && ej && (p.bot.sawKill === ej.id || p.bot.sawShift === ej.id)) p.bot.sawKill = p.bot.sawShift = null; });
+  list().forEach(p => { if (p.bot && p.bot.sawVent && (!players[p.bot.sawVent.id] || (ej && p.bot.sawVent.id === ej.id))) p.bot.sawVent = null; });
+  lastMistake = ej && settings.confirm && team(ej) === 'crew'
+    ? { name: bare(ej.name), by: voters.filter(v => meeting.votes[v.id] === ej.id && v.id !== ej.id).map(v => v.id) } : null;
   // מי הצביע למי (אלא אם ההצבעות אנונימיות)
   if (settings.openVotes) {
     eject.votes = voters.map(v => {
@@ -490,7 +510,7 @@ function act(p, a) {
         return;
       }
       tgt.alive = false; tgt.work = null; tgt.cam = false;
-      bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + 8 : 0 });
+      bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + 8 : 0, t, killer: p.id });
       p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor();
       p.stats.kills++; ev('kill', `🔪 ${nm(p)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
       // לבלש: מי שהיה ליד הזירה נרשם כחשוד קל
@@ -513,9 +533,10 @@ function act(p, a) {
     }
     case 'vent': {
       if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist'].includes(p.role)) return;
-      if (p.inVent !== null) { p.inVent = null; return; } // יציאה מהפתח
+      if (p.inVent !== null) { p.inVent = null; witnessVent(p); return; } // יציאה מהפתח
       const v = nearest(p, MAP.VENTS, USE_RANGE);
       if (!v) return;
+      witnessVent(p);
       p.inVent = MAP.VENTS.indexOf(v); p.x = v.x; p.y = v.y; p.work = null;
       break;
     }
@@ -608,6 +629,28 @@ function act(p, a) {
 }
 
 // ---------- בוטים ----------
+const sightR = () => settings.botLevel === 3 ? 420 : settings.botLevel === 1 ? 240 : 320;
+// בוט מהצוות שרואה מישהו נכנס לפתח אוורור או יוצא ממנו – זוכר את זה (מהנדס יכול להסביר את עצמו בישיבה)
+function witnessVent(p) {
+  const r = MAP.roomAt(p.x, p.y);
+  list().forEach(o => {
+    if (o.bot && o.alive && o.id !== p.id && team(o) === 'crew' && o.inVent === null && dist(o, p) < sightR() * 0.8)
+      o.bot.sawVent = { id: p.id, room: r ? r.name : 'המסדרון' };
+  });
+}
+// מה הבוט זוכר מסביב לזמן החיסול: מי היה בחדר של הגופה, ומי היה איתו במקום אחר (ולכן נקי)
+function recallKill(p, body, bodyRoom) {
+  const b = p.bot, h = b.hist || [], kt = body.t || now();
+  const near = new Set(), withMe = new Set();
+  for (const e of h) {
+    if (e.id === p.id || e.id === body.id || Math.abs(e.t - kt) > 14) continue;
+    if (bodyRoom && e.room === bodyRoom) near.add(e.id);
+    else if (e.me && e.room !== bodyRoom && Math.abs(e.t - kt) < 8) withMe.add(e.id);
+  }
+  near.forEach(id => withMe.delete(id));
+  b.nearBody = [...near].filter(id => players[id] && players[id].alive);
+  b.alibi = [...withMe].filter(id => players[id] && players[id].alive);
+}
 function hereRoom(p) {
   const r = MAP.roomAt(p.x, p.y); if (r) return r;
   return Object.values(MAP.ROOMS).sort((a, b) => dist(p, { x: a.cx, y: a.cy }) - dist(p, { x: b.cx, y: b.cy }))[0];
@@ -625,7 +668,12 @@ function botGoal(p) {
   const todo = p.tasks.filter(x => !x.done);
   let target;
   if (team(p) === 'crew' && todo.length) {
-    const tk = pick(todo); target = { ...MAP.TASKS[tk.i], ref: tk };
+    // כמו שחקן אמיתי: בדרך כלל המשימה הקרובה, לפעמים אחרת
+    const byDist = todo.slice().sort((x, y) => dist(p, MAP.TASKS[x.i]) - dist(p, MAP.TASKS[y.i]));
+    const tk = Math.random() < (settings.botLevel === 1 ? 0.4 : 0.75) ? byDist[0] : pick(todo); target = { ...MAP.TASKS[tk.i], ref: tk };
+  } else if (team(p) === 'imp' && p.alive && MAP.TASKS.length && Math.random() < 0.6) {
+    const tk = MAP.TASKS[Math.floor(Math.random() * MAP.TASKS.length)];
+    target = { x: tk.x, y: tk.y, room: tk.room, fake: true };
   } else {
     const r = pick(Object.values(MAP.ROOMS));
     target = { x: r.cx + (Math.random() - 0.5) * (r.w - 80), y: r.cy + (Math.random() - 0.5) * (r.h - 80), room: r.id };
@@ -647,13 +695,43 @@ function botTick(p, dt) {
     if (b.seeT <= 0) {
       b.seeT = 1; b.seen = b.seen || {};
       const r = MAP.roomAt(p.x, p.y); if (r) b.lastRoom = r.name;
-      list().forEach(o => { if (o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < (settings.botLevel === 3 ? 420 : settings.botLevel === 1 ? 240 : 320)) { const rr = MAP.roomAt(o.x, o.y); if (rr) b.seen[o.id] = rr.name; } });
+      const T0 = now(); b.hist = (b.hist || []).filter(e => T0 - e.t < 30);
+      list().forEach(o => { if (o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < sightR()) { const rr = MAP.roomAt(o.x, o.y); if (rr) {
+        b.seen[o.id] = rr.name;
+        // היסטוריה קצרה: איפה ומתי ראיתי כל אחד (me = היינו באותו חדר)
+        const lastE = b.hist.filter(e => e.id === o.id).pop();
+        if (!lastE || lastE.room !== rr.name || T0 - lastE.t > 4) b.hist.push({ id: o.id, room: rr.name, t: T0, me: !!r && r.id === rr.id });
+      } } });
     }
     // רואים שני שחקנים זהים (משנה צורה) – בורחים, ולפעמים רצים לכפתור החירום
     if (team(p) === 'crew' && !b.flee) {
       const near = list().filter(o => o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < 330);
       const fake = near.find(o => o.shapeAs && players[o.shapeAs] && players[o.shapeAs].alive && near.some(q => q.id === o.shapeAs));
       if (fake) { b.sawShift = fake.id; b.flee = { from: fake.id, t: 4 + Math.random() * 2 }; b.plan = []; b.pressButton = !p.emergencyUsed && Math.random() < 0.6; }
+    }
+    // מתחזה ציד: כשהחיסול כמעט מוכן, הולך אחרי מישהו שמסתובב לבד (כמו שחקן אמיתי)
+    if (team(p) === 'imp' && !NON_KILLERS.includes(p.role) && p.inVent === null && settings.botLevel > 1 && p.killCd < 5 && !sab) {
+      b.huntT = (b.huntT || 0) - dt;
+      if (b.huntT <= 0) {
+        b.huntT = 1.5;
+        const crew = list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null);
+        const alone = crew.filter(o => !list().some(q => q.id !== o.id && q.id !== p.id && q.alive && q.inVent === null && dist(q, o) < 380))
+          .sort((x, y) => dist(p, x) - dist(p, y))[0];
+        if (alone && dist(p, alone) < 900 && (settings.botLevel === 3 || Math.random() < 0.6)) {
+          const to = MAP.roomAt(alone.x, alone.y), here = hereRoom(p);
+          if (to) { b.plan = [...(to.id === here.id ? [] : MAP.path(here.id, to.id)), { x: alone.x, y: alone.y }]; b.goal = null; b.wait = 0; b.hunting = alone.id; }
+        } else b.hunting = null;
+      }
+    }
+    // אחרי חיסול: בורחים מהגופה – דרך פתח אוורור אם יש קרוב, אחרת הולכים לחדר רחוק
+    if (b.escape) {
+      b.escape.t -= dt;
+      if (p.inVent !== null) {
+        if (b.escape.t <= 0) { act(p, { type: 'vent' }); b.escape = null; b.plan = []; b.wait = 0.5; }
+        else if (!b.escape.moved) { const L = MAP.VENTS[p.inVent].links; if (L && L.length) act(p, { type: 'ventMove', to: pick(L) }); b.escape.moved = true; }
+        return;
+      }
+      if (b.escape.t <= 0) b.escape = null;
     }
     // מתחזה: חסל כשאין עדים
     if (team(p) === 'imp' && p.killCd <= 0 && !NON_KILLERS.includes(p.role)) {
@@ -663,7 +741,17 @@ function botTick(p, dt) {
         const witnesses = list().filter(o => o.alive && o.id !== p.id && o.id !== tgt.id && o.inVent === null && dist(o, p) < (lvl === 3 ? 420 : 320));
         // קל: מתחזים רשלניים שחונקים גם מול עדים. חכם: מחסלים רק כשאף אחד לא רואה
         const chance = lvl === 1 ? (witnesses.length ? 0.012 : 0.04) : lvl === 3 ? (witnesses.length ? 0 : 0.08) : (witnesses.length ? 0 : 0.05);
-        if (Math.random() < chance) { act(p, { type: 'kill' }); return; }
+        if (Math.random() < chance) {
+          act(p, { type: 'kill' });
+          if (!p.alive || phase !== 'play') return;
+          b.hunting = null;
+          const canVent = ['impostor', 'shifter', 'phantom', 'viper'].includes(p.role);
+          const v = canVent && settings.botLevel > 1 && nearest(p, MAP.VENTS, 220);
+          if (v) { b.plan = [{ x: v.x, y: v.y }]; b.escape = { t: 6, vent: true }; }
+          else { b.escape = { t: 5 }; const far = Object.values(MAP.ROOMS).sort((x, y) => dist(p, { x: y.cx, y: y.cy }) - dist(p, { x: x.cx, y: x.cy }))[0]; b.plan = [...MAP.path(hereRoom(p).id, far.id), { x: far.cx, y: far.cy }]; b.goal = null; }
+          b.wait = 0;
+          return;
+        }
       }
     }
     if (p.role === 'shifter' && !p.shapeAs && p.shiftCd <= 0 && Math.random() < 0.002) act(p, { type: 'shift' });
@@ -724,6 +812,11 @@ function botTick(p, dt) {
   } else b.pos = null;
   if (b.wait > 0) { b.wait -= dt; return; }
   if (p.work || p.sabWork) return;
+  if (!b.plan.length && b.escape && b.escape.vent && p.inVent === null) {
+    b.escape.vent = false; b.escape.t = 1.5 + Math.random() * 2; act(p, { type: 'vent' });
+    if (p.inVent === null) b.escape = null;
+    return;
+  }
   if (!b.plan.length && b.pressSab) {
     b.pressSab = false;
     act(p, { type: 'use' });
@@ -738,6 +831,8 @@ function botTick(p, dt) {
     if (b.goal && b.goal.ref && !b.goal.ref.done && dist(p, b.goal) < USE_RANGE) {
       act(p, { type: 'use' }); b.goal = null; return;
     }
+    // מתחזה "עושה" משימה מזויפת: עומד ליד העמדה כמה שניות, כמו כולם
+    if (b.goal && b.goal.fake) { b.goal = null; b.wait = 3 + Math.random() * 4; return; }
     b.wait = 0.5 + Math.random() * 2.5;
     botGoal(p);
     return;
@@ -800,7 +895,7 @@ function roomIn(text) {
 }
 function queueSay(bot, text, delay) { meeting.queue.push({ id: bot.id, text, at: meeting.t - delay, silent: true }); }
 // משפט חשוב נכתב גם בצ'אט; שאר הדברים של הבוטים נשמעים בקול בלבד
-const IMPORTANT = /ראיתי|משנה צורה|מחסל|הרג|תצביעו|משקר|המתחזה|נמצא|לא נכון|נכון,|סותר|חשוד מאוד|מצאתי|הגופה/;
+const IMPORTANT = /פתח אוורור|נקי|הצביע נגד|ראיתי|משנה צורה|מחסל|הרג|תצביעו|משקר|המתחזה|נמצא|לא נכון|נכון,|סותר|חשוד מאוד|מצאתי|הגופה/;
 const speechDur = text => 0.9 + String(text).length * 0.075;
 const humanTalking = () => list().some(p => !p.isBot && p.talking && now() - p.talkT < 6);
 
@@ -882,6 +977,9 @@ const PERSONA_LINES = {
   helpful: ['בואו נסדר: מי היה איפה?', 'אני אספר איפה הייתי ואתם תתקנו אותי', 'בואו נבדוק את האליבי של כל אחד', 'מי שראה משהו – עכשיו הזמן'],
 };
 function botLine(p) {
+  // ראיה חשובה קודמת לאופי: גם בוט שקט מספר מה ראה
+  const b = p.bot, has = id => id && players[id] && players[id].alive;
+  if ((has(b.sawKill) || has(b.sawShift) || (b.sawVent && has(b.sawVent.id) && !b.saidVent) || (b.nearBody && b.nearBody.length && !b.saidNear)) && team(p) === 'crew') return botLine0(p);
   const pl = PERSONA_LINES[p.bot.persona];
   if (pl && Math.random() < 0.35) return fresh(pl);
   return botLine0(p);
@@ -892,6 +990,16 @@ function botLine0(p) {
   const myRoom = b.lastRoom || 'חדר האוכל';
   if (team(p) === 'crew' && b.sawShift && alive(b.sawShift)) return fill(fresh(['ראיתי את {n} משנה צורה! הוא מתחזה!', '{n} התחפש למישהו אחר מול העיניים שלי! תצביעו עליו', 'אני בטוח ב-100%: {n} הוא משנה צורה']), { n: name(b.sawShift) });
   if (team(p) === 'crew' && b.sawKill && alive(b.sawKill)) return fill(fresh(['ראיתי את {n} מחסל את {b}! תצביעו עליו!', '{n} הרג את {b} מולי!', 'זה {n}! ראיתי הכל']), { n: name(b.sawKill), b: name(b.sawVictim) });
+  if (team(p) === 'crew' && b.sawVent && alive(b.sawVent.id) && !b.saidVent) { b.saidVent = true; return fill(fresh(['ראיתי את {n} ליד פתח אוורור ב{r}! רק מתחזים משתמשים בפתחים', '{n} יצא לי מפתח אוורור ב{r}, אני בטוח', 'ראיתי את {n} נכנס לפתח ב{r}. {n}, אתה מהנדס?']), { n: name(b.sawVent.id), r: b.sawVent.room }); }
+  if (meeting.body && b.nearBody && b.nearBody.length && !b.saidNear) {
+    const id = pick(b.nearBody.filter(x => !(team(p) === 'imp' && team(players[x]) === 'imp')));
+    if (id) { b.saidNear = true; return fill(fresh(['ראיתי את {n} ב{r} ממש לפני שמצאו את הגופה', '{n} היה ב{r} בדיוק בזמן הזה. {n}, מה עשית שם?', 'רגע, {n} יצא מ{r} לא מזמן']), { n: name(id), r: meeting.bodyRoom }); }
+  }
+  if (team(p) === 'crew' && meeting.body && b.alibi && b.alibi.length && !b.saidAlibi && Math.random() < 0.7) { b.saidAlibi = true; return fill(fresh(['{n} היה איתי ב{m} כשזה קרה, הוא נקי', 'אני יכול לאשר את {n}, היינו ביחד ב{m}', '{n} לא יכול להיות, הוא היה לידי']), { n: name(pick(b.alibi)), m: myRoom }); }
+  if (lastMistake && lastMistake.by.length && !b.saidMistake && Math.random() < 0.4) {
+    const id = pick(lastMistake.by.filter(x => alive(x) && x !== p.id && !(team(p) === 'imp' && team(players[x]) === 'imp')));
+    if (id) { b.saidMistake = true; return fill(fresh(['בסבב הקודם {n} דחף להדיח את {e}, ו{e} היה מהצוות. חשוד', 'תזכרו ש{n} הצביע נגד {e} שהיה נקי']), { n: name(id), e: lastMistake.name }); }
+  }
   if (meeting.by === p.id && meeting.body) return fill(fresh(['מצאתי את {b} ב{r}!', 'הגופה של {b} הייתה ב{r}', 'מישהו היה ב{r} לפני רגע?']), { b: name(meeting.body), r: meeting.room });
   // מתחזה בוט לפעמים מאשים מישהו מהצוות
   if (team(p) === 'imp' && Math.random() < 0.35) {
@@ -935,12 +1043,19 @@ function botMeeting(p) {
     let vote = null;
     if (team(p) === 'crew' && b.sawShift && ok(b.sawShift)) vote = b.sawShift;
     else if (team(p) === 'crew' && b.sawKill && ok(b.sawKill)) vote = b.sawKill;
+    else if (team(p) === 'crew' && b.sawVent && ok(b.sawVent.id) && Math.random() < 0.85) vote = b.sawVent.id;
     else {
       const score = {};
       const lf = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.4 : 1, pe = b.persona;
       const pf = pe === 'suspicious' ? 1.4 : pe === 'quiet' ? 0.8 : 1;
       for (const id in meeting.mentions) score[id] = (score[id] || 0) + meeting.mentions[id] * pf;
       for (const id in meeting.suspect) score[id] = (score[id] || 0) + meeting.suspect[id] * 1.5 * lf * pf;
+      // מי שהיה איתי בזמן החיסול – לא מצביעים עליו
+      if (team(p) === 'crew') (b.alibi || []).forEach(id => { score[id] = (score[id] || 0) - 4; });
+      // הולכים עם הרוב כשיש לו בסיס (וגם מתחזה מצטרף כדי להיראות כמו כולם)
+      const cnt = {}; for (const v of Object.values(meeting.votes)) if (v !== 'skip') cnt[v] = (cnt[v] || 0) + 1;
+      const nv = list().filter(o => o.alive && !o.spectator).length;
+      for (const id in cnt) if (cnt[id] >= Math.max(2, Math.ceil(nv / 3)) && (score[id] || 0) > -1) score[id] = (score[id] || 0) + (team(p) === 'imp' ? 3 : 1.5);
       const top = Object.entries(score).filter(([id]) => ok(id)).sort((x, y) => y[1] - x[1])[0];
       if (top && top[1] >= 3) vote = top[0];
       else if (top && top[1] >= 2 && Math.random() < 0.7) vote = top[0];
@@ -1174,7 +1289,7 @@ function viewFor(v) {
   function setHost(id) { hostId = id; }
   // שמירה ושחזור של מצב המשחק (כדי שמארח שנפל יוכל להמשיך מאותה נקודה)
   function snapshot() {
-    return JSON.stringify({ v: 1, raceEndAt, saved: now(), players, phase, hostId, settings, bodies, meeting, eject, winner, chat, taskTotal, taskDone, sab, doorsUntil, doorCool, hauntDoors, darkRooms, sabCd, alertT, gusts, usedLines: [...usedLines] });
+    return JSON.stringify({ v: 1, raceEndAt, saved: now(), players, phase, hostId, settings, bodies, meeting, eject, winner, chat, taskTotal, taskDone, sab, doorsUntil, doorCool, hauntDoors, darkRooms, sabCd, alertT, gusts, usedLines: [...usedLines], lastMistake });
   }
   function restore(json) {
     const o = JSON.parse(json);
@@ -1182,7 +1297,7 @@ function viewFor(v) {
     MAP = MAPS[settings.map] || MAPS.big; raceEndAt = o.raceEndAt || 0;
     bodies = o.bodies || []; meeting = o.meeting || null; eject = o.eject || null; winner = o.winner || null; chat = o.chat || [];
     taskTotal = o.taskTotal || 0; taskDone = o.taskDone || 0; sab = o.sab || null; doorsUntil = o.doorsUntil || {}; doorCool = o.doorCool || {}; hauntDoors = o.hauntDoors || []; darkRooms = o.darkRooms || {};
-    sabCd = o.sabCd || 0; alertT = o.alertT || 0; gusts = o.gusts || []; usedLines = new Set(o.usedLines || []);
+    sabCd = o.sabCd || 0; alertT = o.alertT || 0; gusts = o.gusts || []; usedLines = new Set(o.usedLines || []); lastMistake = o.lastMistake || null;
     if (meeting && (meeting.floor === null || meeting.floor === undefined)) meeting.floor = Infinity;
     for (const p of Object.values(players)) { p.conn = p.isBot; p.lastSeen = now(); p.input = { dx: 0, dy: 0 }; p.talking = false; }
     last = now();
