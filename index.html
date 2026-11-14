@@ -546,7 +546,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261113-162952'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261114-093228'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -2168,8 +2168,9 @@ function speakBot(name, text) {
   u.rate = 0.98 + (h % 4) * 0.04;
   const cap = $('#nowSpeaking');
   u.onstart = () => { clearTimeout(nowTimer); cap.textContent = '🗣️ ' + String(name).replace(/^🤖\s*/, '') + ': ' + clean; cap.classList.remove('hidden'); };
-  u.onend = () => { nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
-  botSaid.push({ t: Date.now(), w: new Set(normWords(clean)) });
+  u.onend = () => { said.end = Date.now(); nowTimer = setTimeout(() => { if (!speechSynthesis.speaking && !speechSynthesis.pending) cap.classList.add('hidden'); }, 500); };
+  const said = { t: Date.now(), end: Infinity, w: normWords(clean) }; botSaid.push(said);
+  u.onerror = () => { said.end = Date.now(); };
   try { speechSynthesis.speak(u); } catch (e) {}
 }
 function ttsSync(s) {
@@ -2207,10 +2208,19 @@ let rec = null, recWanted = false, recToast = false;
 // מה שהבוטים אמרו לאחרונה – כדי לא "לשמוע" אותם מהרמקול, בלי לזרוק את מה שאתה אומר בזמן שבוט מדבר
 let botSaid = [];
 const normWords = t => String(t).replace(/[^\u0590-\u05FFa-z0-9\s]/gi, ' ').toLowerCase().split(/\s+/).filter(w => w.length >= 2);
+// הד = הדפדפן שמע את הבוט מהרמקול. זה קורה רק בזמן שבוט מדבר (או שניות ספורות אחרי),
+// והטקסט הוא כמעט מילה במילה קטע ממה שהבוט אמר. משפט רגיל שלך עם מילים נפוצות ("אני", "זה", "לא") – לא הד.
 function isEcho(text) {
   const w = normWords(text); if (!w.length) return true;
-  const now = Date.now(); botSaid = botSaid.filter(b => now - b.t < 20000);
-  return botSaid.some(b => w.filter(x => b.w.has(x)).length / w.length >= 0.6);
+  const now = Date.now(); botSaid = botSaid.filter(b => now - b.end < 4000 && now - b.t < 30000);
+  const j = w.join(' ');
+  return botSaid.some(b => {
+    const bj = b.w.join(' ');
+    if (w.length < 3) return j === bj; // מילה או שתיים: הד רק אם זה כל המשפט של הבוט
+    if (bj.includes(j)) return true;
+    const bs = new Set(b.w);
+    return w.filter(x => bs.has(x)).length / w.length >= 0.85;
+  });
 }
 const canTalkNow = () => S && (S.phase === 'lobby' || (S.phase === 'meeting' && S.me.alive && !S.me.spec));
 let heardText = '', heardMsg = '', listening = false, heardMsgTimer = null;
@@ -2230,7 +2240,8 @@ function startRec() {
       const r = ev.results[i], text = r[0].transcript.trim();
       if (!r.isFinal) { interim += text + ' '; continue; }
       // לא "לשמוע" את הבוטים שמדברים מהרמקולים (לפי התוכן, לא לפי הזמן)
-      if (!text || isEcho(text)) continue;
+      if (!text) continue;
+      if (isEcho(text)) { flashHeardMsg('🔈 זה נשמע כמו הבוט מהרמקול – לא נשלח. כדאי אוזניות'); continue; }
       if (typeof adminPhrase === 'function' && adminPhrase(text) !== null) { api({ type: 'chat', text: text.slice(0, 140), voice: true }); heardText = ''; continue; }
       if (!canTalkNow()) continue; // בזמן המשחק מקשיבים רק למשפט הסודי
       try { if (speechSynthesis.speaking) speechSynthesis.cancel(); } catch (e) {} // אתה מדבר – הבוט שותק
