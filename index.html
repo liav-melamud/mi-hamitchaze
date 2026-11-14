@@ -557,7 +557,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261114-194807'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261114-201133'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1139,7 +1139,7 @@ function renderHud(s) {
   $('#rolename').style.color = me.team === 'imp' ? 'var(--imp)' : me.team === 'jester' ? '#ff9f1c' : 'var(--crew)';
   $('#roledesc').textContent = me.desc;
   const mates = me.team === 'imp' ? s.players.filter(p => p.team === 'imp' && p.id !== me.id) : [];
-  $('#tasklist').innerHTML = me.team === 'jester' ? '<li>🤡 גרום להם להדיח אותך בישיבה – ואז אתה מנצח!</li><li>🕳️ קפוץ לפתחים כשרואים אותך · 🍌 בננה (K) · 🎈 גופה מזויפת (T)</li><li>אל תמות: אם מחסלים אותך, הפסדת.</li>' : me.team === 'imp'
+  $('#tasklist').innerHTML = me.team === 'jester' ? '<li>🤡 גרום להם להדיח אותך בישיבה – ואז אתה מנצח!</li><li>🕳️ קפוץ לפתחים כשרואים אותך · 🍌 בננה (K): מי שמחליק חושד בך · 🎈 גופה מזויפת (T): נראית אמיתית לגמרי</li><li>אל תמות: אם מחסלים אותך, הפסדת.</li>' : me.team === 'imp'
     ? '<li>חסל את אנשי הצוות או השווה את מספרם.</li>' + (mates.length ? '<li>שותפים: ' + mates.map(p => esc(p.realName || p.name)).join(', ') + '</li>' : '')
     : me.tasks.map(t => `<li class="${t.done ? 'done' : ''}">${esc(t.name)}</li>`).join('');
   $('#tasktxt').textContent = `(${s.tasks.done}/${s.tasks.total})`;
@@ -1183,7 +1183,7 @@ function renderMeeting(s) {
   const m = s.meeting, me = s.me;
   $('#mtitle').textContent = m.body ? '💀 דווחה גופה!' : '🚨 ישיבת חירום!';
   $('#mtimer').textContent = m.reveal ? '🗳️' : m.t + 'ש׳';
-  $('#msub').textContent = m.body ? `${m.by} מצא את הגופה של ${m.body}. מי עשה את זה?` : `${m.by} לחץ על כפתור החירום.`;
+  $('#msub').textContent = m.body ? (m.body === '?' ? `${m.by} מצא גופה ב${m.room}. מי עשה את זה?` : `${m.by} מצא את הגופה של ${m.body}. מי עשה את זה?`) : `${m.by} לחץ על כפתור החירום.`;
   const roles = {};
   s.players.forEach(p => { if (p.role) roles[p.id] = p; });
   const canVote = me.alive && !me.spec && !m.myVote && !m.reveal;
@@ -1322,7 +1322,7 @@ function renderAlert(s) {
   alertSig = sig;
   $('#alertBox').className = a.body ? 'body' : 'btn';
   $('#alertTitle').textContent = a.body ? `${a.name} דיווח על גופה!` : `${a.name} לחץ על כפתור החירום!`;
-  $('#alertSub').textContent = a.fake ? '🎈 אבל הגופה הייתה מזויפת! מישהו עושה פה מתיחות… 🤡' : a.body ? `הגופה של ${a.bodyName} נמצאה ב${a.room}` : 'כולם לחדר הישיבות 🚨';
+  $('#alertSub').textContent = a.body ? (a.bodyName ? `הגופה של ${a.bodyName} נמצאה ב${a.room}` : `נמצאה גופה ב${a.room}!`) : 'כולם לחדר הישיבות 🚨';
   const c = $('#alertCv'), saved = ctx;
   ctx = c.getContext('2d');
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1345,7 +1345,7 @@ function renderAlert(s) {
     ctx.strokeStyle = '#ffd646'; ctx.lineWidth = 2;
     for (const r of [8, 14]) { ctx.beginPath(); ctx.arc(40, -2, r, -0.6, 0.6); ctx.stroke(); }
     ctx.setTransform(4, 0, 0, 4, 520, 260);
-    if (a.fake) { ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.fillText('🎈', 0, 12); } else drawBody({ x: 0, y: 0, color: a.bodyColor });
+    drawBody({ x: 0, y: 0, color: a.bodyColor });
   } else {
     // כפתור החירום הענק והשחקן מעליו
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2296,6 +2296,27 @@ function refreshHeard() {
   for (const id of ['#micHeard', '#micHeardL']) { const el = $(id); if (!el) continue; el.textContent = t; el.classList.toggle('hidden', !t); }
 }
 function flashHeardMsg(t) { heardMsg = t; refreshHeard(); clearTimeout(heardMsgTimer); heardMsgTimer = setTimeout(() => { heardMsg = ''; refreshHeard(); }, 7000); }
+// שולח משפט שזוהה לצ'אט (פעם אחת בלבד: גם אם הדפדפן שולח אחר כך את אותו משפט כ"סופי")
+let lastSent = null, stableTimer = null, lastInterim = '';
+function sendHeard(text, fromInterim) {
+  text = String(text).trim(); if (!text) return false;
+  const w = normWords(text);
+  if (lastSent && Date.now() - lastSent.t < 8000 && w.length) {
+    const same = w.filter(x => lastSent.w.has(x)).length / w.length;
+    if (same >= 0.7) return false; // כבר נשלח
+  }
+  if (isEcho(text)) { flashHeardMsg('🔈 זה נשמע כמו הבוט מהרמקול – לא נשלח. כדאי אוזניות'); return false; }
+  const adm = typeof adminPhrase === 'function' && adminPhrase(text) !== null;
+  if (!adm && !canTalkNow()) return false; // בזמן המשחק מקשיבים רק למשפט הסודי
+  lastSent = { t: Date.now(), w: new Set(w) };
+  api({ type: 'chat', text: text.slice(0, 140), voice: true });
+  heardText = '';
+  if (!adm) {
+    flashHeardMsg('✅ נשלח לצ\'אט: ' + text.slice(0, 140));
+    toast('💬 נשלח לצ\'אט: ' + text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+  }
+  return true;
+}
 function startRec() {
   if (!SR || rec || !recWanted) return;
   rec = new SR(); rec.lang = 'he-IL'; rec.continuous = true; rec.interimResults = true;
@@ -2305,19 +2326,20 @@ function startRec() {
     for (let i = ev.resultIndex; i < ev.results.length; i++) {
       const r = ev.results[i], text = r[0].transcript.trim();
       if (!r.isFinal) { interim += text + ' '; continue; }
-      // לא "לשמוע" את הבוטים שמדברים מהרמקולים (לפי התוכן, לא לפי הזמן)
-      if (!text) continue;
-      if (isEcho(text)) { flashHeardMsg('🔈 זה נשמע כמו הבוט מהרמקול – לא נשלח. כדאי אוזניות'); continue; }
-      if (typeof adminPhrase === 'function' && adminPhrase(text) !== null) { api({ type: 'chat', text: text.slice(0, 140), voice: true }); heardText = ''; continue; }
-      if (!canTalkNow()) continue; // בזמן המשחק מקשיבים רק למשפט הסודי
-      api({ type: 'chat', text: text.slice(0, 140), voice: true });
-      heardText = '';
-      // מראים בבירור שהדיבור נשלח לצ'אט
-      flashHeardMsg('✅ נשלח לצ\'אט: ' + text.slice(0, 140));
-      toast('💬 נשלח לצ\'אט: ' + text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+      clearTimeout(stableTimer); lastInterim = '';
+      sendHeard(text);
     }
-    if (interim.trim() && canTalkNow() && !isEcho(interim)) {
-      heardText = '🎤 שומע: ' + interim.trim(); // לא קוטעים בוט באמצע משפט; הבא בתור מחכה שתסיים
+    interim = interim.trim();
+    if (interim && canTalkNow() && !isEcho(interim)) heardText = '🎤 שומע: ' + interim; // לא קוטעים בוט באמצע משפט
+    // הדפדפן לפעמים מחכה כמה שניות עד שהוא "סוגר" משפט. אם מה ששמענו לא השתנה שנייה – שולחים כבר עכשיו
+    if (interim && interim !== lastInterim) {
+      lastInterim = interim; clearTimeout(stableTimer);
+      stableTimer = setTimeout(() => {
+        if (lastInterim !== interim) return;
+        lastInterim = '';
+        if (sendHeard(interim, true)) { try { if (rec && rec.abort) rec.abort(); } catch (e) {} } // מתחילים משפט חדש מיד
+        refreshHeard();
+      }, 1000);
     }
     refreshHeard();
   };

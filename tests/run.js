@@ -278,7 +278,18 @@ test('הליצן: קליפת בננה מחליקה שחקן, גופה מזויפ
   sn = JSON.parse(g.snapshot()); const fb = sn.bodies.find(b => b.fake); ok(fb, 'אין גופה מזויפת');
   place(g, q => { q.players[b2].x = fb.x + 30; q.players[b2].y = fb.y; q.players[b2].alive = true; });
   g.act(b2, { type: 'report' }); tick(g, 1);
-  const v = g.view(b2); ok(v.phase === 'alert' && v.alert.fake, 'דיווח על גופה מזויפת לא כינס ישיבה עם הודעה');
+  const v = g.view(b2);
+  ok(v.phase === 'alert' && v.alert.body && !v.alert.bodyName, 'דיווח על גופה מזויפת צריך להיראות כמו דיווח רגיל: ' + JSON.stringify(v.alert));
+  ok(!JSON.stringify(v).includes('מזויפת'), 'השחקן שדיווח קיבל הודעה שהגופה מזויפת');
+  ok(JSON.stringify(g.view(a)).includes('נפלו בפח'), 'הליצן לא קיבל הודעה שהמתיחה הצליחה');
+  // בוט שהחליק על בננה כשהליצן לידו – זוכר אותו
+  const g2 = newGame({ role: 'הליצן', bots: 5, cfg: { jester: true } }); let bot;
+  place(g2.g, sn => { Object.values(sn.players).forEach(p => { p.killCd = 999; }); sn.players[g2.a].bananaCd = 0; sn.sabCd = 999; });
+  g2.g.act(g2.a, { type: 'banana' }); tick(g2.g, 1);
+  const bn2 = JSON.parse(g2.g.snapshot()).bananas[0];
+  place(g2.g, sn => { bot = crewBots(sn)[0].id; sn.players[bot].x = bn2.x + 5; sn.players[bot].y = bn2.y - 5; sn.players[bot].role = 'crew'; });
+  tick(g2.g, 2);
+  ok(JSON.parse(g2.g.snapshot()).players[bot].bot.sawBanana === g2.a, 'בוט שהחליק ליד הליצן לא חשד בו');
 });
 test('דלתות: כמה חדרים ביחד, ואחרי הפתיחה קירור של 20 שניות לכל חדר', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4 }); sec(g, 3);
