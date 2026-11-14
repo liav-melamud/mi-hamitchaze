@@ -34,7 +34,7 @@ const ROLES = {
   bodyguard: { name: 'שומר ראש', team: 'crew', desc: 'הגן (B) על שחקן קרוב ל-20 שניות: ניסיון חיסול שלו ייכשל, ותקבל התראה.' },
   saboteur: { name: 'מחבל', team: 'imp', desc: 'אתה לא מחסל – אתה מומחה חבלות: חבלה כל 15 שניות (במקום 30), למשברים שלך יש רק 30 שניות לתיקון (במקום 45), ונועל דלתות עם חצי זמן המתנה. עוזר לשותף שלך לנצח.' },
   poltergeist: { name: 'רדוף', team: 'imp', desc: 'אתה לא מחסל – אתה רוח רפאים ששולטת בתחנה: נעל דלת אחת (J) ל-8 שניות, כבה את האור בחדר שאתה נמצא בו (L) ל-15 שניות, וגרור גופה (Z) למקום מחבוא. לכלוא קורבן בחדר חשוך בשביל השותף שלך. נעילה וכיבוי אור עובדים גם אחרי שאתה מת.' },
-  jester: { name: 'הליצן', team: 'jester', desc: 'אתה לא צוות ולא מתחזה 🤡 המטרה שלך: שידיחו אותך בישיבה! אם מצביעים עליך ומדיחים אותך – אתה מנצח לבד והמשחק נגמר. תתנהג קצת חשוד, אבל לא יותר מדי. אין לך משימות. אם מחסלים אותך – הפסדת.' },
+  jester: { name: 'הליצן', team: 'jester', desc: 'אתה לא צוות ולא מתחזה 🤡 המטרה שלך: שידיחו אותך בישיבה – ואז אתה מנצח לבד! יכולות: זחילה בפתחי אוורור (V) כדי שיחשדו בך, קליפת בננה (K) שמי שדורך עליה מחליק, וגופה מזויפת (T) שמכנסת ישיבה. אין לך משימות. אם מחסלים אותך – הפסדת.' },
   spectator: { name: 'צופה', team: 'none', desc: 'הצטרפת באמצע משחק – צפה עד הסבב הבא.' },
 };
 
@@ -57,7 +57,8 @@ let phase = 'lobby';
 let hostId = null;
 let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, raceGoal: 10, jester: !!(opts && opts.jester) };
 let usedLines = new Set();
-let lastMistake = null; // ישיבה קודמת: מי דחף להדיח איש צוות
+let lastMistake = null;
+let jesterHint = false; // נמצאה גופה מזויפת במשחק: הבוטים יודעים שיש ליצן // ישיבה קודמת: מי דחף להדיח איש צוות
 let gusts = [], windT = 14;
 // חבלות: sab = משבר פעיל (חשמל/חמצן/כור), דלתות סגורות לפי חדר
 let sab = null, sabCd = 20, doorsUntil = {}, doorCool = {};
@@ -111,6 +112,8 @@ function closeDoors(roomId, noCool) {
 }
 let alertT = 0;
 let bodies = [];
+let bananas = []; // קליפות בננה של הליצן
+const BANANA_CD = 15, BANANA_LIFE = 60, BANANA_MAX = 3, SLIP_TIME = 0.9, FAKE_BODY_CD = 45;
 let meeting = null, eject = null, winner = null;
 let chat = [];
 let taskTotal = 0, taskDone = 0;
@@ -196,13 +199,13 @@ function startGame(by) {
   all.forEach(p => {
     p.alive = true; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
-    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0;
+    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null;
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
     } else p.tasks = [];
   });
-  bodies = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); lastMistake = null; gusts = []; windT = 10 + Math.random() * 8;
+  bodies = []; bananas = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); lastMistake = null; jesterHint = false; gusts = []; windT = 10 + Math.random() * 8;
   sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {};
   settings.reveal = false;
   spawnAround(all);
@@ -214,7 +217,7 @@ function backToLobby(by) {
   Object.values(players).filter(p => p.isBot).forEach(p => delete players[p.id]);
   list().forEach(p => { p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
   spawnAround(list());
-  phase = 'lobby'; bodies = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
+  phase = 'lobby'; bodies = []; bananas = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
   sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {};
 }
 
@@ -271,6 +274,7 @@ function completeTask(p, t) {
 
 function callMeeting(by, body) {
   phase = 'alert'; alertT = 3.2; // מסך הכרזה לפני הישיבה
+  const fake = !!(body && body.fake); // גופה מזויפת של הליצן
   let room = 'מסדרון', bodyRoom = null;
   if (body) {
     const br = MAP.roomAt(body.x, body.y);
@@ -280,8 +284,9 @@ function callMeeting(by, body) {
       room = 'מסדרון ליד ' + near.name;
     }
   }
-  by.stats.reports++; ev('meeting', body ? `📢 ${nm(by)} דיווח על הגופה של ${players[body.id] ? nm(players[body.id]) : 'שחקן'} (${room})` : `🚨 ${nm(by)} כינס ישיבת חירום`);
-  meeting = { by: by.id, body: body ? body.id : null, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {}, floor: Infinity };
+  by.stats.reports++; ev('meeting', fake ? `🎈 ${nm(by)} דיווח על גופה – אבל היא הייתה מזויפת!` : body ? `📢 ${nm(by)} דיווח על הגופה של ${players[body.id] ? nm(players[body.id]) : 'שחקן'} (${room})` : `🚨 ${nm(by)} כינס ישיבת חירום`);
+  if (fake) toastAll('🎈 הגופה הייתה מזויפת! מישהו עושה פה מתיחות… 🤡');
+  meeting = { by: by.id, body: body && !fake ? body.id : null, fake, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {}, floor: Infinity };
   // זיכרון של הבוטים: מי היה ליד הגופה, מי היה איתם (נקי), מי נראה בפתח אוורור, ומי טעה בסבב הקודם
   const addS = (id, n) => { if (players[id]) meeting.suspect[id] = (meeting.suspect[id] || 0) + n; };
   list().forEach(o => {
@@ -290,18 +295,24 @@ function callMeeting(by, body) {
     if (!o.alive || o.spectator) return;
     if (body) recallKill(o, body, bodyRoom);
     if (team(o) !== 'crew') return;
-    o.bot.nearBody.forEach(id => addS(id, 1.2));
+    if (!fake) o.bot.nearBody.forEach(id => addS(id, 1.2)); // גופה מזויפת = יש ליצן; לא מחשידים בגללה
     o.bot.alibi.forEach(id => addS(id, -2));
-    if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addS(o.bot.sawVent.id, 3);
+    if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addS(o.bot.sawVent.id, jesterHint ? 1 : 1.8);
   });
   if (lastMistake) lastMistake.by.forEach(id => addS(id, 0.8));
+  if (fake) jesterHint = true;
+  if (fake) { // שחקנים חכמים: גופה מזויפת אומרת שיש ליצן שרוצה שיצביעו עליו – זהירים יותר עם הצבעות
+    meeting.skipTalk += 2;
+    const w = shuffle(list().filter(o => o.isBot && o.alive && !o.spectator && team(o) === 'crew'))[0];
+    if (w) meeting.queue.push({ id: w.id, at: meeting.t - 2, silent: true, text: fresh(['גופה מזויפת? יש פה ליצן! הוא רוצה שנצביע עליו – לא מצביעים בלי ראיה אמיתית', 'זה הליצן. אם נדיח אותו הוא ינצח, בואו נדלג']) });
+  }
   chat = [];
-  bodies = [];
+  bodies = []; bananas = [];
   // ישיבה פותחת את כל הדלתות, ולכל חדר שנפתח מתחיל זמן קירור
   for (const rid of Object.keys(doorsUntil)) doorCool[rid] = Math.max(doorCool[rid] || 0, now() + DOOR_COOL);
   doorsUntil = {}; hauntDoors = []; darkRooms = {}; list().forEach(q => { q.drag = null; });
   list().forEach(p => {
-    p.work = null; p.shapeAs = null; p.inVent = null; p.cam = false; p.sabWork = null;
+    p.work = null; p.shapeAs = null; p.inVent = null; p.cam = false; p.sabWork = null; p.slip = null;
     if (p.bot) {
       const T = settings.meetingTime;
       const pe = p.bot.persona;
@@ -534,6 +545,24 @@ function act(p, a) {
       checkWin();
       break;
     }
+    case 'banana': { // הליצן משאיר קליפת בננה
+      if (phase !== 'play' || !p.alive || p.role !== 'jester' || p.inVent !== null || (p.bananaCd || 0) > 0) return;
+      const mine = bananas.filter(b => b.by === p.id);
+      if (mine.length >= BANANA_MAX) bananas.splice(bananas.indexOf(mine[0]), 1);
+      bananas.push({ x: p.x, y: p.y + 10, by: p.id, until: t + BANANA_LIFE });
+      p.bananaCd = BANANA_CD; toast(p, '🍌 השארת קליפת בננה. מי שדורך עליה – מחליק!');
+      break;
+    }
+    case 'fakeBody': { // הליצן מניח גופה מזויפת בצבע של שחקן אחר
+      if (phase !== 'play' || !p.alive || p.role !== 'jester' || p.inVent !== null || (p.fakeCd || 0) > 0 || settings.mode === 2) return;
+      const others = list().filter(o => o.id !== p.id && !o.spectator);
+      if (!others.length) return;
+      bodies = bodies.filter(b => !b.fake);
+      bodies.push({ id: 'fake' + Math.floor(Math.random() * 1e9), fake: true, x: p.x + p.dir * 30, y: p.y + 6, color: pick(others).color, decayAt: 0, t });
+      p.fakeCd = FAKE_BODY_CD; toast(p, '🎈 הנחת גופה מזויפת. מי שידווח עליה יכנס ישיבה…');
+      ev('fake', `🎈 ${nm(p)} הניח גופה מזויפת`);
+      break;
+    }
     case 'report': {
       if (phase !== 'play' || !p.alive || settings.mode === 2) return;
       const b = nearest(p, bodies, REPORT_RANGE);
@@ -541,7 +570,7 @@ function act(p, a) {
       break;
     }
     case 'vent': {
-      if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist'].includes(p.role)) return;
+      if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist', 'jester'].includes(p.role)) return;
       if (p.inVent !== null) { p.inVent = null; witnessVent(p); return; } // יציאה מהפתח
       const v = nearest(p, MAP.VENTS, USE_RANGE);
       if (!v) return;
@@ -681,7 +710,11 @@ function botGoal(p) {
     // כמו שחקן אמיתי: בדרך כלל המשימה הקרובה, לפעמים אחרת
     const byDist = todo.slice().sort((x, y) => dist(p, MAP.TASKS[x.i]) - dist(p, MAP.TASKS[y.i]));
     const tk = Math.random() < (settings.botLevel === 1 ? 0.4 : 0.75) ? byDist[0] : pick(todo); target = { ...MAP.TASKS[tk.i], ref: tk };
-  } else if (team(p) !== 'crew' && p.alive && MAP.TASKS.length && Math.random() < 0.6) {
+  } else if (p.role === 'jester' && p.alive && MAP.VENTS.length && Math.random() < 0.3) {
+    const v = pick(MAP.VENTS), vr = MAP.roomAt(v.x, v.y);
+    if (vr) target = { x: v.x, y: v.y, room: vr.id, fake: true };
+  }
+  if (target) { /* כבר נבחר יעד */ } else if (team(p) !== 'crew' && p.alive && MAP.TASKS.length && Math.random() < 0.6) {
     const tk = MAP.TASKS[Math.floor(Math.random() * MAP.TASKS.length)];
     target = { x: tk.x, y: tk.y, room: tk.room, fake: true };
   } else {
@@ -774,6 +807,13 @@ function botTick(p, dt) {
       const myRoom = MAP.roomAt(p.x, p.y);
       if (p.darkCd <= 0 && myRoom && Math.random() < 0.005 && crewNear(400).some(o => { const r = MAP.roomAt(o.x, o.y); return r && r.id === myRoom.id; })) act(p, { type: 'hauntLight' });
       if (!p.drag && p.dragCd <= 0 && bodies.some(bd => dist(bd, p) < 70) && !crewNear(450).length && Math.random() < 0.05) act(p, { type: 'drag' });
+    }
+    // בוט ליצן: קופץ לפתח כשמישהו רואה (שיחשדו בו), זורק בננות ליד אנשים, ושם גופה מזויפת כשאף אחד לא רואה
+    if (p.role === 'jester' && p.inVent === null && !b.escape) {
+      const others = r => list().filter(o => o.id !== p.id && o.alive && !o.spectator && dist(o, p) < r);
+      if (others(330).length && MAP.VENTS.some(v => dist(v, p) < USE_RANGE) && Math.random() < 0.012) { act(p, { type: 'vent' }); if (p.inVent !== null) { b.escape = { t: 1 + Math.random() * 1.5 }; b.plan = []; return; } }
+      if (p.bananaCd <= 0 && others(400).length && Math.random() < 0.004) act(p, { type: 'banana' });
+      if (p.fakeCd <= 0 && !others(450).length && MAP.roomAt(p.x, p.y) && Math.random() < 0.004) act(p, { type: 'fakeBody' });
     }
     if (p.role === 'bodyguard' && p.guardCd <= 0 && Math.random() < 0.008 && list().some(o => o.id !== p.id && o.alive && dist(o, p) < 150)) act(p, { type: 'guard' });
     if (p.role === 'photographer' && p.photoCd <= 0 && Math.random() < 0.012 && list().some(o => o.id !== p.id && o.alive && dist(o, p) < 300)) act(p, { type: 'photo' });
@@ -1003,8 +1043,9 @@ function botLine0(p) {
   if (team(p) === 'crew' && b.sawShift && alive(b.sawShift)) return fill(fresh(['ראיתי את {n} משנה צורה! הוא מתחזה!', '{n} התחפש למישהו אחר מול העיניים שלי! תצביעו עליו', 'אני בטוח ב-100%: {n} הוא משנה צורה']), { n: name(b.sawShift) });
   if (team(p) === 'crew' && b.sawKill && alive(b.sawKill)) return fill(fresh(['ראיתי את {n} מחסל את {b}! תצביעו עליו!', '{n} הרג את {b} מולי!', 'זה {n}! ראיתי הכל']), { n: name(b.sawKill), b: name(b.sawVictim) });
   if (team(p) === 'crew' && b.sawVent && alive(b.sawVent.id) && !b.saidVent) { b.saidVent = true; return fill(fresh(['ראיתי את {n} ליד פתח אוורור ב{r}! רק מתחזים משתמשים בפתחים', '{n} יצא לי מפתח אוורור ב{r}, אני בטוח', 'ראיתי את {n} נכנס לפתח ב{r}. {n}, אתה מהנדס?']), { n: name(b.sawVent.id), r: b.sawVent.room }); }
-  if (meeting.body && b.nearBody && b.nearBody.length && !b.saidNear) {
+  if ((meeting.body || meeting.fake) && b.nearBody && b.nearBody.length && !b.saidNear) {
     const id = pick(b.nearBody.filter(x => !(team(p) === 'imp' && team(players[x]) === 'imp')));
+    if (id && meeting.fake) { b.saidNear = true; return fill(fresh(['מי שם שם גופה מזויפת? ראיתי את {n} ב{r} רגע לפני', '{n} היה ב{r} בדיוק איפה שהייתה הגופה המזויפת. חשוד', 'גופה מזויפת? זה מישהו שרוצה שנצביע עליו… {n}, היית שם']), { n: name(id), r: meeting.bodyRoom || meeting.room }); }
     if (id) { b.saidNear = true; return fill(fresh(['ראיתי את {n} ב{r} ממש לפני שמצאו את הגופה', '{n} היה ב{r} בדיוק בזמן הזה. {n}, מה עשית שם?', 'רגע, {n} יצא מ{r} לא מזמן']), { n: name(id), r: meeting.bodyRoom }); }
   }
   if (team(p) === 'crew' && meeting.body && b.alibi && b.alibi.length && !b.saidAlibi && Math.random() < 0.7) { b.saidAlibi = true; return fill(fresh(['{n} היה איתי ב{m} כשזה קרה, הוא נקי', 'אני יכול לאשר את {n}, היינו ביחד ב{m}', '{n} לא יכול להיות, הוא היה לידי']), { n: name(pick(b.alibi)), m: myRoom }); }
@@ -1055,7 +1096,7 @@ function botMeeting(p) {
     let vote = null;
     if (team(p) === 'crew' && b.sawShift && ok(b.sawShift)) vote = b.sawShift;
     else if (team(p) === 'crew' && b.sawKill && ok(b.sawKill)) vote = b.sawKill;
-    else if (team(p) === 'crew' && b.sawVent && ok(b.sawVent.id) && Math.random() < 0.85) vote = b.sawVent.id;
+    else if (team(p) === 'crew' && b.sawVent && ok(b.sawVent.id) && Math.random() < (jesterHint ? 0.2 : 0.4)) vote = b.sawVent.id;
     else {
       const score = {};
       const lf = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.4 : 1, pe = b.persona;
@@ -1073,6 +1114,7 @@ function botMeeting(p) {
       else if (top && top[1] >= 2 && Math.random() < 0.7) vote = top[0];
       else if (top && team(p) === 'imp' && Math.random() < 0.6) vote = top[0];
       else if (meeting.skipTalk >= 2 || Math.random() < (b.persona === 'aggressive' ? 0.15 : b.persona === 'quiet' ? 0.7 : 0.5)) vote = 'skip';
+      else if (jesterHint && team(p) === 'crew') vote = 'skip'; // יש ליצן – לא מצביעים בניחוש
       else { const opts = list().filter(o => ok(o.id) && !o.spectator); vote = opts.length ? pick(opts).id : 'skip'; }
     }
     meeting.votes[p.id] = vote || 'skip';
@@ -1091,6 +1133,7 @@ function tick() {
     if (settings.mode === 2) { checkWin(); if (phase === 'play' && now() > raceChaosAt) { raceChaosAt = now() + 28 + Math.random() * 14; closeDoors(pick(Object.keys(MAP.ROOMS))); } }
     sabCd = Math.max(0, sabCd - dt);
     bodies = bodies.filter(b => !b.decayAt || b.decayAt > t);
+    if (bananas.length) bananas = bananas.filter(b => b.until > t);
     for (const rid of Object.keys(doorsUntil)) if (doorsUntil[rid] <= t) delete doorsUntil[rid];
     hauntDoors = hauntDoors.filter(d => d.until > t);
     for (const rid of Object.keys(darkRooms)) if (darkRooms[rid] <= t) delete darkRooms[rid];
@@ -1120,16 +1163,28 @@ function tick() {
       p.guardCd = Math.max(0, (p.guardCd || 0) - dt);
       p.photoCd = Math.max(0, (p.photoCd || 0) - dt); p.investCd = Math.max(0, (p.investCd || 0) - dt); p.vanishCd = Math.max(0, (p.vanishCd || 0) - dt);
       if (p.vanishUntil && t > p.vanishUntil) { p.vanishUntil = 0; p.vanishCd = 25; }
+      if (p.role === 'jester') { p.bananaCd = Math.max(0, (p.bananaCd || 0) - dt); p.fakeCd = Math.max(0, (p.fakeCd || 0) - dt); }
       if (p.role === 'poltergeist') { p.hauntDoorCd = Math.max(0, (p.hauntDoorCd || 0) - dt); p.darkCd = Math.max(0, (p.darkCd || 0) - dt); p.dragCd = Math.max(0, (p.dragCd || 0) - (p.drag ? 0 : dt)); }
       p.shiftCd = Math.max(0, p.shiftCd - (p.shapeAs ? 0 : dt));
       p.gaCd = Math.max(0, p.gaCd - dt);
       if (p.shapeAs && (t > p.shapeUntil || !players[p.shapeAs])) { p.shapeAs = null; p.shiftCd = SHIFT_CD; }
 
       let { dx, dy } = p.input;
+      // דרך על קליפת בננה? מחליק בלי שליטה לשנייה
+      if (p.alive && !p.spectator && p.inVent === null && !p.slip && bananas.length) {
+        const bn = bananas.find(b => b.by !== p.id && dist(b, p) < 28);
+        if (bn) {
+          bananas.splice(bananas.indexOf(bn), 1);
+          const il = Math.hypot(dx, dy);
+          p.slip = il > 0.1 ? { dx: dx / il, dy: dy / il, until: t + SLIP_TIME } : { dx: p.dir || 1, dy: 0, until: t + SLIP_TIME };
+          toast(p, '🍌 החלקת על קליפת בננה!'); if (players[bn.by]) toast(players[bn.by], '🍌 ' + p.name + ' החליק על הבננה שלך!');
+        }
+      }
+      if (p.slip) { if (t < p.slip.until && p.alive) { dx = p.slip.dx; dy = p.slip.dy; } else p.slip = null; }
       const len = p.inVent !== null ? 0 : Math.hypot(dx, dy);
       if (len > 0) {
         dx /= len; dy /= len;
-        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1); // גרירת גופה מאטה
+        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1); // גרירת גופה מאטה, החלקה מאיצה
         if (!p.alive || p.spectator) {
           p.x = Math.max(0, Math.min(MAP.WORLD.w, p.x + dx * step));
           p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
@@ -1218,6 +1273,7 @@ function viewFor(v) {
       scan: p.work && MAP.TASKS[p.work.ref.i].kind === 'scan' ? 1 : 0, vent: p.inVent !== null || p.vanishUntil > t ? 1 : 0,
     };
     if (p.shieldUntil > t) o.shield = 1;
+    if (p.slip) o.slip = 1;
     if (showRoles && p.role && (seeAll || p.id === v.id || (team(v) === 'imp' && team(p) === 'imp'))) {
       o.role = ROLES[p.role].name; o.team = team(p);
       if (p.shapeAs) o.realName = p.name;
@@ -1234,7 +1290,7 @@ function viewFor(v) {
     sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial' }[sab.type], i: v.sabWork.i } : null,
     sabCd: Math.ceil(sabCd),
     guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t,
-    hauntDoorCd: Math.ceil(v.hauntDoorCd || 0), darkCd: Math.ceil(v.darkCd || 0), dragCd: Math.ceil(v.dragCd || 0), dragging: !!v.drag,
+    bananaCd: Math.ceil(v.bananaCd || 0), fakeCd: Math.ceil(v.fakeCd || 0), hauntDoorCd: Math.ceil(v.hauntDoorCd || 0), darkCd: Math.ceil(v.darkCd || 0), dragCd: Math.ceil(v.dragCd || 0), dragging: !!v.drag,
     photos: (v.photos || []).map(ph => ({ ago: Math.round(t - ph.t), room: ph.room, names: ph.names, bodies: ph.bodies })), notes: (v.notes || []).slice(-6),
     color: v.color,
   };
@@ -1249,6 +1305,7 @@ function viewFor(v) {
     sab: sab ? { type: sab.type, t: Math.ceil(sab.t), fixed: sab.fixed.slice() } : null,
     doors: Object.keys(doorsUntil).filter(r => doorsUntil[r] > now()),
     hauntDoors: hauntDoors.filter(d => d.until > t).map(d => ({ x: d.x, y: d.y, w: d.w, h: d.h })),
+    bananas: bananas.map(b => ({ x: Math.round(b.x), y: Math.round(b.y) })),
     darkRooms: Object.keys(darkRooms).filter(r => darkRooms[r] > t),
     doorCool: Object.fromEntries(Object.keys(doorCool).filter(r => doorCool[r] > now() && !(doorsUntil[r] > now())).map(r => [r, Math.ceil(doorCool[r] - now())])),
     toast: v.toast.splice(0),
@@ -1269,7 +1326,7 @@ function viewFor(v) {
   if (phase === 'alert' && meeting) {
     const by = players[meeting.by], body = meeting.body && players[meeting.body];
     out.alert = { name: by ? by.name : '', color: by ? COLORS[by.color].c : '#fff', hat: by ? by.hat : 0,
-      body: !!body, bodyName: body ? body.name : null, bodyColor: body ? COLORS[body.color].c : null, room: meeting.room };
+      body: !!body || !!meeting.fake, fake: !!meeting.fake, bodyName: body ? body.name : null, bodyColor: body ? COLORS[body.color].c : null, room: meeting.room };
   }
   if (eject) out.eject = eject;
   if (winner) out.winner = winner;
@@ -1301,7 +1358,7 @@ function viewFor(v) {
   function setHost(id) { hostId = id; }
   // שמירה ושחזור של מצב המשחק (כדי שמארח שנפל יוכל להמשיך מאותה נקודה)
   function snapshot() {
-    return JSON.stringify({ v: 1, raceEndAt, saved: now(), players, phase, hostId, settings, bodies, meeting, eject, winner, chat, taskTotal, taskDone, sab, doorsUntil, doorCool, hauntDoors, darkRooms, sabCd, alertT, gusts, usedLines: [...usedLines], lastMistake });
+    return JSON.stringify({ v: 1, raceEndAt, saved: now(), players, phase, hostId, settings, bodies, meeting, eject, winner, chat, taskTotal, taskDone, sab, doorsUntil, doorCool, hauntDoors, darkRooms, sabCd, alertT, gusts, usedLines: [...usedLines], lastMistake, bananas, jesterHint });
   }
   function restore(json) {
     const o = JSON.parse(json);
@@ -1309,7 +1366,7 @@ function viewFor(v) {
     MAP = MAPS[settings.map] || MAPS.big; raceEndAt = o.raceEndAt || 0;
     bodies = o.bodies || []; meeting = o.meeting || null; eject = o.eject || null; winner = o.winner || null; chat = o.chat || [];
     taskTotal = o.taskTotal || 0; taskDone = o.taskDone || 0; sab = o.sab || null; doorsUntil = o.doorsUntil || {}; doorCool = o.doorCool || {}; hauntDoors = o.hauntDoors || []; darkRooms = o.darkRooms || {};
-    sabCd = o.sabCd || 0; alertT = o.alertT || 0; gusts = o.gusts || []; usedLines = new Set(o.usedLines || []); lastMistake = o.lastMistake || null;
+    sabCd = o.sabCd || 0; alertT = o.alertT || 0; gusts = o.gusts || []; usedLines = new Set(o.usedLines || []); lastMistake = o.lastMistake || null; bananas = o.bananas || []; jesterHint = !!o.jesterHint;
     if (meeting && (meeting.floor === null || meeting.floor === undefined)) meeting.floor = Infinity;
     for (const p of Object.values(players)) { p.conn = p.isBot; p.lastSeen = now(); p.input = { dx: 0, dy: 0 }; p.talking = false; }
     last = now();

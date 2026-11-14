@@ -252,6 +252,34 @@ test('הליצן: אם מדלגים עליו המשחק ממשיך, והוא נ�
     ps.forEach(p => { if (p.id === a || p.id === imp.id) return; if (keep-- > 0) { p.alive = true; p.role = 'crew'; } else p.alive = false; }); });
   tick(g, 2); ok(g.view(a).phase === 'play', 'המתחזים ניצחו מוקדם מדי – הליצן לא נספר');
 });
+test('הליצן: קליפת בננה מחליקה שחקן, גופה מזויפת מכנסת ישיבה, ואפשר לזחול בפתחים', () => {
+  const { g, a, ids } = newGame({ role: 'הליצן', bots: 5, humans: 2, cfg: { jester: true } });
+  const b2 = ids[1];
+  // בלי לחכות: מאפסים את זמני ההמתנה, ואף מתחזה לא מחסל באמצע הבדיקה
+  place(g, sn => { Object.values(sn.players).forEach(p => { p.killCd = 999; }); sn.players[a].bananaCd = 0; sn.players[a].fakeCd = 0; sn.sabCd = 999; });
+  // פתח אוורור
+  const V = MAP.VENTS[0];
+  place(g, sn => { sn.players[a].x = V.x; sn.players[a].y = V.y; });
+  g.act(a, { type: 'vent' }); ok(g.view(a).me.inVent !== null, 'הליצן לא נכנס לפתח'); g.act(a, { type: 'vent' });
+  // בננה
+  g.act(a, { type: 'banana' }); tick(g, 1);
+  let sn = JSON.parse(g.snapshot()); ok(sn.bananas.length === 1, 'אין בננה');
+  ok(g.view(a).me.bananaCd > 0, 'אין זמן המתנה לבננה');
+  g.act(a, { type: 'banana' }); tick(g, 1); ok(JSON.parse(g.snapshot()).bananas.length === 1, 'אפשר לזרוק בננה בלי לחכות');
+  const bn = sn.bananas[0];
+  place(g, q => { q.players[b2].x = bn.x + 10; q.players[b2].y = bn.y - 10; });
+  for (let i = 0; i < 20; i++) { g.act(b2, { type: 'input', dx: -1, dy: 0 }); tick(g, 1); if (JSON.parse(g.snapshot()).players[b2].slip) break; }
+  sn = JSON.parse(g.snapshot()); ok(sn.players[b2].slip && sn.bananas.length === 0, `השחקן לא החליק על הבננה: alive=${sn.players[b2].alive} pos=${Math.round(sn.players[b2].x)},${Math.round(sn.players[b2].y)} bn=${JSON.stringify(sn.bananas)} phase=${sn.phase}`);
+  const sl = sn.players[b2].slip; g.act(b2, { type: 'input', dx: -sl.dx, dy: -sl.dy }); tick(g, 3);
+  ok(JSON.parse(g.snapshot()).players[b2].slip.dx === sl.dx, 'בזמן החלקה אפשר לשלוט בכיוון');
+  g.act(b2, { type: 'input', dx: 0, dy: 0 }); sec(g, 1.2);
+  // גופה מזויפת
+  g.act(a, { type: 'fakeBody' }); tick(g, 1);
+  sn = JSON.parse(g.snapshot()); const fb = sn.bodies.find(b => b.fake); ok(fb, 'אין גופה מזויפת');
+  place(g, q => { q.players[b2].x = fb.x + 30; q.players[b2].y = fb.y; q.players[b2].alive = true; });
+  g.act(b2, { type: 'report' }); tick(g, 1);
+  const v = g.view(b2); ok(v.phase === 'alert' && v.alert.fake, 'דיווח על גופה מזויפת לא כינס ישיבה עם הודעה');
+});
 test('דלתות: כמה חדרים ביחד, ואחרי הפתיחה קירור של 20 שניות לכל חדר', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4 }); sec(g, 3);
   ['F', 'M', 'U'].forEach(r => g.act(a, { type: 'sab', kind: 'door', room: r })); tick(g, 3);
