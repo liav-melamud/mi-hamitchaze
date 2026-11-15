@@ -296,7 +296,9 @@ function callMeeting(by, body) {
     if (body) recallKill(o, body, bodyRoom);
     if (team(o) !== 'crew') return;
     o.bot.nearBody.forEach(id => addS(id, 1.2));
-    if (o.bot.sawBanana && players[o.bot.sawBanana] && players[o.bot.sawBanana].alive) addS(o.bot.sawBanana, 1);
+    // רק הליצן זורק בננות: מי שהחליק יודע שיש ליצן, ואם ראה מי זרק – יודע שאסור להדיח אותו
+    if (o.bot.knowsJester) jesterHint = true;
+    if (o.bot.jesterId && players[o.bot.jesterId] && players[o.bot.jesterId].alive) addS(o.bot.jesterId, -6);
     o.bot.alibi.forEach(id => addS(id, -2));
     if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addS(o.bot.sawVent.id, jesterHint ? 1 : 1.8);
   });
@@ -323,7 +325,7 @@ function callMeeting(by, body) {
       p.bot.chat3At = pe === 'chatty' ? T - (22 + Math.random() * 10) : -999;
       p.bot.voteAt = T - (Math.min(T - 5, (pe === 'aggressive' ? 10 : 16) + Math.random() * 18));
       // מי שראה משהו חשוב מדבר מוקדם, גם אם הוא שקט מטבעו
-      const b0 = p.bot, ev0 = team(p) === 'crew' && p.alive && (b0.sawKill || b0.sawShift || b0.sawVent || b0.sawBanana || (b0.nearBody && b0.nearBody.length));
+      const b0 = p.bot, ev0 = team(p) === 'crew' && p.alive && (b0.sawKill || b0.sawShift || b0.sawVent || b0.knowsJester || (b0.nearBody && b0.nearBody.length));
       if (ev0) b0.chatAt = T - (1.5 + Math.random() * 3);
       p.bot.replies = 0; p.bot.replyAt = -999; p.bot.shared = false; p.bot.saidVent = p.bot.saidNear = p.bot.saidAlibi = p.bot.saidMistake = p.bot.saidBanana = false;
     }
@@ -350,7 +352,6 @@ function resolveMeeting() {
     ? { id: ej.id, name: ej.name, color: ej.color, role: settings.confirm || ej.role === 'jester' ? ROLES[ej.role].name : null, team: settings.confirm || ej.role === 'jester' ? team(ej) : null, jester: ej.role === 'jester', tally, t: EJECT_TIME }
     : { id: null, tally, t: EJECT_TIME, tie };
   list().forEach(p => { if (p.bot && ej && (p.bot.sawKill === ej.id || p.bot.sawShift === ej.id)) p.bot.sawKill = p.bot.sawShift = null; });
-  list().forEach(p => { if (p.bot) p.bot.sawBanana = null; });
   list().forEach(p => { if (p.bot && p.bot.sawVent && (!players[p.bot.sawVent.id] || (ej && p.bot.sawVent.id === ej.id))) p.bot.sawVent = null; });
   lastMistake = ej && settings.confirm && team(ej) === 'crew'
     ? { name: bare(ej.name), by: voters.filter(v => meeting.votes[v.id] === ej.id && v.id !== ej.id).map(v => v.id) } : null;
@@ -1030,7 +1031,7 @@ const PERSONA_LINES = {
 function botLine(p) {
   // ראיה חשובה קודמת לאופי: גם בוט שקט מספר מה ראה
   const b = p.bot, has = id => id && players[id] && players[id].alive;
-  if ((has(b.sawKill) || has(b.sawShift) || (b.sawVent && has(b.sawVent.id) && !b.saidVent) || (has(b.sawBanana) && !b.saidBanana) || (b.nearBody && b.nearBody.length && !b.saidNear)) && team(p) === 'crew') return botLine0(p);
+  if ((has(b.sawKill) || has(b.sawShift) || (b.sawVent && has(b.sawVent.id) && !b.saidVent) || (b.knowsJester && !b.saidBanana) || (b.nearBody && b.nearBody.length && !b.saidNear)) && team(p) === 'crew') return botLine0(p);
   const pl = PERSONA_LINES[p.bot.persona];
   if (pl && Math.random() < 0.35) return fresh(pl);
   return botLine0(p);
@@ -1044,7 +1045,8 @@ function botLine0(p) {
   if (team(p) === 'crew' && b.sawShift && alive(b.sawShift)) return fill(fresh(['ראיתי את {n} משנה צורה! הוא מתחזה!', '{n} התחפש למישהו אחר מול העיניים שלי! תצביעו עליו', 'אני בטוח ב-100%: {n} הוא משנה צורה']), { n: name(b.sawShift) });
   if (team(p) === 'crew' && b.sawKill && alive(b.sawKill)) return fill(fresh(['ראיתי את {n} מחסל את {b}! תצביעו עליו!', '{n} הרג את {b} מולי!', 'זה {n}! ראיתי הכל']), { n: name(b.sawKill), b: name(b.sawVictim) });
   if (team(p) === 'crew' && b.sawVent && alive(b.sawVent.id) && !b.saidVent) { b.saidVent = true; return fill(fresh(['ראיתי את {n} ליד פתח אוורור ב{r}! רק מתחזים משתמשים בפתחים', '{n} יצא לי מפתח אוורור ב{r}, אני בטוח', 'ראיתי את {n} נכנס לפתח ב{r}. {n}, אתה מהנדס?']), { n: name(b.sawVent.id), r: b.sawVent.room }); }
-  if (b.sawBanana && alive(b.sawBanana) && !b.saidBanana) { b.saidBanana = true; return fill(fresh(['{n} השאיר לי קליפת בננה והחלקתי! מי עושה דברים כאלה? חשוד', 'החלקתי על בננה ב{r}, ורק {n} היה שם. מה אתה מסתיר?', 'מישהו פה זורק בננות… ראיתי את {n} ממש לידה']), { n: name(b.sawBanana), r: myRoom }); }
+  if (b.jesterId && alive(b.jesterId) && !b.saidBanana) { b.saidBanana = true; return fill(fresh(['החלקתי על בננה ו{n} היה שם. רק הליצן זורק בננות! אל תצביעו עליו, זה בדיוק מה שהוא רוצה', '{n} הוא הליצן! הוא זרק עליי בננה ב{r}. לא מדיחים אותו', 'שימו לב: {n} זרק בננה, אז הוא הליצן. מי שמצביע עליו עוזר לו לנצח']), { n: name(b.jesterId), r: myRoom }); }
+  if (b.knowsJester && !b.saidBanana) { b.saidBanana = true; return fill(fresh(['החלקתי על קליפת בננה ב{r}! יש פה ליצן, תיזהרו במי מצביעים', 'מישהו זרק בננה ב{r}. מתחזים לא עושים את זה, זה הליצן. לא מצביעים סתם', 'יש ליצן במשחק, החלקתי על הבננה שלו. רק מי שבטוחים בו']), { r: myRoom }); }
   if ((meeting.body || meeting.fake) && b.nearBody && b.nearBody.length && !b.saidNear) {
     const id = pick(b.nearBody.filter(x => !(team(p) === 'imp' && team(players[x]) === 'imp')));
     if (id) { b.saidNear = true; return fill(fresh(['ראיתי את {n} ב{r} ממש לפני שמצאו את הגופה', '{n} היה ב{r} בדיוק בזמן הזה. {n}, מה עשית שם?', 'רגע, {n} יצא מ{r} לא מזמן']), { n: name(id), r: meeting.bodyRoom }); }
@@ -1094,11 +1096,10 @@ function botMeeting(p) {
     meeting.queue.push({ id: p.id, silent: true, at: T, text: fill(fresh(['למה אני? הייתי ב{r}', 'זה לא אני! תבדקו את {m}', 'עשיתי משימות, תשאלו את {m}', 'אני? באמת? הייתי ב{r} כל הזמן', 'אם תדיחו אותי תפסידו 😤']), { r: b.lastRoom || 'חדר האוכל', m }) });
   }
   if (T < b.voteAt && !meeting.votes[p.id]) {
-    const ok = id => players[id] && players[id].alive && id !== p.id && !(team(p) === 'imp' && team(players[id]) === 'imp');
+    const ok = id => players[id] && players[id].alive && id !== p.id && !(team(p) === 'imp' && team(players[id]) === 'imp') && !(team(p) === 'crew' && id === b.jesterId);
     let vote = null;
     if (team(p) === 'crew' && b.sawShift && ok(b.sawShift)) vote = b.sawShift;
     else if (team(p) === 'crew' && b.sawKill && ok(b.sawKill)) vote = b.sawKill;
-    else if (team(p) === 'crew' && b.sawBanana && ok(b.sawBanana) && Math.random() < (jesterHint ? 0.15 : 0.35)) vote = b.sawBanana;
     else if (team(p) === 'crew' && b.sawVent && ok(b.sawVent.id) && Math.random() < (jesterHint ? 0.2 : 0.4)) vote = b.sawVent.id;
     else {
       const score = {};
@@ -1181,13 +1182,14 @@ function tick() {
           const il = Math.hypot(dx, dy);
           p.slip = il > 0.1 ? { dx: dx / il, dy: dy / il, until: t + SLIP_TIME } : { dx: p.dir || 1, dy: 0, until: t + SLIP_TIME };
           toast(p, '🍌 החלקת על קליפת בננה!'); if (players[bn.by]) toast(players[bn.by], '🍌 ' + p.name + ' החליק על הבננה שלך!');
-          // בוט שהחליק נזכר מי הסתובב פה – אם ראה את זורק הבננה, הוא חושד בו
+          // רק הליצן זורק בננות: בוט שהחליק יודע שיש ליצן, ואם ראה מי זרק – יודע מי הליצן ולא מדיח אותו
           const ow = players[bn.by];
+          if (p.bot) p.bot.knowsJester = true;
           if (p.bot && ow && ow.alive) {
             const here = MAP.roomAt(bn.x, bn.y);
             const sawNow = ow.inVent === null && dist(ow, p) < sightR();
             const sawBefore = (p.bot.hist || []).some(e => e.id === ow.id && t - e.t < 25 && here && e.room === here.name);
-            if (sawNow || sawBefore) p.bot.sawBanana = ow.id;
+            if (sawNow || sawBefore) p.bot.jesterId = ow.id;
           }
         }
       }

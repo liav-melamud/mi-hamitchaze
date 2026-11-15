@@ -289,7 +289,15 @@ test('הליצן: קליפת בננה מחליקה שחקן, גופה מזויפ
   const bn2 = JSON.parse(g2.g.snapshot()).bananas[0];
   place(g2.g, sn => { bot = crewBots(sn)[0].id; sn.players[bot].x = bn2.x + 5; sn.players[bot].y = bn2.y - 5; sn.players[bot].role = 'crew'; });
   tick(g2.g, 2);
-  ok(JSON.parse(g2.g.snapshot()).players[bot].bot.sawBanana === g2.a, 'בוט שהחליק ליד הליצן לא חשד בו');
+  const bb = JSON.parse(g2.g.snapshot()).players[bot].bot;
+  ok(bb.knowsJester && bb.jesterId === g2.a, 'בוט שהחליק ליד הליצן לא הבין שהוא הליצן');
+  // בישיבה: הוא מזהיר את כולם, ואף בוט צוות לא מצביע על הליצן
+  callMeeting(g2.g, g2.a);
+  let mv = g2.g.view(g2.a); for (let i = 0; i < 200 && mv.phase === 'meeting'; i++) { sec(g2.g, 1); mv = g2.g.view(g2.a); }
+  const sn2 = JSON.parse(g2.g.snapshot());
+  ok(sn2.chat.some(c => c.from === bot && /ליצן/.test(c.text)), 'הבוט לא אמר שיש ליצן');
+  ok(sn2.jesterHint, 'אחרי החלקה הבוטים צריכים לדעת שיש ליצן');
+  ok(!sn2.winner || sn2.winner.team !== 'jester', 'הבוטים הדיחו את הליצן למרות שידעו שהוא הליצן');
 });
 test('דלתות: כמה חדרים ביחד, ואחרי הפתיחה קירור של 20 שניות לכל חדר', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4 }); sec(g, 3);
