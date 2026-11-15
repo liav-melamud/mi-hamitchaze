@@ -381,7 +381,10 @@ function resolveMeeting() {
       return { id: v.id, tid: tp ? tp.id : null, hat: v.hat || 0, w: v.role === 'judge' ? 2 : 1, n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
     });
   }
-  if (eject.votes) eject.t = EJECT_TIME + 2; // יותר זמן לסצנה של מי הצביע על מי
+  // לאנימציה: הצבע והכובע של המודח, כמה מתחזים נשארו, וזמן לסצנת ההצבעות + הזריקה לחלל
+  if (ej) { eject.c = COLORS[ej.color].c; eject.hat = ej.hat || 0; }
+  if (settings.confirm && !(ej && ej.role === 'jester')) eject.impLeft = list().filter(o => o.alive && !o.spectator && team(o) === 'imp').length;
+  eject.t = (eject.votes ? 0.4 + voters.length * 0.3 + 1 : 0) + 6;
   meeting = null;
   phase = 'eject';
 }
