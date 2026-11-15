@@ -299,6 +299,14 @@ test('הליצן: קליפת בננה מחליקה שחקן, גופה מזויפ
   ok(sn2.jesterHint, 'אחרי החלקה הבוטים צריכים לדעת שיש ליצן');
   ok(!sn2.winner || sn2.winner.team !== 'jester', 'הבוטים הדיחו את הליצן למרות שידעו שהוא הליצן');
 });
+test('סוף ישיבה: הסצנה יודעת מי הצביע על מי', () => {
+  const { g, a } = newGame({ bots: 4 });
+  callMeeting(g, a);
+  let v = g.view(a); for (let i = 0; i < 200 && v.phase === 'meeting'; i++) { sec(g, 1); v = g.view(a); }
+  ok(v.phase === 'eject' && v.eject && v.eject.votes, 'אין רשימת הצבעות בסוף הישיבה');
+  const ids = v.eject.votes.map(x => x.id);
+  ok(v.eject.votes.every(x => x.id && (x.to !== 'p' || ids.includes(x.tid))), 'כל הצבעה צריכה להצביע על שחקן שמופיע בסצנה: ' + JSON.stringify(v.eject.votes));
+});
 test('דלתות: כמה חדרים ביחד, ואחרי הפתיחה קירור של 20 שניות לכל חדר', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4 }); sec(g, 3);
   ['F', 'M', 'U'].forEach(r => g.act(a, { type: 'sab', kind: 'door', room: r })); tick(g, 3);

@@ -522,7 +522,7 @@
 </div>
 
 <!-- הדחה -->
-<div id="eject" class="screen hidden"><div class="card center" style="max-width:520px"><div id="ejectTxt"></div></div></div>
+<div id="eject" class="screen hidden"><div class="card center" style="max-width:680px"><div id="ejectTxt"></div></div></div>
 
 <!-- סוף -->
 <div id="end" class="screen hidden">
@@ -557,7 +557,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-072824'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-143758'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -986,6 +986,7 @@ function onState(s) {
   show('#meeting', s.phase === 'meeting');
   show('#alert', s.phase === 'alert');
   if (s.phase !== 'alert') alertSig = '';
+  if (s.phase !== 'eject') ejectSig = '';
   if (s.phase === 'alert') renderAlert(s);
   show('#eject', s.phase === 'eject');
   show('#end', s.phase === 'end');
@@ -1378,19 +1379,88 @@ function jesterVideo(on) {
 }
 
 // ---------- הדחה וסיום ----------
+let ejectSig = '', voteAnim = 0;
 function renderEject(s) {
   const e = s.eject;
+  const sig = JSON.stringify(Object.assign({}, e, { t: 0 }));
+  if (sig === ejectSig) return;
+  ejectSig = sig;
   const votes = e.tally ? Object.values(e.tally).reduce((a, b) => a + b, 0) : 0;
   $('#ejectTxt').innerHTML = e.id
     ? `<div style="font-size:64px">🚀</div><div class="big"><span class="dot" style="background:${esc(e.color)};width:26px;height:26px"></span> ${esc(e.name)} הודח</div>
        ${e.team === null || e.team === undefined ? '' : `<p style="font-size:20px">${esc(e.name)} `}${e.team === null || e.team === undefined ? '' : e.jester ? '<b style="color:#ff9f1c">היה הליצן! 🤡 והליצן ניצח…</b>' : e.team === 'imp' ? '<b style="color:var(--imp)">היה ' + esc(e.role) + '!</b>' : '<b style="color:var(--crew)">לא היה מתחזה</b> (' + esc(e.role) + ')'}</p>`
     : `<div style="font-size:64px">🤷</div><div class="big">אף אחד לא הודח</div><p class="sub">${e.tie ? 'תיקו בהצבעה' : 'רוב בחר לדלג'}</p>`;
   $('#ejectTxt').innerHTML += `<p class="sub">${votes} קולות</p>`;
+  if (e.votes && e.votes.length) {
+    $('#ejectTxt').innerHTML += '<canvas id="voteCv" width="640" height="360" style="width:100%;max-width:640px;display:block;margin:6px auto 0"></canvas>';
+  }
   if (e.votes) {
     const dot = c => `<span class="dot" style="background:${esc(c)}"></span>`;
     $('#ejectTxt').innerHTML += '<div class="vlist">' + e.votes.map(v =>
       `<div class="vrow">${dot(v.c)}<span>${esc(v.n)}${v.w > 1 ? ' ×2' : ''}</span><b>←</b>${v.to === 'p' ? dot(v.tc) + '<span>' + esc(v.tn) + '</span>' : '<span class="sub" style="margin:0">' + (v.to === 'skip' ? 'דילג' : 'לא הצביע') + '</span>'}</div>`).join('') + '</div>';
   }
+  if ($('#voteCv')) voteScene(e); // אחרי שכל ה-HTML נבנה, אחרת הקנבס מוחלף
+}
+// סצנה: כל מי שהצביע מצביע על מי שבחר, אחד אחרי השני, ובסוף המודח רועד
+function voteScene(e) {
+  const cv = $('#voteCv'); if (!cv) return;
+  const vs = e.votes, n = vs.length, start = performance.now(), pos = {};
+  vs.forEach((v, i) => { const a = Math.PI / 2 + (i / n) * Math.PI * 2; pos[v.id] = { x: 320 + Math.cos(a) * 250, y: 185 + Math.sin(a) * 112 }; });
+  const tAll = 0.4 + n * 0.3 + 0.45;
+  cancelAnimationFrame(voteAnim);
+  const frame = () => {
+    if (!document.body.contains(cv) || $('#eject').classList.contains('hidden')) return;
+    const t = (performance.now() - start) / 1000, saved = ctx;
+    ctx = cv.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 640, 360);
+    // שולחן הישיבות
+    ctx.fillStyle = '#232b3f'; ctx.strokeStyle = '#46526f'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.ellipse(320, 192, 175, 72, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e02424'; ctx.beginPath(); ctx.ellipse(320, 188, 22, 9, 0, 0, Math.PI * 2); ctx.fill();
+    const cnt = {}, prog = vs.map((v, i) => Math.max(0, Math.min(1, (t - 0.4 - i * 0.3) / 0.45)));
+    // חיצים: מכל מצביע אל מי שבחר
+    vs.forEach((v, i) => {
+      const k = prog[i], p = pos[v.id], q = v.to === 'p' && pos[v.tid];
+      if (k <= 0 || !q) return;
+      if (k >= 1) cnt[v.tid] = (cnt[v.tid] || 0) + v.w;
+      const ang = Math.atan2(q.y - p.y, q.x - p.x), L = Math.hypot(q.x - p.x, q.y - p.y) - 62, ez = 1 - Math.pow(1 - k, 3);
+      const ox = -Math.sin(ang) * 6, oy = Math.cos(ang) * 6; // הזזה הצידה כדי ששני חיצים הפוכים לא יתלכדו
+      const x1 = p.x + Math.cos(ang) * 28 + ox, y1 = p.y + Math.sin(ang) * 28 + oy, x2 = x1 + Math.cos(ang) * L * ez, y2 = y1 + Math.sin(ang) * L * ez;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = v.w > 1 ? 11 : 8; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.strokeStyle = v.c; ctx.lineWidth = v.w > 1 ? 7 : 5; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.save(); ctx.translate(x2, y2); ctx.rotate(ang);
+      ctx.fillStyle = v.c; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -9); ctx.lineTo(-6, 9); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    });
+    // הרחפנים
+    vs.forEach((v, i) => {
+      const p = pos[v.id], q = v.to === 'p' && pos[v.tid];
+      const out = e.id === v.id && t > tAll, shake = out ? Math.sin(t * 40) * 2.5 : 0;
+      if (out) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = 'rgba(255,60,60,' + (0.25 + 0.15 * Math.sin(t * 8)) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y, 40, 0, Math.PI * 2); ctx.fill(); }
+      ctx.setTransform(1.35, 0, 0, 1.35, p.x + shake, p.y);
+      drawDrone(0, 0, v.c, (q ? q.x : 320) >= p.x ? 1 : -1, { hat: v.hat, noShadow: true });
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.textAlign = 'center'; ctx.font = 'bold 13px Rubik, Arial'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.fillStyle = '#fff';
+      const nm = v.n.length > 12 ? v.n.slice(0, 11) + '…' : v.n;
+      ctx.strokeText(nm, p.x, p.y + 42); ctx.fillText(nm, p.x, p.y + 42);
+      if (prog[i] > 0 && v.to !== 'p') {
+        ctx.globalAlpha = prog[i]; ctx.font = '13px Rubik, Arial';
+        const tx = v.to === 'skip' ? '⏭ דילג' : '💤 לא הצביע';
+        const ly = p.y < 200 ? p.y - 62 : p.y + 58; ctx.strokeText(tx, p.x, ly); ctx.fillText(tx, p.x, ly); ctx.globalAlpha = 1;
+      }
+      if (cnt[v.id]) {
+        const bx = p.x + 24, by = p.y - 26;
+        ctx.fillStyle = '#ff4d4d'; ctx.beginPath(); ctx.arc(bx, by, 11, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Rubik, Arial'; ctx.fillText(cnt[v.id], bx, by + 5);
+      }
+      if (out) { ctx.font = '26px serif'; ctx.fillText('🚀', p.x - 34, p.y - 30 - ((t - tAll) * 20) % 30); }
+    });
+    ctx = saved;
+    voteAnim = requestAnimationFrame(frame);
+  };
+  frame();
 }
 function renderEnd(s) {
   const w = s.winner;

@@ -360,9 +360,10 @@ function resolveMeeting() {
     eject.votes = voters.map(v => {
       const t = meeting.votes[v.id];
       const tp = t && t !== 'skip' ? players[t] : null;
-      return { w: v.role === 'judge' ? 2 : 1, n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
+      return { id: v.id, tid: tp ? tp.id : null, hat: v.hat || 0, w: v.role === 'judge' ? 2 : 1, n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
     });
   }
+  if (eject.votes) eject.t = EJECT_TIME + 2; // יותר זמן לסצנה של מי הצביע על מי
   meeting = null;
   phase = 'eject';
 }
