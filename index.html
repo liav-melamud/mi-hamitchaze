@@ -364,7 +364,6 @@
 
 <div id="hud" class="hidden">
   <div id="raceBoard" class="hidden"></div>
-  <div id="statsModal" class="hidden"><div class="smBox"><button id="statsClose" style="float:left">✕</button><h2 style="margin:0 0 8px">📊 הסטטיסטיקה שלי</h2><div id="statsBody"></div></div></div>
   <div id="taskbar">משימות הצוות <span id="tasktxt"></span><div class="bar"><i id="taskfill"></i></div></div>
   <div id="rolecard"><div id="rolename"></div><div id="roledesc"></div><ul id="tasklist"></ul></div>
   <div id="topleft">
@@ -376,6 +375,7 @@
   <div id="ventPanel" class="hidden"><b>🕳️ אתה בתוך פתח אוורור – אף אחד לא רואה אותך</b><div class="row" id="ventBtns"></div></div>
   <div id="actions"></div>
 </div>
+<div id="statsModal" class="hidden"><div class="smBox"><button id="statsClose" style="float:left">✕</button><h2 style="margin:0 0 8px">📊 הסטטיסטיקה שלי</h2><div id="statsBody"></div></div></div>
 <div id="toasts"></div>
 <button id="gearBtn" title="הגדרות מקשים">⚙️</button>
 <button id="ttsBtn" title="קול לבוטים">🤖🔊</button>
@@ -661,7 +661,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-193230'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-195100'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
