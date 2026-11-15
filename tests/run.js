@@ -175,7 +175,7 @@ test('שחקן אנושי מתקן חבלה: כפתור השימוש נדלק ב
 });
 // בוטים חכמים: מצבים מסודרים בעזרת snapshot/restore
 const place = (g, fn) => { const sn = JSON.parse(g.snapshot()); fn(sn); g.restore(JSON.stringify(sn)); };
-const crewBots = (sn) => Object.values(sn.players).filter(p => p.isBot && p.alive && !['impostor', 'shifter', 'phantom', 'viper', 'saboteur', 'poltergeist'].includes(p.role));
+const crewBots = (sn) => Object.values(sn.players).filter(p => p.isBot && p.alive && !['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'mole', 'jester'].includes(p.role));
 test('בוט שראה מישהו בפתח אוורור מספר על זה ומצביע עליו', () => {
   const { g, a } = newGame({ role: 'מתחזה', bots: 4, cfg: { botLevel: 2 } }); sec(g, 1);
   const V = MAP.VENTS[0]; let wid;
@@ -248,7 +248,7 @@ test('הליצן: אם מדלגים עליו המשחק ממשיך, והוא נ�
   let v; for (let i = 0; i < 30 * 20; i++) { tick(g, 1); v = g.view(a); if (v.phase === 'play') break; }
   ok(v.phase === 'play', 'המשחק לא המשיך אחרי דילוג: ' + v.phase);
   // 1 מתחזה + ליצן + 1 צוות בחיים: המשחק לא נגמר (הליצן נספר מול המתחזה)
-  place(g, sn => { const ps = Object.values(sn.players); const imp = ps.find(p => ['impostor', 'shifter', 'phantom', 'viper'].includes(p.role)); let keep = 1;
+  place(g, sn => { const ps = Object.values(sn.players); const imp = ps.find(p => ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role)); let keep = 1;
     ps.forEach(p => { if (p.id === a || p.id === imp.id) return; if (keep-- > 0) { p.alive = true; p.role = 'crew'; } else p.alive = false; }); });
   tick(g, 2); ok(g.view(a).phase === 'play', 'המתחזים ניצחו מוקדם מדי – הליצן לא נספר');
 });
@@ -526,7 +526,7 @@ test('מצב אדמין: רק "ראש תפוח אדמה" מפעיל ו"אקסט�
 
 test('מחבל שנשאר המתחזה האחרון הופך למתחזה שיכול לחסל (אחרת המשחק נתקע)', () => {
   const { g, a, ids } = newGame({ bots: 6, cfg: { impostors: 2 }, role: 'מחבל', humans: 1 });
-  const sn = JSON.parse(g.snapshot()); sn.players[Object.values(sn.players).find(p => p.id !== a && ['impostor', 'shifter', 'phantom', 'viper'].includes(p.role)).id].alive = false;
+  const sn = JSON.parse(g.snapshot()); sn.players[Object.values(sn.players).find(p => p.id !== a && ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role)).id].alive = false;
   const g2 = createGame(MAP); g2.restore(JSON.stringify(sn)); g2.join('x', a); tick(g2, 3);
   ok(g2.view(a).me.role === 'מתחזה', 'המחבל לא הפך למתחזה: ' + g2.view(a).me.role);
 });
@@ -567,9 +567,100 @@ test('רדוף: נועל דלת אחת, מכבה אור בחדר, גורר גו�
 });
 test('רדוף שנשאר המתחזה האחרון הופך למתחזה', () => {
   const { g, a } = newGame({ bots: 6, cfg: { impostors: 2 }, role: 'רדוף' });
-  const sn = JSON.parse(g.snapshot()); sn.players[Object.values(sn.players).find(p => p.id !== a && ['impostor', 'shifter', 'phantom', 'viper', 'saboteur'].includes(p.role)).id].alive = false;
+  const sn = JSON.parse(g.snapshot()); sn.players[Object.values(sn.players).find(p => p.id !== a && ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur'].includes(p.role)).id].alive = false;
   const g2 = createGame(MAP); g2.restore(JSON.stringify(sn)); g2.join('x', a); tick(g2, 3);
   ok(g2.view(a).me.role === 'מתחזה', 'הרדוף לא הפך למתחזה: ' + g2.view(a).me.role);
+});
+
+
+test('תפקידים: אפשר לכבות תפקיד בהגדרות והוא לא מופיע', () => {
+  const off = ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'timekeeper', 'mole'];
+  for (let i = 0; i < 40; i++) {
+    const { g, a } = newGame({ bots: 9, cfg: { roleOff: off, impostors: 2 } });
+    const sn = JSON.parse(g.snapshot());
+    ok(!Object.values(sn.players).some(p => off.includes(p.role)), 'הופיע תפקיד כבוי');
+    ok(JSON.stringify(g.view(a).settings.roleOff) === JSON.stringify(off), 'ההגדרה לא נשמרה');
+  }
+  const { g } = newGame({ bots: 9, role: 'מגן אישי' }); ok(g, 'מגן אישי לא הופיע');
+});
+
+test('מגן אישי: יודע מתי ואיפה חוסל מי שהוא שומר עליו, ויכול להחליף פעם אחת', () => {
+  const { g, a } = newGame({ bots: 6, role: 'מגן אישי', cfg: { roleOff: ['mole', 'timekeeper', 'bodyguard', 'angel'] } });
+  let v = g.view(a); ok(v.me.ward && v.me.ward.name, 'אין שחקן לשמור עליו');
+  sec(g, 1);
+  let sn = JSON.parse(g.snapshot()); const imp = Object.values(sn.players).find(p => ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role));
+  const other = Object.values(sn.players).find(p => p.id !== a && p.id !== imp.id && p.alive && !['jester'].includes(p.role) && (p.role === 'crew' || ['engineer', 'scientist', 'photographer', 'detective', 'judge', 'mole'].includes(p.role)));
+  // החלפה: עומד ליד שחקן אחר ולוחץ U
+  place(g, s2 => { Object.values(s2.players).forEach(p => { p.killCd = 999; if (p.bot) p.bot.wait = 999; }); s2.players[a].x = MAP.BUTTON.x; s2.players[a].y = MAP.BUTTON.y; s2.players[other.id].x = MAP.BUTTON.x + 50; s2.players[other.id].y = MAP.BUTTON.y; s2.players[a].ward = imp.id; });
+  g.setConn(a, true);
+  g.act(a, { type: 'ward' }); v = g.view(a);
+  ok(v.me.ward.name === other.name.replace(/^🤖\s*/, ''), 'ההחלפה לא עבדה: ' + v.me.ward.name);
+  ok(!v.me.ward.swap, 'אפשר להחליף שוב');
+  // המתחזה מחסל אותו
+  place(g, s2 => { const k = s2.players[imp.id], o = s2.players[other.id]; k.killCd = 0; k.x = o.x + 30; k.y = o.y; k.alive = true; });
+  g.setConn(a, true);
+  g.act(imp.id, { type: 'kill' }); tick(g, 1);
+  v = g.view(a);
+  ok(!v.me.ward.alive, 'השחקן לא חוסל');
+  ok(v.me.notes.some(n => n.includes('💔')), 'המגן לא קיבל התראה');
+});
+
+test('שומר הזמן: מחזיר את כולם אחורה ומחייה מי שחוסל בשניות האחרונות – פעם אחת', () => {
+  const { g, a } = newGame({ bots: 6, role: 'שומר הזמן', cfg: { roleOff: ['mole', 'bodyguard', 'angel'] } });
+  place(g, sn => { Object.values(sn.players).forEach(p => { p.killCd = 999; if (p.bot) p.bot.wait = 999; }); });
+  g.setConn(a, true);
+  sec(g, 3);
+  const sn = JSON.parse(g.snapshot()); const imp = Object.values(sn.players).find(p => ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role));
+  const vic = Object.values(sn.players).find(p => p.id !== a && p.id !== imp.id && p.role === 'crew') || Object.values(sn.players).find(p => p.id !== a && p.id !== imp.id && !['saboteur', 'poltergeist'].includes(p.role) && p.role !== 'jester');
+  place(g, s2 => { const k = s2.players[imp.id], o = s2.players[vic.id]; k.killCd = 0; k.vanishUntil = 0; o.shieldUntil = 0; k.x = o.x + 30; k.y = o.y; Object.values(s2.players).forEach(p => { if (p.bot) p.bot.plan = []; }); });
+  g.setConn(a, true);
+  g.act(imp.id, { type: 'kill' });
+  ok(!JSON.parse(g.snapshot()).players[vic.id].alive, 'החיסול לא קרה');
+  g.act(a, { type: 'rewind' }); tick(g, 1);
+  const s3 = JSON.parse(g.snapshot());
+  ok(s3.players[vic.id].alive, 'הקורבן לא חזר לחיים');
+  ok(!g.view(a).bodies.length, 'הגופה נשארה');
+  ok(s3.players[a].rewindUsed, 'לא נרשם שהשתמש');
+  g.act(a, { type: 'rewind' }); ok(g.view(a).phase === 'play', 'נשבר בשימוש שני');
+});
+
+test('רעשן: רעש מזויף בחדר אחר, אנשי צוות קרובים שומעים ובוטים הולכים לבדוק', () => {
+  const { g, a } = newGame({ bots: 6, role: 'רעשן', cfg: { roleOff: ['mole'] } });
+  sec(g, 16);
+  const room = Object.values(MAP.ROOMS).find(r => r !== MAP.roomAt(me(g, a).x, me(g, a).y));
+  g.act(a, { type: 'noise', room: room.id }); tick(g, 1);
+  const v = g.view(a);
+  ok(v.noises.length === 1 && Math.abs(v.noises[0].x - room.cx) < 2, 'אין רעש בחדר שנבחר');
+  ok(v.me.noiseCd > 0, 'אין השהיה');
+  g.act(a, { type: 'noise' }); tick(g, 1); ok(g.view(a).noises.length === 1, 'רעש שני בלי השהיה');
+  sec(g, 7); ok(g.view(a).noises.length === 0, 'הרעש לא נעלם');
+});
+
+test('שתול: יודע מי המתחזים, הם לא יודעים עליו, הבלש רואה אותו נקי, ומנצח עם המתחזים', () => {
+  let res;
+  for (let i = 0; i < 300 && !res; i++) {
+    const g = createGame(MAP); const ids = [g.join('א'), g.join('ב'), g.join('ג')];
+    g.act(ids[0], { type: 'settings', impostors: 1, bots: 5, killCd: 10, newRoles: true, jester: false });
+    g.act(ids[0], { type: 'start' });
+    const m = ids.find(id => g.view(id).me.roleKey === 'mole'), im = ids.find(id => g.view(id).me.team === 'imp');
+    if (m && im) res = { g, m, im, ids };
+  }
+  ok(res, 'לא נוצר משחק עם שתול ומתחזה אנושיים');
+  const { g, m, im } = res;
+  const vm = g.view(m), vi = g.view(im);
+  ok(vm.me.team === 'mole', 'הצוות של השתול לא נכון');
+  ok(vm.players.find(p => p.id === im).team === 'imp', 'השתול לא רואה את המתחזה');
+  ok(!vi.players.find(p => p.id === m).team, 'המתחזה רואה את השתול');
+  ok(vm.me.tasks.length > 0, 'אין לשתול משימות הסוואה');
+  // סוף משחק: ניצחון מתחזים
+  let last;
+  place(g, sn => { const I = ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist'];
+    Object.values(sn.players).forEach(p => { if (p.role !== 'mole' && !I.includes(p.role)) { if (!last) { last = p; p.x = sn.players[im].x + 30; p.y = sn.players[im].y; p.shieldUntil = 0; } else p.alive = false; } });
+    sn.players[im].killCd = 0; sn.players[im].vanishUntil = 0; if (['saboteur', 'poltergeist'].includes(sn.players[im].role)) sn.players[im].role = 'impostor'; });
+  g.setConn(m, true); g.setConn(im, true);
+  g.act(im, { type: 'kill' }); tick(g, 2);
+  const allDead = g.view(m);
+  ok(allDead.phase === 'end' && allDead.winner.team === 'imp', 'המתחזים לא ניצחו: ' + allDead.phase);
 });
 
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));

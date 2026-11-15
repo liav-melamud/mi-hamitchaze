@@ -37,6 +37,7 @@
   .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #26304a; color: var(--muted); }
   .tag.imp { background: rgba(255,77,77,.18); color: var(--imp); }
   .tag.crew { background: rgba(59,227,255,.14); color: var(--crew); }
+  .tag.mole { background: rgba(255,77,77,.12); color: #ff8a8a; }
   .tag.jester { background: rgba(255,159,28,.18); color: #ff9f1c; }
   #clownWeek { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-weight: 800; font-size: 17px; text-align: center; color: #1a1300;
     background: linear-gradient(90deg, #ff9f1c, #ffd23f, #ff6bcb, #ff9f1c); background-size: 300% 100%; animation: clownbg 6s linear infinite; }
@@ -141,6 +142,9 @@
   #settingsGrid select { padding: 4px 6px; }
   #roleSet { margin: 4px 0 6px; background: #10152290; border-radius: 12px; padding: 6px 10px; }
   #roleSet summary { cursor: pointer; padding: 4px 0; }
+  .roleToggles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 10px; font-size: 14px; }
+  .roleToggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .roleToggles .imp { color: var(--imp); } .roleToggles .mole { color: #ff8a8a; }
   .rgroup { margin-top: 8px; }
   .rname { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
   .roleGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; font-size: 14px; }
@@ -454,7 +458,12 @@
       <label>🤡 הליצן <select data-s="jester"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
     </div>
-    <details id="roleSet"><summary><b>🎭 הגדרות תפקידים</b> <span class="sub" style="margin:0">– כמה זמן כל יכולת נמשכת וכמה מחכים</span></summary>
+    <details id="roleSet"><summary><b>🎭 הגדרות תפקידים</b> <span class="sub" style="margin:0">– אילו תפקידים במשחק, וכמה זמן כל יכולת</span></summary>
+      <div class="rgroup"><div class="rname">✅ תפקידים במשחק <span class="sub" style="margin:0">(בטל סימון כדי להוציא תפקיד)</span></div><div id="roleToggles" class="roleToggles"></div></div>
+      <div class="rgroup"><div class="rname">🫂 מגן אישי · ⏪ שומר הזמן · 🔊 רעשן</div><div class="roleGrid">
+          <label>החזרת זמן אחורה <select data-s="rewindSecs"><option value="5">5ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option></select></label>
+          <label>המתנה בין רעשים <select data-s="noiseCd"><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
+      </div></div>
       <div class="rgroup"><div class="rname">🔧 מהנדס</div><div class="roleGrid">
           <label>זמן בתוך פתח <select data-s="engVent"><option value="0">בלי הגבלה</option><option value="5">5ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option></select></label>
           <label>המתנה בין זחילות <select data-s="engVentCd"><option value="0">בלי</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option></select></label>
@@ -494,9 +503,10 @@
     </div>
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
-      <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול)<br>
+      <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול) · מגן אישי (יודע איפה מת מי שהוא שומר עליו) · שומר הזמן (מחזיר את כולם אחורה פעם אחת)<br>
       <b>🤡 לבד:</b> הליצן – לא צוות ולא מתחזה. מנצח אם מדיחים אותו בישיבה. פתחי אוורור, קליפת בננה וגופה מזויפת (אפשר לכבות בהגדרות)<br>
-      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה) · מרקיב (גופות מתפרקות) · מחבל · רדוף (נועל דלת, מכבה אור בחדר, גורר גופות)<br>
+      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה) · מרקיב (גופות מתפרקות) · מחבל · רדוף (נועל דלת, מכבה אור בחדר, גורר גופות) · רעשן (רעש מזויף בחדר אחר)<br>
+      <b>🕵️ שתול:</b> נראה כמו איש צוות, יודע מי המתחזים ומנצח איתם – בלי חיסול<br>
       <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span> · קול: <span id="linkInfo">לא פעיל</span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
@@ -621,7 +631,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-174415'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-191350'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1124,16 +1134,22 @@ function renderLobby(s) {
     el.value = BOOL_S.includes(k) ? (v ? '1' : '0') : String(v);
     el.disabled = !s.me.host;
   });
+  const off = s.settings.roleOff || [];
+  document.querySelectorAll('#roleToggles input').forEach(el => { el.checked = !off.includes(el.dataset.role); el.disabled = !s.me.host; });
 }
 $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) { api({ type: 'color', color: +b.dataset.c }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.color = +b.dataset.c; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
 document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 16 }, (_, i) => `<option>${i}</option>`).join('');
 const BOOL_S = ['confirm', 'openVotes', 'newRoles', 'jester'];
+const ROLE_TOGGLES = [['engineer', '🔧 מהנדס'], ['scientist', '🧪 מדען'], ['angel', '😇 מלאך שומר'], ['photographer', '📸 צלם'], ['detective', '🔎 בלש'], ['judge', '⚖️ שופט'], ['bodyguard', '🛡 שומר ראש'], ['guardian', '🫂 מגן אישי'], ['timekeeper', '⏪ שומר הזמן'],
+  ['shifter', '🎭 משנה צורה', 'imp'], ['phantom', '👻 נעלם', 'imp'], ['viper', '🐍 מרקיב', 'imp'], ['noisemaker', '🔊 רעשן', 'imp'], ['saboteur', '💣 מחבל', 'imp'], ['poltergeist', '🌀 רדוף', 'imp'], ['mole', '🕵️ שתול', 'mole']];
+$('#roleToggles').innerHTML = ROLE_TOGGLES.map(([k, n, c]) => `<label class="${c || ''}"><input type="checkbox" data-role="${k}" checked> ${n}</label>`).join('');
 const sendSettings = () => {
   const o = { type: 'settings' };
   document.querySelectorAll('#settingsGrid select, #roleSet select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : BOOL_S.includes(el.dataset.s) ? el.value === '1' : +el.value; });
+  o.roleOff = [...document.querySelectorAll('#roleToggles input')].filter(el => !el.checked).map(el => el.dataset.role);
   api(o);
 };
-document.querySelectorAll('#settingsGrid select, #roleSet select').forEach(el => el.onchange = sendSettings);
+document.querySelectorAll('#settingsGrid select, #roleSet select, #roleToggles input').forEach(el => el.onchange = sendSettings);
 $('#startBtn').onclick = () => api({ type: 'start' });
 
 // ---------- HUD ----------
@@ -1156,6 +1172,9 @@ const ACTIONS = [
   { k: 'drag', ic: '🫳', label: 'גרור גופה', key: 'Z', red: true },
   { k: 'banana', ic: '🍌', label: 'בננה', key: 'K' },
   { k: 'fakeBody', ic: '🎈', label: 'גופה מזויפת', key: 'T' },
+  { k: 'ward', ic: '🫂', label: 'שמור על', key: 'U' },
+  { k: 'rewind', ic: '⏪', label: 'החזר זמן', key: 'Y' },
+  { k: 'noise', ic: '🔊', label: 'רעש', key: 'N', red: true },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -1180,7 +1199,7 @@ function actionState(s) {
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey), on: inVent || (!me.engVentCd && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : 'פתח') };
+  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey), on: inVent || (!me.engVentCd && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : 'פתח') };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
@@ -1200,6 +1219,9 @@ function actionState(s) {
   const jest = alive && me.roleKey === 'jester';
   st.banana = { show: jest, on: !inVent && me.bananaCd === 0, label: me.bananaCd ? 'בננה ' + me.bananaCd : 'בננה' };
   st.fakeBody = { show: jest, on: !inVent && me.fakeCd === 0, label: me.fakeCd ? 'גופה ' + me.fakeCd : 'גופה מזויפת' };
+  st.ward = { show: alive && me.roleKey === 'guardian' && !!me.ward && me.ward.swap, on: closeP, label: 'החלף שמירה' };
+  st.rewind = { show: alive && me.roleKey === 'timekeeper' && !me.rewindUsed, on: true, label: 'החזר זמן' };
+  st.noise = { show: alive && me.roleKey === 'noisemaker', on: !inVent && me.noiseCd === 0, label: me.noiseCd ? 'רעש ' + me.noiseCd : 'רעש' };
   st.sab = { show: alive && me.team === 'imp', on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
 }
@@ -1215,14 +1237,17 @@ function doAction(k) {
 
 function renderHud(s) {
   const me = s.me;
-  $('#rolecard').classList.toggle('imp', me.team === 'imp');
+  $('#rolecard').classList.toggle('imp', me.team === 'imp' || me.team === 'mole');
   $('#rolename').textContent = me.spec ? 'צופה' : (me.alive ? '' : '👻 ') + 'התפקיד שלך: ' + me.role;
-  $('#rolename').style.color = me.team === 'imp' ? 'var(--imp)' : me.team === 'jester' ? '#ff9f1c' : 'var(--crew)';
+  $('#rolename').style.color = me.team === 'imp' || me.team === 'mole' ? 'var(--imp)' : me.team === 'jester' ? '#ff9f1c' : 'var(--crew)';
   $('#roledesc').textContent = me.desc;
-  const mates = me.team === 'imp' ? s.players.filter(p => p.team === 'imp' && p.id !== me.id) : [];
+  const mates = me.team === 'imp' || me.team === 'mole' ? s.players.filter(p => p.team === 'imp' && p.id !== me.id) : [];
+  const extra = me.team === 'mole' ? '<li>🕵️ אתה השתול. המתחזים: ' + (mates.map(p => esc(p.realName || p.name)).join(', ') || '—') + '. הם לא יודעים שאתה איתם! המשימות שלך רק להסוואה.</li>'
+    : me.ward ? '<li>🫂 אתה שומר על: <b>' + esc(me.ward.name) + '</b>' + (me.ward.alive ? '' : ' 💀 (חוסל ב' + esc(me.ward.died || '?') + ')') + (me.ward.swap ? ' · אפשר להחליף פעם אחת (U)' : '') + '</li>'
+    : me.roleKey === 'timekeeper' ? '<li>⏪ ' + (me.rewindUsed ? 'כבר השתמשת בהחזרת הזמן' : 'החזרת זמן אחת זמינה (Y) – שמור אותה לרגע הנכון!') + '</li>' : '';
   $('#tasklist').innerHTML = me.team === 'jester' ? '<li>🤡 גרום להם להדיח אותך בישיבה – ואז אתה מנצח!</li><li>🕳️ קפוץ לפתחים כשרואים אותך · 🍌 בננה (K): מי שמחליק חושד בך · 🎈 גופה מזויפת (T): נראית אמיתית לגמרי</li><li>אל תמות: אם מחסלים אותך, הפסדת.</li>' : me.team === 'imp'
     ? '<li>חסל את אנשי הצוות או השווה את מספרם.</li>' + (mates.length ? '<li>שותפים: ' + mates.map(p => esc(p.realName || p.name)).join(', ') + '</li>' : '')
-    : me.tasks.map(t => `<li class="${t.done ? 'done' : ''}">${esc(t.name)}</li>`).join('');
+    : extra + me.tasks.map(t => `<li class="${t.done ? 'done' : ''}">${esc(t.name)}</li>`).join('');
   $('#tasktxt').textContent = `(${s.tasks.done}/${s.tasks.total})`;
   $('#taskfill').style.width = (s.tasks.total ? 100 * s.tasks.done / s.tasks.total : 0) + '%';
   show('#revealBadge', s.settings.reveal);
@@ -1486,6 +1511,7 @@ function ejectLines(e) {
   if (!e.id) a = e.tie ? 'תיקו – אף אחד לא הודח' : 'דילגו – אף אחד לא הודח';
   else if (e.team == null) a = e.name + ' הודח';
   else if (e.jester) a = e.name + ' היה הליצן! 🤡';
+  else if (e.team === 'mole') a = e.name + ' היה השתול! 🕵️';
   else if (e.team === 'imp') a = e.name + ' היה ' + (e.role === 'מתחזה' ? 'המתחזה' : e.role) + '!';
   else a = e.name + ' לא היה המתחזה (' + e.role + ')';
   const k = e.impLeft;
@@ -1680,7 +1706,7 @@ function danceScene(s, roles) {
   if (w.team === 'race') { cv.style.display = 'none'; return; }
   cv.style.display = 'block';
   const all = s.roster.filter(p => !p.spec).map(p => ({ ...p, team: (roles[p.id] || {}).team }));
-  const winners = w.team === 'jester' ? all.filter(p => p.id === w.jester || p.team === 'jester') : all.filter(p => p.team === w.team);
+  const winners = w.team === 'jester' ? all.filter(p => p.id === w.jester || p.team === 'jester') : all.filter(p => p.team === w.team || (w.team === 'imp' && p.team === 'mole'));
   const jester = w.team === 'jester' ? null : all.find(p => p.team === 'jester');
   const W = jester ? 520 : 640, start = performance.now();
   const conf = Array.from({ length: 70 }, (_, i) => ({ x: (i * 97) % 640, y: -((i * 53) % 300), v: 40 + (i % 7) * 12, c: ['#ffd646', '#4dd2ff', '#ff6bd6', '#7dff7a', '#ff9f1c'][i % 5], r: i }));
@@ -2780,8 +2806,8 @@ $('#quick').onclick = e => {
 };
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB', hauntDoor: 'KeyJ', hauntLight: 'KeyL', drag: 'KeyZ', banana: 'KeyK', fakeBody: 'KeyT' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)', hauntDoor: 'נעילת דלת (רדוף)', hauntLight: 'כיבוי אור בחדר (רדוף)', drag: 'גרירת גופה (רדוף)', banana: 'קליפת בננה (ליצן)', fakeBody: 'גופה מזויפת (ליצן)' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB', hauntDoor: 'KeyJ', hauntLight: 'KeyL', drag: 'KeyZ', banana: 'KeyK', fakeBody: 'KeyT', ward: 'KeyU', rewind: 'KeyY', noise: 'KeyN' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)', hauntDoor: 'נעילת דלת (רדוף)', hauntLight: 'כיבוי אור בחדר (רדוף)', drag: 'גרירת גופה (רדוף)', banana: 'קליפת בננה (ליצן)', fakeBody: 'גופה מזויפת (ליצן)', ward: 'החלפת שמירה (מגן אישי)', rewind: 'החזרת זמן (שומר הזמן)', noise: 'רעש מזויף (רעשן)' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -2838,7 +2864,7 @@ function sendInput() {
 }
 // מצב אדמין: רק במשפט הסודי בצ'אט או בדיבור (ראו adminPhrase במנוע). אין יותר קיצור מקשים או מגע.
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard', 'hauntDoor', 'hauntLight', 'drag', 'banana', 'fakeBody'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard', 'hauntDoor', 'hauntLight', 'drag', 'banana', 'fakeBody', 'ward', 'rewind', 'noise'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;
@@ -3353,7 +3379,7 @@ function drawMap(t) {
   }
 }
 
-const ROLE_COL = { imp: '#ff4d4d', crew: '#3be3ff' };
+const ROLE_COL = { imp: '#ff4d4d', crew: '#3be3ff', mole: '#ff8a8a', jester: '#ff9f1c' };
 
 // ---------- מסך מצלמות האבטחה: 4 תצוגות חיות עם אפקט ניטור ----------
 function drawCams(t) {
@@ -3434,6 +3460,7 @@ function frame(t) {
   const inView = p => noDark || D(cam, disp[p.id] || p) <= vision;
 
   for (const b of S.bodies) if (noDark || D(cam, b) <= vision) drawBody(b);
+  if (S.noises && S.noises.length) { ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ph = performance.now() / 200; for (const n of S.noises) { ctx.globalAlpha = 0.55 + 0.45 * Math.sin(ph); ctx.fillText('👣', n.x - 26, n.y); ctx.fillText('🔊', n.x + 26, n.y - 10); } ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic'; }
   if (S.bananas && S.bananas.length) { ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const b of S.bananas) if (noDark || D(cam, b) <= vision) ctx.fillText('🍌', b.x, b.y); ctx.textBaseline = 'alphabetic'; }
 
   // חושך
