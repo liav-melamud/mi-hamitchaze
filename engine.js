@@ -38,6 +38,12 @@ const ROLES = {
   spectator: { name: 'צופה', team: 'none', desc: 'הצטרפת באמצע משחק – צפה עד הסבב הבא.' },
 };
 
+// התיאור של התפקיד עם המספרים מההגדרות
+const roleDesc = r => {
+  const d = ROLES[r].desc, S = settings;
+  if (r === 'engineer') return d + (S.engVent ? ` עד ${S.engVent} שניות בכל פעם` : '') + (S.engVentCd ? `, ואז ${S.engVentCd} שניות המתנה.` : '');
+  return d.replace('ל-20 שניות.', 'ל-' + (r === 'shifter' ? S.shiftTime : S.guardTime) + ' שניות.').replace('ל-8 שניות', 'ל-' + S.vanishTime + ' שניות').replace('אחרי 8 שניות', 'אחרי ' + S.rotTime + ' שניות');
+};
 const BOT_NAMES = ['בוטי', 'רובי', 'צ׳יפ', 'ננו', 'ביפ', 'זיק', 'פיקסל', 'טורבו', 'גלקסי', 'בורג', 'ג׳ט', 'מגנט', 'רדאר', 'קוונטי', 'סטאר'];
 const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', 'מי ראה משהו?', 'דלג, אין מספיק מידע', 'זה חשוד…',
   'ראיתי מישהו ליד הפתח', 'אני סומך על כולם 😅', 'בואו נצביע ביחד', 'אני מהצוות, באמת'];
@@ -45,6 +51,17 @@ const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', '�
 const SPEED = 220, KILL_RANGE = 90, REPORT_RANGE = 110, USE_RANGE = 60;
 const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15, TASK_TIME = 2.5;
 const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
+// הגדרות תפקידים (כמו במשחק האמיתי): [ברירת מחדל, מינימום, מקסימום]
+const ROLE_SET = {
+  engVent: [15, 0, 60], engVentCd: [15, 0, 60],       // מהנדס: כמה זמן אפשר להיות בפתח (0 = בלי הגבלה), והמתנה בין זחילות
+  vanishTime: [8, 3, 30], vanishCd: [25, 5, 60],      // נעלם
+  shiftTime: [20, 5, 60], shiftCd: [30, 5, 60],       // משנה צורה
+  shieldTime: [15, 5, 60], gaCd: [30, 5, 60],         // מלאך שומר
+  guardTime: [20, 5, 60], guardCd: [50, 10, 90],      // שומר ראש
+  photoCd: [25, 5, 60], investCd: [35, 5, 90],        // צלם, בלש
+  rotTime: [8, 3, 30],                                // מרקיב: אחרי כמה זמן הגופה נעלמת
+  bananaCd: [15, 5, 60], fakeCd: [45, 10, 120],       // ליצן
+};
   // רמת אורך משימות (1 קל, 2 רגיל, 3 ארוך): מאריכה משימות עם פס התקדמות, ומשימות של בוטים
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
   const botTaskTime = () => (4 + 4 * settings.taskLevel) * (settings.botLevel === 1 ? 1.3 : settings.botLevel === 3 ? 0.8 : 1);
@@ -56,6 +73,7 @@ let players = {};
 let phase = 'lobby';
 let hostId = null;
 let settings = { impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, raceGoal: 10, jester: !!(opts && opts.jester) };
+for (const k in ROLE_SET) settings[k] = ROLE_SET[k][0];
 let usedLines = new Set();
 let lastMistake = null;
 let jesterHint = false; // נמצאה גופה מזויפת במשחק: הבוטים יודעים שיש ליצן // ישיבה קודמת: מי דחף להדיח איש צוות
@@ -406,8 +424,8 @@ function act(p, a) {
       if (phase !== 'play' || !p.alive || p.role !== 'bodyguard' || p.guardCd > 0 || p.inVent !== null) return;
       const tgt = nearest(p, list().filter(o => o.id !== p.id && o.alive && !o.spectator && o.inVent === null && !(o.vanishUntil > t)), 160);
       if (!tgt) return toast(p, '🛡 התקרב לשחקן כדי להגן עליו');
-      tgt.shieldUntil = t + 20; tgt.guardedBy = p.id; p.guardCd = 50;
-      toast(p, '🛡 אתה מגן על ' + nm(tgt) + ' ל-20 שניות');
+      tgt.shieldUntil = t + settings.guardTime; tgt.guardedBy = p.id; p.guardCd = settings.guardCd;
+      toast(p, '🛡 אתה מגן על ' + nm(tgt) + ' ל-' + settings.guardTime + ' שניות');
       break;
     }
     case 'photo': {
@@ -419,7 +437,7 @@ function act(p, a) {
       const shown = o => (o.shapeAs && players[o.shapeAs] ? players[o.shapeAs] : o).name.replace(/^🤖\s*/, '');
       p.photos.push({ t, room, names: near.map(shown), bodies: bds.length });
       if (p.photos.length > 6) p.photos.shift();
-      p.photoCd = 25;
+      p.photoCd = settings.photoCd;
       toast(p, '📸 צילמת ב' + room + ': ' + (near.map(shown).join(', ') || 'גופה'));
       break;
     }
@@ -431,16 +449,16 @@ function act(p, a) {
       const text = tgt.nearKill > 0 ? `🔎 ${nm} היה ליד זירת חיסול` : `🔎 ${nm}: אין ראיות נגדו`;
       p.notes.push(text); if (p.notes.length > 6) p.notes.shift();
       p.noteMeta = p.noteMeta || []; p.noteMeta.push({ id: tgt.id, hit: tgt.nearKill > 0 }); if (p.noteMeta.length > 6) p.noteMeta.shift();
-      p.investCd = 35;
+      p.investCd = settings.investCd;
       toast(p, text);
       break;
     }
     case 'vanish': {
       if (phase !== 'play' || !p.alive || p.role !== 'phantom') return;
-      if (p.vanishUntil > t) { p.vanishUntil = 0; p.vanishCd = 25; toast(p, '👻 הופעת מחדש'); return; }
+      if (p.vanishUntil > t) { p.vanishUntil = 0; p.vanishCd = settings.vanishCd; toast(p, '👻 הופעת מחדש'); return; }
       if (p.vanishCd > 0 || p.inVent !== null) return toast(p, 'היכולת בהשהיה');
-      p.vanishUntil = t + 8; p.work = null; p.cam = false;
-      toast(p, '👻 אתה נעלם ל-8 שניות');
+      p.vanishUntil = t + settings.vanishTime; p.work = null; p.cam = false;
+      toast(p, '👻 אתה נעלם ל-' + settings.vanishTime + ' שניות');
       break;
     }
     // ---------- הרדוף ----------
@@ -533,7 +551,7 @@ function act(p, a) {
         return;
       }
       tgt.alive = false; tgt.work = null; tgt.cam = false;
-      bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + 8 : 0, t, killer: p.id });
+      bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + settings.rotTime : 0, t, killer: p.id });
       p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor();
       p.stats.kills++; ev('kill', `🔪 ${nm(p)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
       // לבלש: מי שהיה ליד הזירה נרשם כחשוד קל
@@ -553,7 +571,7 @@ function act(p, a) {
       const mine = bananas.filter(b => b.by === p.id);
       if (mine.length >= BANANA_MAX) bananas.splice(bananas.indexOf(mine[0]), 1);
       bananas.push({ x: p.x, y: p.y + 10, by: p.id, until: t + BANANA_LIFE });
-      p.bananaCd = BANANA_CD; toast(p, '🍌 השארת קליפת בננה. מי שדורך עליה – מחליק!');
+      p.bananaCd = settings.bananaCd; toast(p, '🍌 השארת קליפת בננה. מי שדורך עליה – מחליק!');
       break;
     }
     case 'fakeBody': { // הליצן מניח גופה מזויפת בצבע של שחקן אחר
@@ -562,7 +580,7 @@ function act(p, a) {
       if (!others.length) return;
       bodies = bodies.filter(b => !b.fake);
       bodies.push({ id: 'fake' + Math.floor(Math.random() * 1e9), fake: true, by: p.id, x: p.x + p.dir * 30, y: p.y + 6, color: pick(others).color, decayAt: 0, t });
-      p.fakeCd = FAKE_BODY_CD; toast(p, '🎈 הנחת גופה מזויפת. מי שידווח עליה יכנס ישיבה…');
+      p.fakeCd = settings.fakeCd; toast(p, '🎈 הנחת גופה מזויפת. מי שידווח עליה יכנס ישיבה…');
       ev('fake', `🎈 ${nm(p)} הניח גופה מזויפת`);
       break;
     }
@@ -575,6 +593,7 @@ function act(p, a) {
     case 'vent': {
       if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist', 'jester'].includes(p.role)) return;
       if (p.inVent !== null) { p.inVent = null; witnessVent(p); return; } // יציאה מהפתח
+      if (p.role === 'engineer' && p.engVentCd > 0) return toast(p, '🕳️ אפשר לזחול שוב בעוד ' + Math.ceil(p.engVentCd) + ' שניות');
       const v = nearest(p, MAP.VENTS, USE_RANGE);
       if (!v) return;
       witnessVent(p);
@@ -602,11 +621,11 @@ function act(p, a) {
     }
     case 'shift': {
       if (phase !== 'play' || !p.alive || p.role !== 'shifter') return;
-      if (p.shapeAs) { p.shapeAs = null; p.shiftCd = SHIFT_CD; return; }
+      if (p.shapeAs) { p.shapeAs = null; p.shiftCd = settings.shiftCd; return; }
       if (p.shiftCd > 0) return;
       const tgt = nearest(p, list().filter(o => o.id !== p.id && o.alive && !o.spectator), 5000);
       if (!tgt) return;
-      p.shapeAs = tgt.id; p.shapeUntil = t + SHIFT_TIME;
+      p.shapeAs = tgt.id; p.shapeUntil = t + settings.shiftTime;
       // בוטים שראו את ההתחפשות יחשפו אותו בישיבה
       list().forEach(o => { if (o.bot && o.alive && o.id !== p.id && team(o) === 'crew' && dist(o, p) < 400) o.bot.sawShift = p.id; });
       toast(p, '🎭 התחפשת ל' + tgt.name);
@@ -616,7 +635,7 @@ function act(p, a) {
       if (phase !== 'play' || p.alive || p.role !== 'angel' || p.gaCd > 0) return;
       const tgt = nearest(p, list().filter(o => o.alive && !o.spectator), 150);
       if (!tgt) return toast(p, 'התקרב לשחקן חי כדי להגן עליו');
-      tgt.shieldUntil = t + SHIELD_TIME; p.gaCd = GA_CD;
+      tgt.shieldUntil = t + settings.shieldTime; p.gaCd = settings.gaCd;
       toast(p, '🛡 הגנת על ' + tgt.name);
       break;
     }
@@ -657,6 +676,7 @@ function act(p, a) {
       settings.map = a.map === 'small' ? 'small' : 'big';
       settings.mode = a.mode === 2 ? 2 : 1;
       settings.raceGoal = Math.round(cl(a.raceGoal, 4, 25, 10));
+      for (const k in ROLE_SET) settings[k] = Math.round(cl(a[k] === undefined ? settings[k] : a[k], ROLE_SET[k][1], ROLE_SET[k][2], ROLE_SET[k][0]));
       break;
     case 'color': {
       if (phase !== 'lobby') return;
@@ -1167,12 +1187,21 @@ function tick() {
       p.killCd = Math.max(0, p.killCd - dt);
       p.guardCd = Math.max(0, (p.guardCd || 0) - dt);
       p.photoCd = Math.max(0, (p.photoCd || 0) - dt); p.investCd = Math.max(0, (p.investCd || 0) - dt); p.vanishCd = Math.max(0, (p.vanishCd || 0) - dt);
-      if (p.vanishUntil && t > p.vanishUntil) { p.vanishUntil = 0; p.vanishCd = 25; }
+      // מהנדס: זמן מוגבל בתוך הפתח, ואחרי היציאה המתנה
+      if (p.role === 'engineer') {
+        p.engVentCd = Math.max(0, (p.engVentCd || 0) - dt);
+        if (p.inVent !== null) {
+          if (!p.ventSince) p.ventSince = t;
+          if (settings.engVent && t - p.ventSince > settings.engVent) { p.inVent = null; witnessVent(p); toast(p, '🕳️ נגמר הזמן בפתח'); }
+        }
+        if (p.inVent === null && p.ventSince) { p.ventSince = 0; p.engVentCd = settings.engVentCd; }
+      }
+      if (p.vanishUntil && t > p.vanishUntil) { p.vanishUntil = 0; p.vanishCd = settings.vanishCd; }
       if (p.role === 'jester') { p.bananaCd = Math.max(0, (p.bananaCd || 0) - dt); p.fakeCd = Math.max(0, (p.fakeCd || 0) - dt); }
       if (p.role === 'poltergeist') { p.hauntDoorCd = Math.max(0, (p.hauntDoorCd || 0) - dt); p.darkCd = Math.max(0, (p.darkCd || 0) - dt); p.dragCd = Math.max(0, (p.dragCd || 0) - (p.drag ? 0 : dt)); }
       p.shiftCd = Math.max(0, p.shiftCd - (p.shapeAs ? 0 : dt));
       p.gaCd = Math.max(0, p.gaCd - dt);
-      if (p.shapeAs && (t > p.shapeUntil || !players[p.shapeAs])) { p.shapeAs = null; p.shiftCd = SHIFT_CD; }
+      if (p.shapeAs && (t > p.shapeUntil || !players[p.shapeAs])) { p.shapeAs = null; p.shiftCd = settings.shiftCd; }
 
       let { dx, dy } = p.input;
       // דרך על קליפת בננה? מחליק בלי שליטה לשנייה
@@ -1299,14 +1328,14 @@ function viewFor(v) {
   }
   const me = {
     id: v.id, alive: v.alive, spec: !!v.spectator, role: v.role ? ROLES[v.role].name : null, roleKey: v.role,
-    team: v.role ? team(v) : null, desc: v.role ? ROLES[v.role].desc : '',
+    team: v.role ? team(v) : null, desc: v.role ? roleDesc(v.role) : '',
     tasks: v.tasks.map(x => ({ name: MAP.TASKS[x.i].name, i: x.i, done: x.done })),
     killCd: Math.ceil(v.killCd), shiftCd: Math.ceil(v.shiftCd), shifted: !!v.shapeAs, gaCd: Math.ceil(v.gaCd),
     emergencyUsed: v.emergencyUsed, work: v.work && !v.work.mini ? v.work.t / taskTime(v.work.ref.i) : 0,
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
     sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial' }[sab.type], i: v.sabWork.i } : null,
     sabCd: Math.ceil(sabCd),
-    guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t,
+    guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t, engVentCd: Math.ceil(v.engVentCd || 0), ventLeft: v.role === 'engineer' && v.inVent !== null && settings.engVent && v.ventSince ? Math.max(0, Math.ceil(settings.engVent - (t - v.ventSince))) : null,
     bananaCd: Math.ceil(v.bananaCd || 0), fakeCd: Math.ceil(v.fakeCd || 0), hauntDoorCd: Math.ceil(v.hauntDoorCd || 0), darkCd: Math.ceil(v.darkCd || 0), dragCd: Math.ceil(v.dragCd || 0), dragging: !!v.drag,
     photos: (v.photos || []).map(ph => ({ ago: Math.round(t - ph.t), room: ph.room, names: ph.names, bodies: ph.bodies })), notes: (v.notes || []).slice(-6),
     color: v.color,

@@ -299,6 +299,25 @@ test('הליצן: קליפת בננה מחליקה שחקן, גופה מזויפ
   ok(sn2.jesterHint, 'אחרי החלקה הבוטים צריכים לדעת שיש ליצן');
   ok(!sn2.winner || sn2.winner.team !== 'jester', 'הבוטים הדיחו את הליצן למרות שידעו שהוא הליצן');
 });
+test('הגדרות תפקידים: זמן היעלמות, וזמן מוגבל בפתח למהנדס', () => {
+  const { g, a } = newGame({ role: 'נעלם', bots: 4, cfg: { vanishTime: 15, vanishCd: 10 } });
+  ok(g.view(a).me.desc.includes('15 שניות'), 'התיאור של התפקיד צריך להראות את הזמן מההגדרות: ' + g.view(a).me.desc);
+  g.act(a, { type: 'vanish' }); tick(g, 3);
+  sec(g, 10); ok(g.view(a).me.vanished, 'הנעלם היה צריך להישאר נעלם 15 שניות');
+  sec(g, 6); ok(!g.view(a).me.vanished, 'הנעלם היה צריך להופיע אחרי 15 שניות');
+  const e = newGame({ role: 'מהנדס', bots: 4, cfg: { engVent: 5, engVentCd: 10 } });
+  const V = MAP.VENTS[0];
+  place(e.g, sn => { Object.values(sn.players).forEach(q => { q.killCd = 999; q.emergencyUsed = true; }); sn.sabCd = 999; sn.players[e.a].x = V.x; sn.players[e.a].y = V.y; });
+  e.g.setConn(e.a, true);
+  e.g.act(e.a, { type: 'vent' }); tick(e.g, 2);
+  ok(e.g.view(e.a).me.inVent !== null, 'המהנדס לא נכנס לפתח');
+  sec(e.g, 6); ok(e.g.view(e.a).me.inVent === null, 'המהנדס היה צריך לצאת מהפתח אחרי 5 שניות');
+  e.g.act(e.a, { type: 'vent' }); tick(e.g, 2);
+  ok(e.g.view(e.a).me.inVent === null && e.g.view(e.a).me.engVentCd > 0, 'המהנדס לא אמור להיכנס שוב לפני שנגמרת ההמתנה');
+  sec(e.g, 10); place(e.g, sn => { sn.players[e.a].x = V.x; sn.players[e.a].y = V.y; }); e.g.setConn(e.a, true);
+  e.g.act(e.a, { type: 'vent' }); tick(e.g, 2);
+  ok(e.g.view(e.a).me.inVent !== null, 'אחרי ההמתנה המהנדס צריך להיות מסוגל לזחול שוב');
+});
 test('סוף ישיבה: הסצנה יודעת מי הצביע על מי', () => {
   const { g, a } = newGame({ bots: 4 });
   callMeeting(g, a);

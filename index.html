@@ -138,6 +138,13 @@
   #settingsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 6px 0; font-size: 14px; }
   #settingsGrid label { display: flex; justify-content: space-between; align-items: center; gap: 6px; background: #151b2c; padding: 6px 10px; border-radius: 10px; }
   #settingsGrid select { padding: 4px 6px; }
+  #roleSet { margin: 4px 0 6px; background: #10152290; border-radius: 12px; padding: 6px 10px; }
+  #roleSet summary { cursor: pointer; padding: 4px 0; }
+  .rgroup { margin-top: 8px; }
+  .rname { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .roleGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; font-size: 14px; }
+  .roleGrid label { display: flex; justify-content: space-between; align-items: center; gap: 6px; background: #151b2c; padding: 6px 10px; border-radius: 10px; }
+  .roleGrid select { padding: 4px 6px; }
   #alert { background: rgba(0,0,0,.6); }
   #alertBox { width: min(720px, 100%); text-align: center; border-radius: 22px; padding: 18px 16px 24px; animation: pop .35s ease-out; }
   #alertBox.btn { background: repeating-linear-gradient(135deg, #7a1010 0 26px, #5c0b0b 26px 52px); border: 4px solid #ff4d4d; }
@@ -446,6 +453,41 @@
       <label>🤡 הליצן <select data-s="jester"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
     </div>
+    <details id="roleSet"><summary><b>🎭 הגדרות תפקידים</b> <span class="sub" style="margin:0">– כמה זמן כל יכולת נמשכת וכמה מחכים</span></summary>
+      <div class="rgroup"><div class="rname">🔧 מהנדס</div><div class="roleGrid">
+          <label>זמן בתוך פתח <select data-s="engVent"><option value="0">בלי הגבלה</option><option value="5">5ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option></select></label>
+          <label>המתנה בין זחילות <select data-s="engVentCd"><option value="0">בלי</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">👻 נעלם</div><div class="roleGrid">
+          <label>זמן היעלמות <select data-s="vanishTime"><option value="5">5ש׳</option><option value="8">8ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option></select></label>
+          <label>המתנה <select data-s="vanishCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="25">25ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">🎭 משנה צורה</div><div class="roleGrid">
+          <label>זמן בשינוי צורה <select data-s="shiftTime"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
+          <label>המתנה <select data-s="shiftCd"><option value="10">10ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">😇 מלאך שומר</div><div class="roleGrid">
+          <label>זמן הגנה <select data-s="shieldTime"><option value="5">5ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option></select></label>
+          <label>המתנה <select data-s="gaCd"><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">🛡 שומר ראש</div><div class="roleGrid">
+          <label>זמן שמירה <select data-s="guardTime"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option></select></label>
+          <label>המתנה <select data-s="guardCd"><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="40">40ש׳</option><option value="50">50ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">📸 צלם</div><div class="roleGrid">
+          <label>המתנה בין תמונות <select data-s="photoCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="25">25ש׳</option><option value="35">35ש׳</option><option value="45">45ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">🔎 בלש</div><div class="roleGrid">
+          <label>המתנה בין חקירות <select data-s="investCd"><option value="15">15ש׳</option><option value="25">25ש׳</option><option value="35">35ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">🐍 מרקיב</div><div class="roleGrid">
+          <label>גופה נעלמת אחרי <select data-s="rotTime"><option value="5">5ש׳</option><option value="8">8ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option></select></label>
+      </div></div>
+      <div class="rgroup"><div class="rname">🤡 ליצן</div><div class="roleGrid">
+          <label>המתנה לבננה <select data-s="bananaCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option></select></label>
+          <label>המתנה לגופה מזויפת <select data-s="fakeCd"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option></select></label>
+      </div></div>
+    </details>
     <div id="hostSettings" class="row hidden" style="margin:12px 0">
       <button id="startBtn" class="primary">התחל משחק ▶</button>
     </div>
@@ -453,7 +495,7 @@
     <div class="help">
       <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול)<br>
       <b>🤡 לבד:</b> הליצן – לא צוות ולא מתחזה. מנצח אם מדיחים אותו בישיבה. פתחי אוורור, קליפת בננה וגופה מזויפת (אפשר לכבות בהגדרות)<br>
-      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה ל-8ש׳) · מרקיב (גופות מתפרקות) · מחבל · רדוף (נועל דלת, מכבה אור בחדר, גורר גופות)<br>
+      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה) · מרקיב (גופות מתפרקות) · מחבל · רדוף (נועל דלת, מכבה אור בחדר, גורר גופות)<br>
       <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span> · קול: <span id="linkInfo">לא פעיל</span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
@@ -557,7 +599,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-143758'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-150248'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1039,7 +1081,7 @@ function renderLobby(s) {
     `<button title="${esc(c.n)}" data-c="${i}" class="${i === s.me.color ? 'sel' : ''}" style="background:${esc(c.c)}" ${taken.has(i) ? 'disabled' : ''}></button>`).join('');
   show('#hostSettings', s.me.host);
   show('#waitHost', !s.me.host);
-  document.querySelectorAll('#settingsGrid select').forEach(el => {
+  document.querySelectorAll('#settingsGrid select, #roleSet select').forEach(el => {
     const k = el.dataset.s, v = s.settings[k];
     el.value = BOOL_S.includes(k) ? (v ? '1' : '0') : String(v);
     el.disabled = !s.me.host;
@@ -1050,10 +1092,10 @@ document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 16 },
 const BOOL_S = ['confirm', 'openVotes', 'newRoles', 'jester'];
 const sendSettings = () => {
   const o = { type: 'settings' };
-  document.querySelectorAll('#settingsGrid select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : BOOL_S.includes(el.dataset.s) ? el.value === '1' : +el.value; });
+  document.querySelectorAll('#settingsGrid select, #roleSet select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : BOOL_S.includes(el.dataset.s) ? el.value === '1' : +el.value; });
   api(o);
 };
-document.querySelectorAll('#settingsGrid select').forEach(el => el.onchange = sendSettings);
+document.querySelectorAll('#settingsGrid select, #roleSet select').forEach(el => el.onchange = sendSettings);
 $('#startBtn').onclick = () => api({ type: 'start' });
 
 // ---------- HUD ----------
@@ -1100,7 +1142,7 @@ function actionState(s) {
   st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey), on: inVent || MAP.VENTS.some(v => D(pos, v) <= 60), label: inVent ? 'צא מהפתח' : 'פתח' };
+  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey), on: inVent || (!me.engVentCd && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : 'פתח') };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
