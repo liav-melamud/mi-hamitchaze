@@ -357,6 +357,11 @@
     #taskbar { top: auto; bottom: 170px; }
     h1 { font-size: 28px; }
   }
+#proxMeter{position:fixed;left:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column-reverse;gap:4px;align-items:center;z-index:30;pointer-events:none;background:rgba(0,0,0,.45);padding:8px 6px;border-radius:12px}
+#proxMeter.hidden{display:none}
+#proxMeter span{display:block;width:16px;height:10px;border-radius:3px;background:#2a3042;opacity:.8}
+#proxMeter span:nth-child(1).on{background:#8be07a}#proxMeter span:nth-child(2).on{background:#cfe25a}#proxMeter span:nth-child(3).on{background:#ffd23f}#proxMeter span:nth-child(4).on{background:#ff8a2b}#proxMeter span:nth-child(5).on{background:#ff3b30;box-shadow:0 0 10px #ff3b30}
+#proxMeter small{font-size:10px;color:#cdd6ee;margin-bottom:2px}
 </style>
 </head>
 <body>
@@ -372,6 +377,7 @@
   <div id="vitals" class="hidden"></div>
   <div id="workbar" class="hidden"><span id="worktxt">מבצע משימה…</span><div class="bar"><i id="workfill"></i></div></div>
   <div id="ghostBadge" class="hidden">👻 אתה רוח – רק רוחות רואות אותך</div>
+  <div id="proxMeter" class="hidden"><span></span><span></span><span></span><span></span><span></span><small>המחפש</small></div>
   <div id="ventPanel" class="hidden"><b>🕳️ אתה בתוך פתח אוורור – אף אחד לא רואה אותך</b><div class="row" id="ventBtns"></div></div>
   <div id="actions"></div>
 </div>
@@ -661,7 +667,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-195658'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-210511'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -720,7 +726,7 @@ function staleBanner() {
 }
 // בודק אם הדף שנטען הוא הגרסה האחרונה שעל השרת
 fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
-  const m = t.match(/const VERSION = '([^']+)'/);
+  const m = t.match(/const VERSION = '20261115-210511']+)'/);
   if (m && VERSION !== 'dev' && m[1] !== 'dev' && m[1] !== VERSION) staleBanner();
 }).catch(() => {});
 // שרתי עזר לחיבור בין רשתות שונות (STUN + שרת ממסר ציבורי) – כדי שהקול יעבוד גם כשכל חבר בבית אחר
@@ -1110,6 +1116,7 @@ function switchMap(id) {
 }
 function onState(s) {
   if (s.map) switchMap(s.map);
+  if (s.pings && s.pings.length) { const mx = Math.max(...s.pings.map(n => n.id)); if (mx > (window._lastPing || 0)) { pingSound(); window._lastPing = mx; } }
   S = s;
   $('#join').classList.add('hidden');
   for (const p of s.players) {
@@ -1227,6 +1234,7 @@ const ACTIONS = [
   { k: 'ward', ic: '🫂', label: 'שמור על', key: 'U' },
   { k: 'rewind', ic: '⏪', label: 'החזר זמן', key: 'Y' },
   { k: 'noise', ic: '🔊', label: 'רעש', key: 'N', red: true },
+  { k: 'hide', ic: '🫣', label: 'הסתתר', key: 'M' },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -1273,11 +1281,15 @@ function actionState(s) {
   st.fakeBody = { show: jest, on: !inVent && me.fakeCd === 0, label: me.fakeCd ? 'גופה ' + me.fakeCd : 'גופה מזויפת' };
   st.ward = { show: alive && me.roleKey === 'guardian' && !!me.ward && me.ward.swap, on: closeP, label: 'החלף שמירה' };
   st.rewind = { show: alive && me.roleKey === 'timekeeper' && !me.rewindUsed, on: true, label: 'החזר זמן' };
+  st.hide = { show: alive && s.settings.mode === 3 && me.team !== 'imp' && !inVent, on: !!me.hiding || (!me.hideCd && (MAP.SPOTS || []).some(q => D(pos, q) <= 75)), label: me.hiding ? 'צא' : me.hideCd ? 'הסתתר ' + me.hideCd : 'הסתתר' };
   st.noise = { show: alive && me.roleKey === 'noisemaker', on: !inVent && me.noiseCd === 0, label: me.noiseCd ? 'רעש ' + me.noiseCd : 'רעש' };
   st.sab = { show: alive && me.team === 'imp' && s.settings.mode !== 3, on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
 }
 
+function pingSound() {
+  try { const ac = window._pAC = window._pAC || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(); o.type = 'square'; o.frequency.setValueAtTime(220, ac.currentTime); o.frequency.exponentialRampToValueAtTime(90, ac.currentTime + 0.18); g.gain.setValueAtTime(0.12, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.22); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.25); } catch (e) {}
+}
 function doAction(k) {
   if (!S || S.phase !== 'play') return;
   if (k === 'vitals') { if (S.me.roleKey === 'scientist') { vitalsOpen = !vitalsOpen; renderHud(S); } return; }
@@ -1308,6 +1320,7 @@ function renderHud(s) {
   $('#workfill').style.width = Math.min(100, me.work * 100) + '%';
   show('#ghostBadge', !me.alive && !me.spec);
   show('#raceBoard', !!s.race || !!s.hide);
+  { const pm = $('#proxMeter'), on = !!s.hide && me.team !== 'imp' && me.alive && !me.spec; pm.classList.toggle('hidden', !on); if (on) [...pm.querySelectorAll('span')].forEach((e, i) => e.classList.toggle('on', i < s.hide.near)); }
   if (s.hide) {
     const m = Math.floor(s.hide.left / 60), sc = s.hide.left % 60;
     $('#raceBoard').innerHTML = `<div class="rt">🙈 מחבואים · ${m}:${String(sc).padStart(2, '0')}</div><div class="rr">${s.hide.wait ? '🔢 המחפש יוצא בעוד ' + s.hide.wait : '👀 המחפש מחפש!'}</div><div class="rr">🫣 נשארו ${s.hide.hiders} מתחבאים</div>` + (s.tour ? `<div class="rr">🏆 סיבוב ${s.tour.round}/${s.tour.total}</div>` : '');
@@ -2947,8 +2960,8 @@ $('#quick').onclick = e => {
 };
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB', hauntDoor: 'KeyJ', hauntLight: 'KeyL', drag: 'KeyZ', banana: 'KeyK', fakeBody: 'KeyT', ward: 'KeyU', rewind: 'KeyY', noise: 'KeyN' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)', hauntDoor: 'נעילת דלת (רדוף)', hauntLight: 'כיבוי אור בחדר (רדוף)', drag: 'גרירת גופה (רדוף)', banana: 'קליפת בננה (ליצן)', fakeBody: 'גופה מזויפת (ליצן)', ward: 'החלפת שמירה (מגן אישי)', rewind: 'החזרת זמן (שומר הזמן)', noise: 'רעש מזויף (רעשן)' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB', hauntDoor: 'KeyJ', hauntLight: 'KeyL', drag: 'KeyZ', banana: 'KeyK', fakeBody: 'KeyT', ward: 'KeyU', rewind: 'KeyY', noise: 'KeyN', hide: 'KeyM' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)', hauntDoor: 'נעילת דלת (רדוף)', hauntLight: 'כיבוי אור בחדר (רדוף)', drag: 'גרירת גופה (רדוף)', banana: 'קליפת בננה (ליצן)', fakeBody: 'גופה מזויפת (ליצן)', ward: 'החלפת שמירה (מגן אישי)', rewind: 'החזרת זמן (שומר הזמן)', noise: 'רעש מזויף (רעשן)', hide: 'הסתתרות (מחבואים)' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -3005,7 +3018,7 @@ function sendInput() {
 }
 // מצב אדמין: רק במשפט הסודי בצ'אט או בדיבור (ראו adminPhrase במנוע). אין יותר קיצור מקשים או מגע.
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard', 'hauntDoor', 'hauntLight', 'drag', 'banana', 'fakeBody', 'ward', 'rewind', 'noise'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard', 'hauntDoor', 'hauntLight', 'drag', 'banana', 'fakeBody', 'ward', 'rewind', 'noise', 'hide'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;
@@ -3669,7 +3682,7 @@ function frame(t) {
 
   const noDark = !me.alive || me.spec;
   let vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
-  if (S.settings.mode === 3) vision = me.team === 'imp' ? 230 : 165; // מחבואים: טווח ראייה קטן לכולם
+  if (S.settings.mode === 3) vision = me.team === 'imp' ? (S.hide && S.hide.wait > 0 ? 22 : 150) : 165; // מחבואים: טווח ראייה קטן לכולם
   if (S.sab && S.sab.type === 'lights' && me.team !== 'imp') vision = 95;
   { const myRoom = MAP.roomAt(cam.x, cam.y); if (myRoom && (S.darkRooms || []).includes(myRoom.id) && me.team !== 'imp') vision = 95; } // חדר שהרדוף כיבה בו את האור
   const reveal = S.settings.reveal || noDark;
@@ -3677,6 +3690,18 @@ function frame(t) {
 
   for (const b of S.bodies) if (noDark || D(cam, b) <= vision) drawBody(b);
   if (S.pairCalls && S.pairCalls.length) { ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const bob = Math.sin(performance.now() / 250) * 5; for (const c of S.pairCalls) ctx.fillText('🤝', c.x, c.y - 56 + bob); ctx.textBaseline = 'alphabetic'; }
+  if (S.settings.mode === 3 && MAP.SPOTS) {
+    const ice = MAP.theme === 'ice';
+    MAP.SPOTS.forEach((sp, i) => {
+      if (!noDark && D(cam, sp) > vision + 40) return;
+      const mine = me.hiding && D(sp, pos) < 4;
+      ctx.save(); ctx.globalAlpha = mine ? 0.55 : 1;
+      if (ice) { ctx.fillStyle = '#dff1ff'; ctx.beginPath(); ctx.ellipse(sp.x, sp.y + 6, 30, 20, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#b6d4ec'; ctx.beginPath(); ctx.ellipse(sp.x + 8, sp.y + 8, 18, 10, 0, Math.PI, 0); ctx.fill(); }
+      else { box(sp.x - 20, sp.y - 30, 40, 56, '#4d6a8f', '#1d2b40', 5, 3); ctx.fillStyle = '#16233a'; for (let k = 0; k < 4; k++) ctx.fillRect(sp.x - 13, sp.y - 20 + k * 9, 26, 3); ctx.fillStyle = '#9fb3d4'; ctx.fillRect(sp.x + 10, sp.y - 2, 4, 8); }
+      ctx.restore();
+    });
+  }
+  if (S.pings && S.pings.length) { const tt = performance.now(); for (const n of S.pings) { const k = ((tt / 700) + n.id * 0.37) % 1; ctx.strokeStyle = 'rgba(255,230,120,' + (0.8 - k * 0.7) + ')'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(n.x, n.y, 20 + k * 90, 0, 7); ctx.stroke(); ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('🔊', n.x, n.y - 24 - k * 10); } }
   if (S.noises && S.noises.length) { ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ph = performance.now() / 200; for (const n of S.noises) { ctx.globalAlpha = 0.55 + 0.45 * Math.sin(ph); ctx.fillText('👣', n.x - 26, n.y); ctx.fillText('🔊', n.x + 26, n.y - 10); } ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic'; }
   if (S.bananas && S.bananas.length) { ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const b of S.bananas) if (noDark || D(cam, b) <= vision) ctx.fillText('🍌', b.x, b.y); ctx.textBaseline = 'alphabetic'; }
 

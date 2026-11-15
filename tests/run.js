@@ -819,5 +819,48 @@ test('מחבואים: חיסול כל שנייה, והמתחבאים נכנסי�
   ok(cd <= 1.01, 'זמן בין חיסולים ארוך מדי: ' + cd);
 });
 
+test('מחבואים: מסתור בלתי נראה, רעש בפתחים, ומד קירבה למחפש', () => {
+  const { g, a } = newGame({ bots: 5, role: 'איש צוות', cfg: { mode: 3, hideTime: 300 } });
+  const SP = MAP.SPOTS[0], V = MAP.VENTS[0];
+  ok(MAP.SPOTS.length >= 6, 'אין מספיק מסתורים');
+  const sn0 = JSON.parse(g.snapshot()); const sk = Object.values(sn0.players).find(p => p.role === 'seeker');
+  const other = Object.values(sn0.players).find(p => p.id !== a && p.id !== sk.id);
+  place(g, sn => { Object.values(sn.players).forEach(p => { p.x = 100; p.y = 100; if (p.bot) { p.bot.plan = []; p.bot.wait = 999; } }); sn.players[a].x = SP.x + 20; sn.players[a].y = SP.y; sn.players[sk.id].x = SP.x + 900; sn.players[sk.id].y = SP.y; sn.players[sk.id].frozenUntil = 0; sn.players[sk.id].killCd = 0; });
+  g.setConn(a, true);
+  g.act(a, { type: 'hide' }); tick(g, 2);
+  ok(g.view(a).me.hiding === 1, 'לא התחבא');
+  ok(!g.view(sk.id).players.some(p => p.id === a), 'המתחבא נראה למחפש');
+  ok(g.view(a).hide.near === 0, 'המד אמור להיות 0 כשהמחפש רחוק');
+  // מחפש רחוק לא תופס; קרוב מאוד תופס
+  place(g, sn => { sn.players[sk.id].x = SP.x + 85; sn.players[sk.id].y = SP.y; });
+  g.setConn(a, true);
+  g.act(sk.id, { type: 'kill' });
+  ok(JSON.parse(g.snapshot()).players[a].alive, 'נתפס מרחוק');
+  ok(g.view(a).hide.near >= 4, 'המד לא עלה כשהמחפש קרוב: ' + g.view(a).hide.near);
+  place(g, sn => { sn.players[sk.id].x = SP.x + 30; sn.players[sk.id].y = SP.y; });
+  g.setConn(a, true);
+  g.act(sk.id, { type: 'kill' });
+  ok(!JSON.parse(g.snapshot()).players[a].alive, 'לא נתפס מקרוב');
+  // פתח אוורור משמיע רעש למחפש
+  const o = other.id;
+  place(g, sn => { sn.players[o].x = V.x; sn.players[o].y = V.y; sn.players[sk.id].x = V.x + 300; sn.players[sk.id].y = V.y; sn.players[sk.id].frozenUntil = 0; });
+  g.setConn(a, true);
+  g.act(o, { type: 'vent' });
+  ok(g.view(sk.id).pings.length >= 1, 'המחפש לא שמע את הפתח');
+});
+
+test('מחבואים: בוטים מתחבאים חכם, והמחפש הבוט בודק מסתורים', () => {
+  const { g, a } = newGame({ bots: 7, role: 'איש צוות', cfg: { mode: 3, hideTime: 300, botLevel: 3 } });
+  let hid = 0, vented = 0;
+  for (let i = 0; i < 120; i++) {
+    sec(g, 1);
+    const sn = JSON.parse(g.snapshot());
+    for (const p of Object.values(sn.players)) { if (p.bot && p.hiding != null) hid++; if (p.bot && p.inVent !== null) vented++; }
+    if (g.view(a).phase === 'end') break;
+  }
+  ok(hid > 20, 'הבוטים כמעט לא התחבאו: ' + hid);
+  console.log('    (בוט במסתור ' + hid + ' שניות-בוט, בפתח ' + vented + ')');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

@@ -77,7 +77,9 @@ const roleOn = k => !(settings.roleOff || []).includes(k);
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
   const botTaskTime = () => (4 + 4 * settings.taskLevel) * (settings.botLevel === 1 ? 1.3 : settings.botLevel === 3 ? 0.8 : 1);
   // בקבוצה קטנה למתחזה קשה יותר, אז זמן ההמתנה בין חיסולים מתקצר קצת
-  const HIDE_VENTS = 5, HIDE_VENT_TIME = 15;
+  const HIDE_VENTS = 5, HIDE_VENT_TIME = 15, HIDE_SPOT_TIME = 25, HIDE_SPOT_CD = 6;
+let pings = [], pingId = 0; // רעשים של פתחי אוורור/מחבואים (מחבואים בלבד)
+const addPing = (x, y, by) => { pings.push({ id: ++pingId, x, y, by, until: now() + 3 }); };
   const killCdFor = () => { if (settings.mode === 3) return 1;  const n = Object.values(players).filter(q => !q.spectator).length; return settings.killCd * (n <= 5 ? 0.7 : n <= 7 ? 0.85 : 1); };
   const isMini = i => !MAP.TASK_TIME[MAP.TASKS[i].kind];
 
@@ -250,7 +252,7 @@ function startGame(by) {
   all.forEach(p => {
     p.alive = true; p.ejected = false; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
-    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15;
+    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.hiding = null; p.hideSince = 0; p.hideCd = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15;
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
@@ -259,8 +261,8 @@ function startGame(by) {
   });
   // המגן האישי מקבל שחקן לשמור עליו
   all.filter(p => p.role === 'guardian').forEach(p => { const w = pick(all.filter(o => o.id !== p.id)); if (w) { p.ward = w.id; toast(p, '🫂 אתה שומר על ' + nm(w) + '. אם יקרה לו משהו – תדע מיד'); } });
-  noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
-  if (hide) imps.forEach(p => { p.frozenUntil = now() + 10; p.killCd = 10; toast(p, '🙈 אתה המחפש! סופר עד 10…'); });
+  pings = []; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
+  if (hide) { imps.forEach(p => { p.frozenUntil = now() + 10; p.killCd = 10; toast(p, '🙈 אתה המחפש! עיניים עצומות 10 שניות, ואז מחפשים…'); }); all.filter(q => team(q) !== 'imp').forEach(q => toast(q, '🔍 המחפש הוא ' + imps.map(nm).join(', ') + ' – מתחבאים! (הסתתר במסתור: M)')); }
   else all.forEach(p => { p.frozenUntil = 0; });
   if (hide) crew.forEach(p => toast(p, '🙈 מחבואים! ' + nm(imps[0]) + ' הוא המחפש – יש לך 10 שניות להתחבא'));
   pairCalls = []; camsOffUntil = 0; camsCd = 0;
@@ -635,7 +637,7 @@ function act(p, a) {
       if (p.role === 'poltergeist') return toast(p, 'הרדוף לא מחסל – נעל דלת, כבה אור או גרור גופה!');
       if (p.vanishUntil > t) return toast(p, 'אי אפשר לחסל בזמן שאתה נעלם');
       if (p.frozenUntil > t) return toast(p, 'עוד רגע… סופר עד 10');
-      const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null), KILL_RANGE);
+      const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null && (o.hiding == null || dist(o, p) < 60)), KILL_RANGE);
       if (!tgt) return;
       if (tgt.shieldUntil > t) {
         p.killCd = 10; toast(p, '🛡 המטרה מוגנת!');
@@ -692,14 +694,25 @@ function act(p, a) {
     case 'vent': {
       const hideVent = settings.mode === 3 && p.role === 'crew'; // מחבואים: המתחבאים יכולים להיכנס לפתחים 5 פעמים
       if (phase !== 'play' || !p.alive || !(hideVent || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(p.role))) return;
-      if (p.inVent !== null) { p.inVent = null; witnessVent(p); return; } // יציאה מהפתח
+      if (p.inVent !== null) { if (settings.mode === 3) addPing(p.x, p.y, p.id); p.inVent = null; witnessVent(p); return; } // יציאה מהפתח
       if (hideVent) { if ((p.hideVents || 0) >= HIDE_VENTS) return toast(p, '🕳️ נגמרו לך הכניסות לפתחים'); }
       if (p.role === 'engineer' && p.engVentCd > 0) return toast(p, '🕳️ אפשר לזחול שוב בעוד ' + Math.ceil(p.engVentCd) + ' שניות');
       const v = nearest(p, MAP.VENTS, USE_RANGE);
       if (!v) return;
-      witnessVent(p);
+      witnessVent(p); if (settings.mode === 3) addPing(v.x, v.y, p.id);
       p.inVent = MAP.VENTS.indexOf(v); p.x = v.x; p.y = v.y; p.work = null;
       if (hideVent) { p.hideVents = (p.hideVents || 0) + 1; p.ventSince = t; toast(p, '🕳️ נשארו לך ' + (HIDE_VENTS - p.hideVents) + ' כניסות לפתחים (עד ' + HIDE_VENT_TIME + ' שניות בכל פעם)'); }
+      break;
+    }
+    case 'hide': { // מחבואים: להיכנס/לצאת ממקום מסתור
+      if (phase !== 'play' || !p.alive || settings.mode !== 3 || p.role !== 'crew' || p.inVent !== null) return;
+      if (p.hiding != null) { p.hiding = null; p.hideCd = HIDE_SPOT_CD; addPing(p.x, p.y, p.id); return; }
+      if ((p.hideCd || 0) > 0) return toast(p, '🫣 אפשר להסתתר שוב בעוד ' + Math.ceil(p.hideCd) + ' שניות');
+      const sp = nearest(p, MAP.SPOTS.filter((q, i) => !list().some(o => o.hiding === i)), USE_RANGE + 15);
+      if (!sp) return;
+      p.hiding = MAP.SPOTS.indexOf(sp); p.x = sp.x; p.y = sp.y; p.work = null; p.hideSince = t;
+      addPing(sp.x, sp.y, p.id);
+      toast(p, '🫣 מסתתר! (עד ' + HIDE_SPOT_TIME + ' שניות, אפשר לצאת עם M)');
       break;
     }
     case 'ventMove': {
@@ -958,17 +971,49 @@ function botTick(p, dt) {
       const fake = near.find(o => o.shapeAs && players[o.shapeAs] && players[o.shapeAs].alive && near.some(q => q.id === o.shapeAs));
       if (fake) { b.sawShift = fake.id; b.flee = { from: fake.id, t: 4 + Math.random() * 2 }; b.plan = []; b.pressButton = !p.emergencyUsed && Math.random() < 0.6; }
     }
-    // מחבואים: מתחבא שרואה את המחפש בורח ממנו; המחפש רודף אחרי הקרוב ביותר
-    if (settings.mode === 3 && team(p) !== 'imp' && !b.flee) {
-      const sk = list().find(o => o.alive && team(o) === 'imp' && !(o.frozenUntil > now()) && dist(o, p) < sightR() * 1.1);
-      if (sk) { b.flee = { from: sk.id, t: 1.5 + Math.random() }; b.plan = []; b.pressButton = false; }
+    // מחבואים: המתחבא מתחבא חכם (מסתור או פתח אוורור), המחפש בודק מסתורים ומקשיב לרעשים
+    if (settings.mode === 3 && team(p) !== 'imp' && phase === 'play') {
+      const lvl = settings.botLevel, T = now();
+      const sk = list().filter(o => o.alive && team(o) === 'imp' && !(o.frozenUntil > T)).sort((x, y) => dist(x, p) - dist(y, p))[0];
+      const sd = sk ? dist(sk, p) : 9999;
+      if (p.hiding != null) { // במסתור: נשאר, ויוצא כשהמחפש רחוק
+        if (b.hideStay === undefined) b.hideStay = 6 + Math.random() * 14;
+        if (T - p.hideSince > b.hideStay && sd > 450) { act(p, { type: 'hide' }); b.hideStay = undefined; b.wait = 0.5; }
+        return;
+      }
+      if (p.inVent !== null) {
+        if (b.ventStay === undefined) b.ventStay = 4 + Math.random() * 9;
+        if (T - (p.ventSince || T) > b.ventStay && sd > 300) { act(p, { type: 'vent' }); b.ventStay = undefined; b.wait = 0.5; }
+        return;
+      }
+      const freeSpot = (maxD) => MAP.SPOTS.map((q, i) => ({ q, i })).filter(o => !list().some(z => z.hiding === o.i) && dist(o.q, p) < maxD).sort((x, y) => dist(x.q, p) - dist(y.q, p))[0];
+      const goSpot = o => { b.spot = o.i; b.plan = [...(hereRoom(p).id === o.q.room ? [] : MAP.path(hereRoom(p).id, o.q.room)), { x: o.q.x, y: o.q.y }]; b.goal = null; b.wait = 0; b.flee = null; };
+      if (b.spot != null && !b.plan.length) { const sp = MAP.SPOTS[b.spot]; b.spot = null; if (sp && dist(sp, p) < USE_RANGE + 12) { act(p, { type: 'hide' }); return; } }
+      if (b.toVent && !b.plan.length) { b.toVent = false; act(p, { type: 'vent' }); return; }
+      if (sk && sd < 340 && !b.flee && b.spot == null && !b.toVent && lvl > 1) {
+        const v = (p.hideVents || 0) < HIDE_VENTS && nearest(p, MAP.VENTS, 240);
+        if (v && Math.random() < 0.5) { b.toVent = true; b.plan = [{ x: v.x, y: v.y }]; b.goal = null; b.wait = 0; }
+        else { const o = !(p.hideCd > 0) && freeSpot(260); if (o && Math.random() < 0.6) goSpot(o); }
+      }
+      if (sk && sd < sightR() * 1.1 && !b.flee && b.spot == null && !b.toVent) { b.flee = { from: sk.id, t: 1.5 + Math.random() }; b.plan = []; b.pressButton = false; }
     }
     if (settings.mode === 3 && team(p) === 'imp' && !(p.frozenUntil > now())) {
       b.huntT = (b.huntT || 0) - dt;
       if (b.huntT <= 0) {
         b.huntT = 1;
-        const tg = list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && dist(o, p) < (settings.botLevel === 1 ? 500 : 900)).sort((x, y) => dist(p, x) - dist(p, y))[0];
-        if (tg) { const to = MAP.roomAt(tg.x, tg.y) || hereRoom(tg), here = hereRoom(p); b.plan = [...(to.id === here.id ? [] : MAP.path(here.id, to.id)), { x: tg.x, y: tg.y }]; b.goal = null; b.wait = 0; }
+        const T = now(), lvl = settings.botLevel;
+        const tg = list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.hiding == null && o.inVent === null && dist(o, p) < (lvl === 1 ? 160 : lvl === 2 ? 200 : 250)).sort((x, y) => dist(p, x) - dist(p, y))[0];
+        const toPoint = (x, y) => { const to = MAP.roomAt(x, y) || hereRoom(p), here = hereRoom(p); b.plan = [...(to.id === here.id ? [] : MAP.path(here.id, to.id)), { x, y }]; b.goal = null; b.wait = 0; };
+        if (tg) toPoint(tg.x, tg.y);
+        else {
+          const pg = lvl > 1 ? pings.filter(q => q.by !== p.id && q.until > T && dist(q, p) < 1400 && q.id !== b.lastPing).sort((x, y) => dist(p, x) - dist(p, y))[0] : null;
+          if (pg) { b.lastPing = pg.id; toPoint(pg.x, pg.y); b.searched = b.searched || {}; }
+          else if (!b.plan.length || Math.random() < 0.1) {
+            b.searched = b.searched || {};
+            const sp = MAP.SPOTS.map((q, i) => ({ q, i })).filter(o => T - (b.searched[o.i] || -99) > 45).sort((x, y) => dist(p, x.q) - dist(p, y.q))[0];
+            if (sp) { b.searched[sp.i] = T; toPoint(sp.q.x, sp.q.y); }
+          }
+        }
       }
     }
     // מתחזה ציד: כשהחיסול כמעט מוכן, הולך אחרי מישהו שמסתובב לבד (כמו שחקן אמיתי)
@@ -997,7 +1042,7 @@ function botTick(p, dt) {
     }
     // מתחזה: חסל כשאין עדים
     if (team(p) === 'imp' && p.killCd <= 0 && !NON_KILLERS.includes(p.role)) {
-      const tgt = nearest(p, list().filter(o => o.alive && team(o) !== 'imp'), KILL_RANGE);
+      const tgt = nearest(p, list().filter(o => o.alive && team(o) !== 'imp' && (o.hiding == null || dist(o, p) < 60)), KILL_RANGE);
       if (tgt) {
         const lvl = settings.botLevel;
         const witnesses = list().filter(o => o.alive && o.id !== p.id && o.id !== tgt.id && o.inVent === null && dist(o, p) < (lvl === 3 ? 420 : 320));
@@ -1119,6 +1164,12 @@ function botTick(p, dt) {
     // מתחזה "עושה" משימה מזויפת: עומד ליד העמדה כמה שניות, כמו כולם
     if (b.goal && b.goal.fake) { b.goal = null; b.wait = 3 + Math.random() * 4; return; }
     b.wait = 0.5 + Math.random() * 2.5;
+    if (settings.mode === 3 && team(p) !== 'imp' && !(p.hideCd > 0) && Math.random() < (settings.botLevel === 1 ? 0.35 : settings.botLevel === 2 ? 0.65 : 0.85)) {
+      const sk = list().find(o => o.alive && team(o) === 'imp');
+      const free = MAP.SPOTS.map((q, i) => ({ q, i })).filter(o => !list().some(z => z.hiding === o.i)).sort((x, y) => (sk ? dist(sk, y.q) - dist(sk, x.q) : 0)).slice(0, 5);
+      const o = free.length ? pick(free) : null;
+      if (o) { b.spot = o.i; b.plan = [...(hereRoom(p).id === o.q.room ? [] : MAP.path(hereRoom(p).id, o.q.room)), { x: o.q.x, y: o.q.y }]; b.goal = null; b.wait = 0; return; }
+    }
     botGoal(p);
     return;
   }
@@ -1436,7 +1487,7 @@ function tick() {
         if (MAP.walkable(nx, ny)) { q.x = nx; q.y = ny; }
       }
     }
-    noises = noises.filter(n => n.until > t);
+    noises = noises.filter(n => n.until > t); pings = pings.filter(n => n.until > t);
     pairCalls = pairCalls.filter(c => c.until > t && players[c.by] && players[c.by].alive);
     histT -= dt;
     if (histT <= 0) { // תמונת מצב כל חצי שנייה לשומר הזמן
@@ -1451,6 +1502,7 @@ function tick() {
       p.guardCd = Math.max(0, (p.guardCd || 0) - dt);
       if (p.role === 'noisemaker') p.noiseCd = Math.max(0, (p.noiseCd || 0) - dt);
       p.photoCd = Math.max(0, (p.photoCd || 0) - dt); p.investCd = Math.max(0, (p.investCd || 0) - dt); p.vanishCd = Math.max(0, (p.vanishCd || 0) - dt);
+      if (settings.mode === 3) { p.hideCd = Math.max(0, (p.hideCd || 0) - dt); if (p.hiding != null && t - p.hideSince > HIDE_SPOT_TIME) { p.hiding = null; p.hideCd = HIDE_SPOT_CD; addPing(p.x, p.y, p.id); toast(p, '🫣 נגמר הזמן במסתור'); } }
       if (settings.mode === 3 && p.role === 'crew' && p.inVent !== null && p.ventSince && t - p.ventSince > HIDE_VENT_TIME) { p.inVent = null; p.ventSince = 0; witnessVent(p); toast(p, '🕳️ נגמר הזמן בפתח'); }
       // מהנדס: זמן מוגבל בתוך הפתח, ואחרי היציאה המתנה
       if (p.role === 'engineer') {
@@ -1489,7 +1541,7 @@ function tick() {
         }
       }
       if (p.slip) { if (t < p.slip.until && p.alive) { dx = p.slip.dx; dy = p.slip.dy; } else p.slip = null; }
-      const len = p.inVent !== null || p.frozenUntil > t ? 0 : Math.hypot(dx, dy);
+      const len = p.inVent !== null || p.hiding != null || p.frozenUntil > t ? 0 : Math.hypot(dx, dy);
       if (len > 0) {
         dx /= len; dy /= len;
         const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1) * (settings.mode === 3 && team(p) === 'imp' ? 1.12 : 1) * (sab && sab.type === 'freeze' && p.alive && team(p) !== 'imp' ? 0.55 : 1); // גרירת גופה מאטה, החלקה מאיצה, המחפש מהיר
@@ -1603,13 +1655,13 @@ function viewFor(v) {
   const ps = [];
   for (const p of list()) {
     if (phase === 'play' && !p.alive && v.alive && p.id !== v.id) continue; // רוחות נסתרות מהחיים
-    if (p.inVent !== null && p.id !== v.id && !seeAll && !(team(v) === 'imp' && team(p) === 'imp')) continue; // בתוך פתח – בלתי נראה
+    if ((p.inVent !== null || p.hiding != null) && p.id !== v.id && !seeAll && !(team(v) === 'imp' && team(p) === 'imp' && p.hiding == null)) continue; // בתוך פתח/מסתור – בלתי נראה
     if (p.vanishUntil > t && p.id !== v.id && team(v) !== 'imp' && !seeAll) continue; // נעלם – בלתי נראה
     const disp = p.shapeAs && players[p.shapeAs] ? players[p.shapeAs] : p;
     const o = {
       id: p.id, x: Math.round(p.x), y: Math.round(p.y), dir: p.dir, name: disp.name, color: COLORS[disp.color].c,
       alive: p.alive, spec: !!p.spectator, bot: p.isBot, work: p.work && !p.work.mini ? p.work.t / taskTime(p.work.ref.i) : 0, hat: disp.hat, pet: disp.pet || 0,
-      scan: p.work && MAP.TASKS[p.work.ref.i].kind === 'scan' ? 1 : 0, vent: p.inVent !== null || p.vanishUntil > t ? 1 : 0,
+      scan: p.work && MAP.TASKS[p.work.ref.i].kind === 'scan' ? 1 : 0, vent: p.inVent !== null || p.hiding != null || p.vanishUntil > t ? 1 : 0,
     };
     if (p.shieldUntil > t) o.shield = 1;
     if (p.slip) o.slip = 1;
@@ -1628,7 +1680,7 @@ function viewFor(v) {
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
     sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial', freeze: 'dial' }[sab.type], i: v.sabWork.i } : null,
     sabCd: Math.ceil(sabCd),
-    guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t, engVentCd: Math.ceil(v.engVentCd || 0), hideVentsLeft: settings.mode === 3 && v.role === 'crew' ? HIDE_VENTS - (v.hideVents || 0) : null, ventLeft: v.role === 'engineer' && v.inVent !== null && settings.engVent && v.ventSince ? Math.max(0, Math.ceil(settings.engVent - (t - v.ventSince))) : null,
+    guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t, engVentCd: Math.ceil(v.engVentCd || 0), hideVentsLeft: settings.mode === 3 && v.role === 'crew' ? HIDE_VENTS - (v.hideVents || 0) : null, hiding: v.hiding != null ? 1 : 0, hideCd: Math.ceil(v.hideCd || 0), ventLeft: v.role === 'engineer' && v.inVent !== null && settings.engVent && v.ventSince ? Math.max(0, Math.ceil(settings.engVent - (t - v.ventSince))) : null,
     bananaCd: Math.ceil(v.bananaCd || 0), fakeCd: Math.ceil(v.fakeCd || 0), hauntDoorCd: Math.ceil(v.hauntDoorCd || 0), darkCd: Math.ceil(v.darkCd || 0), dragCd: Math.ceil(v.dragCd || 0), dragging: !!v.drag,
     photos: (v.photos || []).map(ph => ({ ago: Math.round(t - ph.t), room: ph.room, names: ph.names, bodies: ph.bodies })), notes: (v.notes || []).slice(-6),
     color: v.color,
@@ -1641,7 +1693,7 @@ function viewFor(v) {
     bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c, rot: b.decayAt ? 1 : 0 })),
     tasks: settings.mode === 2 ? { done: v.stats ? v.stats.tasks : 0, total: settings.raceGoal } : { done: taskDone, total: taskTotal },
     map: settings.map,
-    hide: settings.mode === 3 && phase === 'play' ? { left: Math.max(0, Math.round(hideEndAt - t)), wait: Math.max(0, Math.ceil(Math.max(...list().map(q => (q.frozenUntil || 0) - t)))), hiders: list().filter(q => q.alive && !q.spectator && team(q) !== 'imp').length } : null,
+    hide: settings.mode === 3 && phase === 'play' ? { near: (() => { const sk = list().filter(q => q.alive && !q.spectator && team(q) === 'imp'); if (!sk.length || team(v) === 'imp') return 0; const d = Math.min(...sk.map(q => dist(q, v))); return d < 170 ? 5 : d < 270 ? 4 : d < 390 ? 3 : d < 540 ? 2 : d < 750 ? 1 : 0; })(), left: Math.max(0, Math.round(hideEndAt - t)), wait: Math.max(0, Math.ceil(Math.max(...list().map(q => (q.frozenUntil || 0) - t)))), hiders: list().filter(q => q.alive && !q.spectator && team(q) !== 'imp').length } : null,
     tour: tourView(),
     race: settings.mode === 2 && phase === 'play' ? { goal: settings.raceGoal, left: Math.max(0, Math.round(raceEndAt - t)), board: raceRanking().slice(0, 5) } : null,
     gusts: gusts.map(g => g.i),
@@ -1652,6 +1704,7 @@ function viewFor(v) {
     hauntDoors: hauntDoors.filter(d => d.until > t).map(d => ({ x: d.x, y: d.y, w: d.w, h: d.h })),
     pairCalls: pairCalls.map(c => ({ x: c.x, y: c.y })),
     noises: noises.map(n => ({ x: n.x, y: n.y })),
+    pings: settings.mode === 3 && phase === 'play' ? pings.filter(n => n.by !== v.id && Math.hypot(n.x - v.x, n.y - v.y) < (team(v) === 'imp' ? 1000 : 380)).map(n => ({ id: n.id, x: n.x, y: n.y })) : [],
     bananas: bananas.map(b => ({ x: Math.round(b.x), y: Math.round(b.y) })),
     darkRooms: Object.keys(darkRooms).filter(r => darkRooms[r] > t),
     doorCool: Object.fromEntries(Object.keys(doorCool).filter(r => doorCool[r] > now() && !(doorsUntil[r] > now())).map(r => [r, Math.ceil(doorCool[r] - now())])),

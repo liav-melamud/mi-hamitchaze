@@ -288,7 +288,29 @@
       TASKS.push({ room, x: best.x, y: best.y, name, kind, theme });
     }
   })();
-  return { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant, theme: ice ? 'ice' : 'space' };
+  // מקומות מסתור (למצב מחבואים): שניים בכל חדר, רחוקים ממשימות ומפתחים
+  const SPOTS = [];
+  (function addSpots() {
+    const fixed = [...TASKS, ...VENTS, BUTTON, CAM_CONSOLE, ...SAB_POINTS.lights, ...SAB_POINTS.oxygen, ...SAB_POINTS.reactor, ...SAB_POINTS.freeze];
+    let seed = 777;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    for (const id of Object.keys(ROOMS)) {
+      const r = ROOMS[id];
+      for (let n = 0; n < 2; n++) {
+        let best = null, bestScore = 70;
+        for (let i = 0; i < 400; i++) {
+          const x = Math.round(r.x + 55 + rnd() * (r.w - 110)), y = Math.round(r.y + 60 + rnd() * (r.h - 110));
+          if (!walkable(x, y)) continue;
+          let d = 1e9;
+          for (const q of fixed) d = Math.min(d, Math.hypot(q.x - x, q.y - y));
+          for (const q of SPOTS) d = Math.min(d, Math.hypot(q.x - x, q.y - y) * 0.6);
+          if (d > bestScore) { bestScore = d; best = { x, y, room: id }; }
+        }
+        if (best) SPOTS.push(best);
+      }
+    }
+  })();
+  return { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, SPOTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant, theme: ice ? 'ice' : 'space' };
   }
   const MAP = build('big'), SMALL = build('small'), ICE = build('ice');
   MAP.byId = { big: MAP, small: SMALL, ice: ICE };
