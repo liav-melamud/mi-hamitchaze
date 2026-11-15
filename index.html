@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="מי המתחזה">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>מי המתחזה?</title>
 <style>
   :root {
@@ -620,7 +621,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-160230'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-174415'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -2698,7 +2699,7 @@ const sendLobby = () => { const t = $('#lobbyIn').value.trim(); if (t) api({ typ
 $('#lobbySend').onclick = sendLobby;
 $('#lobbyIn').onkeydown = e => { if (e.key === 'Enter') sendLobby(); e.stopPropagation(); };
 
-// ---------- הורדת אפליקציה (אנדרואיד) ----------
+// ---------- הורדת אפליקציה (אנדרואיד / אייפון) ----------
 const APK_URL = 'https://github.com/liav-melamud/mi-hamitchaze/releases/download/app/mi-hamitchaze.apk';
 (function () {
   const box = $('#appBox');
@@ -2715,9 +2716,10 @@ const APK_URL = 'https://github.com/liav-melamud/mi-hamitchaze/releases/download
         האפליקציה פותחת את המשחק האונליין במסך מלא, עם מיקרופון וזיהוי דיבור.
       </details>`;
   } else if (ios) {
-    h = `<div class="sub" style="margin:0">📲 ב-iPhone: לחץ על כפתור השיתוף ואז "הוסף למסך הבית" – והמשחק נפתח כמו אפליקציה במסך מלא.</div>`;
+    if (navigator.standalone) return;
+    h = `<a class="dl" href="iphone.html">📲 התקן את האפליקציה באייפון</a>`;
   } else {
-    h = `<div class="sub" style="margin:0">📲 יש גם אפליקציה לאנדרואיד: <a href="${APK_URL}" style="color:var(--accent)">הורדה ישירה</a> (פתח את האתר בטלפון כדי לקבל הוראות התקנה).</div>`;
+    h = `<div class="sub" style="margin:0">📲 יש גם אפליקציה: <a href="${APK_URL}" style="color:var(--accent)">אנדרואיד (הורדה ישירה)</a> · <a href="iphone.html" style="color:var(--accent)">אייפון (הוראות התקנה)</a></div>`;
   }
   box.innerHTML = h; box.classList.remove('hidden');
 })();
