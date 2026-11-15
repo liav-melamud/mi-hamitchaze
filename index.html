@@ -620,7 +620,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-154054'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-160230'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -633,15 +633,16 @@ if (urlNet === 'local' || urlNet === 'online') NET = urlNet; // קישור מה�
 // איזה שרת הכוונה משמש כל מצב (מחרוזת לזיהוי – אם שני המצבים על אותו שרת, אין טעם לנסות את השני)
 const brokerOf = m => m === 'online' && SIGNAL ? 'private' : m === 'local' && LOCAL && LOCAL.signal ? 'home' : 'public';
 // שרת האונליין החינמי נרדם אחרי זמן בלי שימוש – מעירים אותו לפני שמתחברים (עד כדקה)
-let signalAwake = false;
+let signalAwake = 0; // מתי השרת ענה לאחרונה – אחרי 5 דקות בודקים שוב (הוא נרדם אחרי זמן בלי שימוש)
+const NET_ERRS = ['network', 'server-error', 'socket-error', 'socket-closed'];
 function wakeSignal(showStatus) {
-  if (brokerOf(NET) !== 'private' || signalAwake) return Promise.resolve();
+  if (brokerOf(NET) !== 'private' || Date.now() - signalAwake < 5 * 60000) return Promise.resolve();
   const url = 'https://' + SIGNAL.host + '/peerjs/id?wake=' + Date.now();
   const t0 = Date.now();
   return new Promise(done => {
     const tryOnce = () => {
       const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 15000);
-      fetch(url, { cache: 'no-store', signal: ac.signal }).then(r => { clearTimeout(to); if (r.ok) { signalAwake = true; if (showStatus) status(''); loadRelay().then(done); } else again(); }, () => { clearTimeout(to); again(); });
+      fetch(url, { cache: 'no-store', signal: ac.signal }).then(r => { clearTimeout(to); if (r.ok) { signalAwake = Date.now(); if (showStatus) status(''); loadRelay().then(done); } else again(); }, () => { clearTimeout(to); again(); });
     };
     const again = () => {
       if (Date.now() - t0 > 90000) return done(); // ננסה בכל זאת – PeerJS יחזיר שגיאה אם זה לא עובד
@@ -848,7 +849,15 @@ function hostGame(name, tries = 0, resume = null) {
       if (resume && tries < 25) { status('ממתין לשחרור החדר ' + ROOM + '… (' + (tries + 1) + '/25)'); try { peer.destroy(); } catch (er) {} setTimeout(() => hostGame(name, tries + 1, resume), 2000); return; }
       if (!resume && tries < 5) { try { peer.destroy(); } catch (er) {} hostGame(name, tries + 1); return; }
     }
-    if (!isHost) { busy(false); status('שגיאה ביצירת חדר: ' + e.type); }
+    // השרת נרדם או החיבור נפל לרגע: מעירים אותו ומנסים שוב (עד 3 פעמים) לפני שמציגים שגיאה
+    if (!isHost && NET_ERRS.includes(e.type) && tries < 3) {
+      try { peer.destroy(); } catch (er) {}
+      signalAwake = 0;
+      status('🌐 מתחבר לשרת… ניסיון ' + (tries + 2) + ' מתוך 4');
+      wakeSignal(true).then(() => setTimeout(() => hostGame(name, tries + 1, resume), 800));
+      return;
+    }
+    if (!isHost) { busy(false); status(NET_ERRS.includes(e.type) ? '⚠️ אין חיבור לשרת המשחק. בדוק את האינטרנט ונסה שוב בעוד דקה' : 'שגיאה ביצירת חדר: ' + e.type); }
   });
 }
 
@@ -889,6 +898,7 @@ function giveUpReconnect() {
   reconnecting = false; guestCtx = null; netBar('');
   lost();
 }
+let joinNetTries = 0;
 function joinGame(name, code, silent, flipped) {
   if (typeof Peer === 'undefined') return status('לא הצלחתי לטעון את ספריית החיבור – בדוק חיבור לאינטרנט');
   code = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -934,8 +944,14 @@ function joinGame(name, code, silent, flipped) {
       NET = other; renderNet();
       return wakeSignal(!silent).then(() => joinGame(name, code, silent, true));
     }
+    if (NET_ERRS.includes(e.type) && joinNetTries < 3) {
+      joinNetTries++; signalAwake = 0;
+      try { peer.destroy(); } catch (er) {}
+      status('🌐 מתחבר לשרת… ניסיון ' + (joinNetTries + 1) + ' מתוך 4');
+      return wakeSignal(true).then(() => setTimeout(() => joinGame(name, code, silent, flipped), 800));
+    }
     busy(false);
-    status(e.type === 'peer-unavailable' ? 'לא נמצא חדר עם הקוד הזה' : 'שגיאת חיבור: ' + e.type);
+    status(e.type === 'peer-unavailable' ? 'לא נמצא חדר עם הקוד הזה' : NET_ERRS.includes(e.type) ? '⚠️ אין חיבור לשרת המשחק. בדוק את האינטרנט ונסה שוב בעוד דקה' : 'שגיאת חיבור: ' + e.type);
   });
 }
 addEventListener('online', () => { if (reconnecting) { clearTimeout(retryTimer); retryTimer = null; scheduleRetry(); } });
@@ -1006,12 +1022,12 @@ const LOCAL_READY = location.protocol !== 'http:' ? Promise.resolve() : fetch('l
     const b = $('#resumeBtn');
     b.textContent = `▶ המשך את החדר הקודם שלך (${last.room})`;
     b.classList.remove('hidden');
-    b.onclick = () => hostGame(getName(), 0, { room: last.room, snapshot: snap, pid: last.pid });
+    b.onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(true)).then(() => { busy(false); hostGame(getName(), 0, { room: last.room, snapshot: snap, pid: last.pid }); }); };
   } catch (e) {}
 })();
 document.querySelectorAll('.exitDemo').forEach(b => b.onclick = () => { location.href = location.pathname; });
 $('#tutClose').onclick = () => { tutStep = TUT.length; renderTut(); };
-$('#joinBtn').onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(true)).then(() => { busy(false); joinGame(getName(), $('#codeIn').value); }); };
+$('#joinBtn').onclick = () => { joinNetTries = 0; busy(true); LOCAL_READY.then(() => wakeSignal(true)).then(() => { busy(false); joinGame(getName(), $('#codeIn').value); }); };
 $('#codeIn').onkeydown = e => { if (e.key === 'Enter') $('#joinBtn').click(); };
 $('#nameIn').onkeydown = e => { if (e.key === 'Enter') (urlRoom ? $('#joinBtn') : $('#hostBtn')).click(); };
 $('#copyBtn').onclick = () => {
