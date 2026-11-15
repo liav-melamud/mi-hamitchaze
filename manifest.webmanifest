@@ -4,11 +4,13 @@
   "description": "משחק חשיפה חברתי בעברית עם חברים",
   "start_url": "./",
   "scope": "./",
-  "display": "fullscreen",
+  "id": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "landscape",
   "background_color": "#0b0e16",
   "theme_color": "#0b0e16",
   "lang": "he",
   "dir": "rtl",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }, { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }, { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }, { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" }, { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }, { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
 }
