@@ -15,6 +15,8 @@ import android.os.Looper;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -30,6 +32,7 @@ import android.widget.Toast;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 /**
  * מעטפת לאתר המשחק: פותח את "מי המתחזה?" האונליין במסך מלא, עם מיקרופון (צ'אט קולי)
@@ -42,6 +45,8 @@ public class MainActivity extends Activity {
     private WebView web;
     private PermissionRequest pendingPermission;
     private SpeechRecognizer recognizer;
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private long lastBack = 0;
 
@@ -71,6 +76,8 @@ public class MainActivity extends Activity {
         s.setUserAgentString(s.getUserAgentString() + " MiHamitchazeApp/1");
 
         web.addJavascriptInterface(new SpeechBridge(), "AndroidSpeech");
+        web.addJavascriptInterface(new TtsBridge(), "AndroidTTS");
+        initTts();
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
@@ -148,6 +155,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (recognizer != null) { recognizer.destroy(); recognizer = null; }
+        if (tts != null) { tts.shutdown(); tts = null; }
         if (web != null) { web.destroy(); web = null; }
         super.onDestroy();
     }
@@ -224,6 +232,42 @@ public class MainActivity extends Activity {
         i.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
         silenceBeep();
         recognizer.startListening(i);
+    }
+
+    // ---------- הקראה (WebView לא תומך ב-speechSynthesis, אז הבוטים מדברים דרך ההקראה של אנדרואיד) ----------
+    private void initTts() {
+        tts = new TextToSpeech(this, status -> {
+            if (status != TextToSpeech.SUCCESS || tts == null) return;
+            int r = tts.setLanguage(new Locale("he", "IL"));
+            if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) tts.setLanguage(new Locale("iw", "IL"));
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override public void onStart(String id) { ui.post(() -> js("window.__ttsEv && window.__ttsEv(" + JSONObject.quote(id) + ",'start')")); }
+                @Override public void onDone(String id) { ui.post(() -> js("window.__ttsEv && window.__ttsEv(" + JSONObject.quote(id) + ",'end')")); }
+                @Override public void onError(String id) { ui.post(() -> js("window.__ttsEv && window.__ttsEv(" + JSONObject.quote(id) + ",'error')")); }
+                @Override public void onStop(String id, boolean interrupted) { ui.post(() -> js("window.__ttsEv && window.__ttsEv(" + JSONObject.quote(id) + ",'end')")); }
+            });
+            ttsReady = true;
+        });
+    }
+
+    public class TtsBridge {
+        @JavascriptInterface
+        public boolean available() { return ttsReady; }
+
+        @JavascriptInterface
+        public void speak(final String text, final float pitch, final float rate, final String id) {
+            ui.post(() -> {
+                if (tts == null || !ttsReady) { js("window.__ttsEv && window.__ttsEv(" + JSONObject.quote(id) + ",'error')"); return; }
+                tts.setPitch(Math.max(0.5f, Math.min(2f, pitch)));
+                tts.setSpeechRate(Math.max(0.5f, Math.min(2f, rate)));
+                Bundle b = new Bundle();
+                b.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, id);
+                tts.speak(text, TextToSpeech.QUEUE_ADD, b, id);
+            });
+        }
+
+        @JavascriptInterface
+        public void stop() { ui.post(() -> { if (tts != null) tts.stop(); }); }
     }
 
     public class SpeechBridge {

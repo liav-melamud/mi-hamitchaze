@@ -586,6 +586,23 @@
 <script src="map.js"></script>
 <script src="engine.js"></script>
 <script>
+// באפליקציית האנדרואיד (WebView) אין speechSynthesis – משתמשים בהקראה של אנדרואיד דרך הגשר AndroidTTS
+if (!('speechSynthesis' in window) && window.AndroidTTS) (function () {
+  let n = 0, cbs = {};
+  window.SpeechSynthesisUtterance = function (text) { this.text = text; this.lang = 'he-IL'; this.pitch = 1; this.rate = 1; this.voice = null; };
+  window.__ttsEv = (id, ev) => {
+    const u = cbs[id]; if (!u) return;
+    if (ev === 'start') { if (u.onstart) u.onstart(); return; }
+    delete cbs[id];
+    const f = ev === 'end' ? u.onend : u.onerror; if (f) f();
+  };
+  window.speechSynthesis = {
+    get speaking() { return Object.keys(cbs).length > 0; }, get pending() { return false; },
+    getVoices() { return []; }, onvoiceschanged: null, pause() {}, resume() {},
+    speak(u) { const id = 'u' + (++n); cbs[id] = u; try { AndroidTTS.speak(String(u.text), +u.pitch || 1, +u.rate || 1, id); } catch (e) { delete cbs[id]; } },
+    cancel() { try { AndroidTTS.stop(); } catch (e) {} cbs = {}; },
+  };
+})();
 const $ = s => document.querySelector(s);
 const cv = $('#cv');
 let ctx = cv.getContext('2d');
@@ -600,7 +617,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-152420'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-153916'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -2522,8 +2539,13 @@ function speakBot(name, text) {
     try { speechSynthesis.speak(u); } catch (e) {}
   });
 }
+let nearHeard = 0;
+const bubbles = {};
 function ttsSync(s) {
-  if (s.phase !== 'meeting') { $('#nowSpeaking').classList.add('hidden'); if (spoken) { spoken = 0; try { speechSynthesis.cancel(); } catch (e) {} } return; }
+  // בזמן המשחק: בוטים חיים שקרובים אליך מדברים (בקול ובבועה מעל הראש)
+  if (s.phase === 'play') (s.near || []).forEach(e => { if (e.id > nearHeard) { nearHeard = e.id; bubbles[e.from] = { text: e.text, until: Date.now() + 4500 }; speakBot(e.name, e.text); } });
+  if (s.phase === 'lobby') nearHeard = 0;
+  if (s.phase !== 'meeting') { if (s.phase !== 'play') $('#nowSpeaking').classList.add('hidden'); if (spoken) { spoken = 0; try { speechSynthesis.cancel(); } catch (e) {} } return; }
   if (s.chat.length < spoken) spoken = 0;
   for (; spoken < s.chat.length; spoken++) {
     const c = s.chat[spoken], r = s.roster.find(x => x.id === c.from);
@@ -3414,6 +3436,17 @@ function frame(t) {
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
     const nameCol = p.team === 'imp' && (p.id === me.id || me.team === 'imp' || reveal) ? '#ff6b6b' : '#fff';
     ctx.strokeText(cs(p.color) + p.name, d.x, d.y - 38); ctx.fillStyle = nameCol; ctx.fillText(cs(p.color) + p.name, d.x, d.y - 38);
+    const bub = bubbles[p.id];
+    if (bub && bub.until > Date.now() && p.alive) {
+      const txt = bub.text.length > 42 ? bub.text.slice(0, 41) + '…' : bub.text;
+      ctx.font = '13px Rubik, Arial'; ctx.direction = 'rtl';
+      const w = ctx.measureText(txt).width + 18, by = d.y - 74;
+      ctx.globalAlpha = Math.min(1, (bub.until - Date.now()) / 400);
+      ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(d.x - w / 2, by - 15, w, 24, 10) : ctx.rect(d.x - w / 2, by - 15, w, 24); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(d.x - 6, by + 9); ctx.lineTo(d.x + 6, by + 9); ctx.lineTo(d.x, by + 16); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#141826'; ctx.fillText(txt, d.x, by + 2);
+      ctx.globalAlpha = 1; ctx.direction = 'inherit';
+    }
     if (p.work > 0) {
       ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(d.x - 20, d.y + 26, 40, 5);
       ctx.fillStyle = '#4ade80'; ctx.fillRect(d.x - 20, d.y + 26, 40 * Math.min(1, p.work), 5);

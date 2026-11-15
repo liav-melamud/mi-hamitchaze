@@ -134,6 +134,8 @@ let bananas = []; // קליפות בננה של הליצן
 const BANANA_CD = 15, BANANA_LIFE = 60, BANANA_MAX = 3, SLIP_TIME = 0.9, FAKE_BODY_CD = 45;
 let meeting = null, eject = null, winner = null;
 let chat = [];
+let nearTalk = []; // דיבור של בוטים חיים בזמן המשחק – רק מי שקרוב שומע
+const HEAR_R = 520;
 let taskTotal = 0, taskDone = 0;
 
 const now = () => Date.now() / 1000;
@@ -326,7 +328,7 @@ function callMeeting(by, body) {
     const w = shuffle(list().filter(o => o.isBot && o.alive && !o.spectator && team(o) === 'crew'))[0];
     if (w) { meeting.deduce = true; meeting.queue.push({ id: w.id, at: meeting.t - (10 + Math.random() * 10), silent: true, deduce: true, text: fresh(['רגע… אף אחד לא מת! כולנו פה. הגופה הייתה מזויפת – יש פה ליצן שרוצה שנצביע עליו', 'תספרו: כולם חיים. זאת הייתה גופה מזויפת! לא מצביעים בלי ראיה אמיתית']) }); }
   }
-  chat = [];
+  chat = []; nearTalk = [];
   bodies = []; bananas = [];
   // ישיבה פותחת את כל הדלתות, ולכל חדר שנפתח מתחיל זמן קירור
   for (const rid of Object.keys(doorsUntil)) doorCool[rid] = Math.max(doorCool[rid] || 0, now() + DOOR_COOL);
@@ -753,12 +755,37 @@ function botGoal(p) {
   p.bot.goal = target;
 }
 
+// בוט חי מדבר מדי פעם בזמן המשחק, רק כשיש מישהו לידו (כמו צ'אט קולי לפי קרבה)
+let talkId = 0;
+function botChatter(p, dt) {
+  const b = p.bot;
+  if (b.talkT === undefined) b.talkT = 8 + Math.random() * 20;
+  b.talkT -= dt;
+  if (b.talkT > 0 || p.inVent !== null || p.vanishUntil > now()) return;
+  b.talkT = (b.persona === 'chatty' ? 14 : b.persona === 'quiet' ? 45 : 25) + Math.random() * 20;
+  const others = list().filter(o => o.id !== p.id && o.alive && !o.spectator && dist(o, p) < HEAR_R);
+  if (!others.length) return;
+  const human = others.find(o => !o.isBot), o = human || pick(others), n = bare(o.name);
+  const room = (MAP.roomAt(p.x, p.y) || {}).name || 'המסדרון';
+  let lines;
+  if (sab) lines = ['צריך לתקן את התקלה, מהר!', 'מישהו בא איתי לתקן?', 'אני רץ לתקן, תכסו אותי', 'אם לא נתקן את זה נפסיד!'];
+  else if (bodies.length && Math.random() < 0.3) lines = ['משהו פה מריח לא טוב…', 'יש לי הרגשה רעה', 'אני נשאר ליד אנשים, לא מסתובב לבד'];
+  else lines = [
+    'היי {n}, מה אתה עושה ב{r}?', '{n}, בוא נעשה משימות ביחד', 'אני הולך לעשות משימה', 'נשארו לי עוד כמה משימות',
+    'מישהו ראה משהו חשוד?', 'אני לא אוהב את השקט הזה…', '{n}, אתה בא איתי?', 'אני הולך לבדוק מה קורה ב{r}',
+    'למה אתה עוקב אחריי, {n}?', 'סיימתי משימה! עוד קצת', 'זהירות, אולי המתחזה פה', 'אני סומך עליך {n}, נשארים ביחד',
+  ];
+  const text = fill(fresh(lines), { n, r: room });
+  nearTalk.push({ id: ++talkId, from: p.id, name: p.name, x: p.x, y: p.y, text, t: now() });
+  nearTalk = nearTalk.filter(e => now() - e.t < 10);
+}
 function botTick(p, dt) {
   const b = p.bot;
   p.input = { dx: 0, dy: 0 };
   if (phase !== 'play' || p.spectator) return;
 
   if (p.alive) {
+    botChatter(p, dt);
     // זיכרון: איפה ראיתי את מי
     b.seeT = (b.seeT || 0) - dt;
     if (b.seeT <= 0) {
@@ -1360,6 +1387,7 @@ function viewFor(v) {
     toast: v.toast.splice(0),
     roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat })),
     chat,
+    near: phase === 'play' ? nearTalk.filter(e => now() - e.t < 6 && e.from !== v.id && Math.hypot(e.x - v.x, e.y - v.y) < HEAR_R).map(e => ({ id: e.id, from: e.from, name: e.name, text: e.text })) : [],
   };
   if (v.role === 'scientist' || seeAll) out.vitals = list().filter(p => !p.spectator).map(p => ({ name: p.name, color: COLORS[p.color].c, alive: p.alive }));
   if (meeting) {

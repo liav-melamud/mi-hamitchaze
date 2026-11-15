@@ -318,6 +318,24 @@ test('הגדרות תפקידים: זמן היעלמות, וזמן מוגבל ב
   e.g.act(e.a, { type: 'vent' }); tick(e.g, 2);
   ok(e.g.view(e.a).me.inVent !== null, 'אחרי ההמתנה המהנדס צריך להיות מסוגל לזחול שוב');
 });
+test('בזמן המשחק: בוט חי שקרוב אליך מדבר, ורק מי שקרוב שומע', () => {
+  const { g, a } = newGame({ bots: 3 });
+  place(g, sn => { Object.values(sn.players).forEach(q => { q.killCd = 999; q.emergencyUsed = true; if (q.bot) q.bot.talkT = 0; }); sn.sabCd = 999; });
+  g.setConn(a, true);
+  let heard = [];
+  for (let i = 0; i < 90 && !heard.length; i++) { sec(g, 1); heard = g.view(a).near || []; }
+  // הבוטים מסתובבים – אם אף אחד לא היה ליד המארח, נקרב אחד אליו
+  if (!heard.length) {
+    place(g, sn => { const me = sn.players[a]; Object.values(sn.players).filter(q => q.bot).forEach(q => { q.x = me.x + 40; q.y = me.y; q.bot.talkT = 0; }); });
+    g.setConn(a, true);
+    for (let i = 0; i < 10 && !heard.length; i++) { tick(g, 3); heard = g.view(a).near || []; }
+  }
+  ok(heard.length && heard[0].text, 'בוט קרוב לא דיבר בזמן המשחק');
+  // בוט מת לא מדבר
+  place(g, sn => { const me = sn.players[a]; Object.values(sn.players).filter(q => q.bot).forEach(q => { q.alive = false; q.x = me.x + 40; q.y = me.y; q.bot.talkT = 0; }); });
+  g.setConn(a, true); sec(g, 7);
+  ok(!(g.view(a).near || []).length, 'בוט מת דיבר');
+});
 test('סוף ישיבה: הסצנה יודעת מי הצביע על מי', () => {
   const { g, a } = newGame({ bots: 4 });
   callMeeting(g, a);
