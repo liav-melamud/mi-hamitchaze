@@ -586,22 +586,25 @@
 <script src="map.js"></script>
 <script src="engine.js"></script>
 <script>
-// באפליקציית האנדרואיד (WebView) אין speechSynthesis – משתמשים בהקראה של אנדרואיד דרך הגשר AndroidTTS
-if (!('speechSynthesis' in window) && window.AndroidTTS) (function () {
+// באפליקציית האנדרואיד (WebView) ה-speechSynthesis קיים אבל שותק – תמיד משתמשים בהקראה של אנדרואיד דרך הגשר AndroidTTS
+if (window.AndroidTTS) (function () {
   let n = 0, cbs = {};
-  window.SpeechSynthesisUtterance = function (text) { this.text = text; this.lang = 'he-IL'; this.pitch = 1; this.rate = 1; this.voice = null; };
+  const Utt = function (text) { this.text = text; this.lang = 'he-IL'; this.pitch = 1; this.rate = 1; this.voice = null; };
   window.__ttsEv = (id, ev) => {
     const u = cbs[id]; if (!u) return;
     if (ev === 'start') { if (u.onstart) u.onstart(); return; }
     delete cbs[id];
     const f = ev === 'end' ? u.onend : u.onerror; if (f) f();
   };
-  window.speechSynthesis = {
+  const synth = {
     get speaking() { return Object.keys(cbs).length > 0; }, get pending() { return false; },
     getVoices() { return []; }, onvoiceschanged: null, pause() {}, resume() {},
     speak(u) { const id = 'u' + (++n); cbs[id] = u; try { AndroidTTS.speak(String(u.text), +u.pitch || 1, +u.rate || 1, id); } catch (e) { delete cbs[id]; } },
     cancel() { try { AndroidTTS.stop(); } catch (e) {} cbs = {}; },
   };
+  // דורסים את המקוריים (הם getter על ה-prototype, אז השמה רגילה לא עובדת)
+  try { Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true, writable: true }); } catch (e) {}
+  try { Object.defineProperty(window, 'SpeechSynthesisUtterance', { value: Utt, configurable: true, writable: true }); } catch (e) {}
 })();
 const $ = s => document.querySelector(s);
 const cv = $('#cv');
@@ -617,7 +620,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-153916'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-154054'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
