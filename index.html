@@ -476,7 +476,7 @@
       <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
-      <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option><option value="3">🙈 מחבואים (מחפש גלוי)</option><option value="4">🎲 הפתעה (אולי אין מתחזה בכלל!)</option></select></label>
+      <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option><option value="3">🙈 מחבואים (ראייה קצרה, חיסול כל שנייה, 5 פתחים)</option><option value="4">🎲 הפתעה (אולי אין מתחזה בכלל!)</option></select></label>
       <label>זמן מחבואים <select data-s="hideTime"><option value="120">2 דק׳</option><option value="180">3 דק׳</option><option value="240">4 דק׳</option><option value="300">5 דק׳</option></select></label>
       <label>🏆 טורניר <select data-s="rounds"><option value="1">בלי (משחק בודד)</option><option value="3">3 סיבובים</option><option value="5">5 סיבובים</option></select></label>
       <label>יעד המרוץ (משימות) <select data-s="raceGoal"><option>6</option><option>10</option><option>15</option><option>20</option></select></label>
@@ -661,7 +661,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-195100'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-195658'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1251,7 +1251,7 @@ function actionState(s) {
   st.report = { show: alive && s.settings.mode !== 3, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey), on: inVent || (!me.engVentCd && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : 'פתח') };
+  st.vent = { show: alive && (me.hideVentsLeft != null || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey)), on: inVent || (!me.engVentCd && me.hideVentsLeft !== 0 && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : me.hideVentsLeft != null ? 'פתח (' + me.hideVentsLeft + ')' : 'פתח') };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
@@ -3669,6 +3669,7 @@ function frame(t) {
 
   const noDark = !me.alive || me.spec;
   let vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
+  if (S.settings.mode === 3) vision = me.team === 'imp' ? 230 : 165; // מחבואים: טווח ראייה קטן לכולם
   if (S.sab && S.sab.type === 'lights' && me.team !== 'imp') vision = 95;
   { const myRoom = MAP.roomAt(cam.x, cam.y); if (myRoom && (S.darkRooms || []).includes(myRoom.id) && me.team !== 'imp') vision = 95; } // חדר שהרדוף כיבה בו את האור
   const reveal = S.settings.reveal || noDark;

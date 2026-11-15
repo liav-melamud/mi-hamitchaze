@@ -797,5 +797,27 @@ test('חיית מחמד נשמרת ונראית לכולם, ובסוף המשח�
   const v = g.view(a); ok(v.phase === 'end' && v.myStats && typeof v.myStats.won === 'boolean' && v.myStats.game > 0, 'אין סטטיסטיקה אישית');
 });
 
+
+test('מחבואים: חיסול כל שנייה, והמתחבאים נכנסים לפתחים 5 פעמים בלבד', () => {
+  const { g, a } = newGame({ bots: 5, role: 'איש צוות', cfg: { mode: 3, hideTime: 300 } });
+  const V = MAP.VENTS[0];
+  place(g, sn => { Object.values(sn.players).forEach(p => { if (p.id !== a) { p.x = 100; p.y = 100; if (p.bot) { p.bot.plan = []; p.bot.wait = 999; } } }); sn.players[a].x = V.x; sn.players[a].y = V.y; });
+  g.setConn(a, true);
+  for (let i = 1; i <= 6; i++) {
+    g.act(a, { type: 'vent' }); tick(g, 1);
+    const inV = g.view(a).me.inVent !== null;
+    if (i <= 5) ok(inV, 'לא נכנס לפתח בפעם ' + i); else ok(!inV, 'נכנס פעם שישית');
+    if (inV) { g.act(a, { type: 'vent' }); tick(g, 1); }
+  }
+  ok(g.view(a).me.hideVentsLeft === 0, 'המונה לא ירד לאפס');
+  // המחפש: זמן בין חיסולים של שנייה
+  const sn = JSON.parse(g.snapshot()); const sk = Object.values(sn.players).find(p => p.role === 'seeker');
+  ok(sk, 'אין מחפש');
+  place(g, s2 => { const k = s2.players[sk.id]; k.frozenUntil = 0; k.killCd = 0; k.x = 300; k.y = 300; const vs = Object.values(s2.players).filter(p => p.id !== sk.id); vs.forEach((p, i) => { p.x = 300 + 20 * (i + 1); p.y = 300; p.alive = true; }); });
+  g.setConn(a, true);
+  g.act(sk.id, { type: 'kill' }); const cd = JSON.parse(g.snapshot()).players[sk.id].killCd;
+  ok(cd <= 1.01, 'זמן בין חיסולים ארוך מדי: ' + cd);
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

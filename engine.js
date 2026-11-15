@@ -77,7 +77,8 @@ const roleOn = k => !(settings.roleOff || []).includes(k);
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
   const botTaskTime = () => (4 + 4 * settings.taskLevel) * (settings.botLevel === 1 ? 1.3 : settings.botLevel === 3 ? 0.8 : 1);
   // בקבוצה קטנה למתחזה קשה יותר, אז זמן ההמתנה בין חיסולים מתקצר קצת
-  const killCdFor = () => { const n = Object.values(players).filter(q => !q.spectator).length; return settings.killCd * (n <= 5 ? 0.7 : n <= 7 ? 0.85 : 1); };
+  const HIDE_VENTS = 5, HIDE_VENT_TIME = 15;
+  const killCdFor = () => { if (settings.mode === 3) return 1;  const n = Object.values(players).filter(q => !q.spectator).length; return settings.killCd * (n <= 5 ? 0.7 : n <= 7 ? 0.85 : 1); };
   const isMini = i => !MAP.TASK_TIME[MAP.TASKS[i].kind];
 
 let players = {};
@@ -249,7 +250,7 @@ function startGame(by) {
   all.forEach(p => {
     p.alive = true; p.ejected = false; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
-    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15;
+    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15;
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
@@ -689,13 +690,16 @@ function act(p, a) {
       break;
     }
     case 'vent': {
-      if (phase !== 'play' || !p.alive || !['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(p.role)) return;
+      const hideVent = settings.mode === 3 && p.role === 'crew'; // מחבואים: המתחבאים יכולים להיכנס לפתחים 5 פעמים
+      if (phase !== 'play' || !p.alive || !(hideVent || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(p.role))) return;
       if (p.inVent !== null) { p.inVent = null; witnessVent(p); return; } // יציאה מהפתח
+      if (hideVent) { if ((p.hideVents || 0) >= HIDE_VENTS) return toast(p, '🕳️ נגמרו לך הכניסות לפתחים'); }
       if (p.role === 'engineer' && p.engVentCd > 0) return toast(p, '🕳️ אפשר לזחול שוב בעוד ' + Math.ceil(p.engVentCd) + ' שניות');
       const v = nearest(p, MAP.VENTS, USE_RANGE);
       if (!v) return;
       witnessVent(p);
       p.inVent = MAP.VENTS.indexOf(v); p.x = v.x; p.y = v.y; p.work = null;
+      if (hideVent) { p.hideVents = (p.hideVents || 0) + 1; p.ventSince = t; toast(p, '🕳️ נשארו לך ' + (HIDE_VENTS - p.hideVents) + ' כניסות לפתחים (עד ' + HIDE_VENT_TIME + ' שניות בכל פעם)'); }
       break;
     }
     case 'ventMove': {
@@ -998,7 +1002,7 @@ function botTick(p, dt) {
         const lvl = settings.botLevel;
         const witnesses = list().filter(o => o.alive && o.id !== p.id && o.id !== tgt.id && o.inVent === null && dist(o, p) < (lvl === 3 ? 420 : 320));
         // קל: מתחזים רשלניים שחונקים גם מול עדים. חכם: מחסלים רק כשאף אחד לא רואה
-        const chance = settings.mode === 3 ? (lvl === 1 ? 0.06 : 0.2) : lvl === 1 ? (witnesses.length ? 0.012 : 0.04) : lvl === 3 ? (witnesses.length ? 0 : 0.08) : (witnesses.length ? 0 : 0.05);
+        const chance = settings.mode === 3 ? (lvl === 1 ? 0.006 : lvl === 2 ? 0.012 : 0.025) : lvl === 1 ? (witnesses.length ? 0.012 : 0.04) : lvl === 3 ? (witnesses.length ? 0 : 0.08) : (witnesses.length ? 0 : 0.05);
         if (Math.random() < chance) {
           act(p, { type: 'kill' });
           if (!p.alive || phase !== 'play') return;
@@ -1447,6 +1451,7 @@ function tick() {
       p.guardCd = Math.max(0, (p.guardCd || 0) - dt);
       if (p.role === 'noisemaker') p.noiseCd = Math.max(0, (p.noiseCd || 0) - dt);
       p.photoCd = Math.max(0, (p.photoCd || 0) - dt); p.investCd = Math.max(0, (p.investCd || 0) - dt); p.vanishCd = Math.max(0, (p.vanishCd || 0) - dt);
+      if (settings.mode === 3 && p.role === 'crew' && p.inVent !== null && p.ventSince && t - p.ventSince > HIDE_VENT_TIME) { p.inVent = null; p.ventSince = 0; witnessVent(p); toast(p, '🕳️ נגמר הזמן בפתח'); }
       // מהנדס: זמן מוגבל בתוך הפתח, ואחרי היציאה המתנה
       if (p.role === 'engineer') {
         p.engVentCd = Math.max(0, (p.engVentCd || 0) - dt);
@@ -1623,7 +1628,7 @@ function viewFor(v) {
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
     sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial', freeze: 'dial' }[sab.type], i: v.sabWork.i } : null,
     sabCd: Math.ceil(sabCd),
-    guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t, engVentCd: Math.ceil(v.engVentCd || 0), ventLeft: v.role === 'engineer' && v.inVent !== null && settings.engVent && v.ventSince ? Math.max(0, Math.ceil(settings.engVent - (t - v.ventSince))) : null,
+    guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t, engVentCd: Math.ceil(v.engVentCd || 0), hideVentsLeft: settings.mode === 3 && v.role === 'crew' ? HIDE_VENTS - (v.hideVents || 0) : null, ventLeft: v.role === 'engineer' && v.inVent !== null && settings.engVent && v.ventSince ? Math.max(0, Math.ceil(settings.engVent - (t - v.ventSince))) : null,
     bananaCd: Math.ceil(v.bananaCd || 0), fakeCd: Math.ceil(v.fakeCd || 0), hauntDoorCd: Math.ceil(v.hauntDoorCd || 0), darkCd: Math.ceil(v.darkCd || 0), dragCd: Math.ceil(v.dragCd || 0), dragging: !!v.drag,
     photos: (v.photos || []).map(ph => ({ ago: Math.round(t - ph.t), room: ph.room, names: ph.names, bodies: ph.bodies })), notes: (v.notes || []).slice(-6),
     color: v.color,
