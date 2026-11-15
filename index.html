@@ -600,7 +600,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-150636'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-152420'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1037,7 +1037,7 @@ function onState(s) {
   if (s.phase === 'play') renderHud(s);
   if (s.phase === 'meeting') renderMeeting(s);
   if (s.phase === 'eject') renderEject(s);
-  if (s.phase === 'end') renderEnd(s); else jesterVideo(false);
+  if (s.phase === 'end') renderEnd(s); else { jesterVideo(false); stopVictoryMusic(); }
   if (s.phase !== 'play' && joy.active) window.__joyEnd && window.__joyEnd();
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
@@ -1414,7 +1414,11 @@ const JESTER_VIDEO = 'DyJpRcLsVAY';
 function jesterVideo(on) {
   const box = $('#jesterVideo'); if (!box) return;
   if (!on) { if (box.innerHTML) { box.innerHTML = ''; show('#jesterVideo', false); } return; }
-  if (box.innerHTML) return;
+  if (box.innerHTML || box.dataset.wait) return;
+  box.dataset.wait = '1';
+  setTimeout(() => { delete box.dataset.wait; if (S && S.phase === 'end' && !box.innerHTML) jesterVideoNow(box); }, 4200); // קודם הצחוק, ואז השיר
+}
+function jesterVideoNow(box) {
   try { speechSynthesis.cancel(); } catch (e) {}
   box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${JESTER_VIDEO}?autoplay=1&rel=0&playsinline=1" title="השיר של הליצן" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
     + `<p class="sub" style="margin:6px 0 0"><a href="https://www.youtube.com/watch?v=${JESTER_VIDEO}" target="_blank" rel="noopener" style="color:#ff9f1c">▶ לא מתנגן? פתח ביוטיוב</a></p>`;
@@ -1571,12 +1575,69 @@ function renderEnd(s) {
   show('#lobbyBtn', s.me.host); show('#againBtn', s.me.host);
   show('#endWait', !s.me.host);
 }
+// מוזיקת ניצחון מקורית, מנוגנת בדפדפן (בלי קבצים): מתחזים – מנגינה אפלה ומאיימת, צוות – תרועת ניצחון, ליצן – צחוק "חה חה"
+let musicAC = null, musicOut = null;
+function stopVictoryMusic() {
+  if (!musicOut) return;
+  const o = musicOut; musicOut = null;
+  try { o.gain.setTargetAtTime(0, musicAC.currentTime, 0.08); setTimeout(() => o.disconnect(), 600); } catch (e) {}
+}
+function victoryMusic(team) {
+  stopVictoryMusic();
+  if (team === 'race') team = 'crew';
+  try { musicAC = musicAC || new (window.AudioContext || window.webkitAudioContext)(); musicAC.resume && musicAC.resume(); } catch (e) { return; }
+  const ac = musicAC, out = musicOut = ac.createGain(), t0 = ac.currentTime + 0.08;
+  out.gain.value = 0.2; out.connect(ac.destination);
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  const note = (m, s, d, type = 'square', vol = 0.4, filt = 0) => {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = hz(m);
+    g.gain.setValueAtTime(0.0001, t0 + s); g.gain.linearRampToValueAtTime(vol, t0 + s + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t0 + s + d);
+    let last = o; if (filt) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filt; o.connect(f); last = f; }
+    last.connect(g); g.connect(out); o.start(t0 + s); o.stop(t0 + s + d + 0.05);
+  };
+  const kick = (s, v = 0.9) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.setValueAtTime(140, t0 + s); o.frequency.exponentialRampToValueAtTime(40, t0 + s + 0.15);
+    g.gain.setValueAtTime(v, t0 + s); g.gain.exponentialRampToValueAtTime(0.001, t0 + s + 0.2);
+    o.connect(g); g.connect(out); o.start(t0 + s); o.stop(t0 + s + 0.25);
+  };
+  if (team === 'crew') {
+    // תרועה: מז'ור, קצב שמח ואקורד ניצחון בסוף
+    [[72, 0, .14], [72, .15, .14], [72, .3, .14], [76, .45, .4], [74, .9, .14], [76, 1.05, .14], [79, 1.2, .55], [77, 1.8, .14], [76, 1.95, .14], [74, 2.1, .14], [72, 2.25, .14], [76, 2.4, .28], [79, 2.7, .28], [84, 3.0, 1.4]]
+      .forEach(([m, st, d]) => { note(m, st, d + 0.05, 'square', 0.28, 3200); note(m + 12, st, d, 'triangle', 0.12); });
+    [[48, 0], [55, .45], [53, .9], [55, 1.2], [57, 1.8], [55, 2.4], [48, 3.0]].forEach(([m, st]) => note(m, st, st === 3 ? 1.4 : .5, 'triangle', 0.5));
+    [72, 76, 79].forEach(m => note(m, 3.0, 1.6, 'sawtooth', 0.1, 2200));
+    for (let i = 0; i < 7; i++) kick(i * 0.45, 0.6);
+  } else if (team === 'imp') {
+    // אפל: דופק נמוך כמו לב, מנגינה במינור שיורדת, ואקורד צורם בסוף
+    for (let i = 0; i < 9; i++) { kick(i * 0.5, 0.9); kick(i * 0.5 + 0.18, 0.5); }
+    for (let i = 0; i < 16; i++) note(38, i * 0.25, 0.22, 'sawtooth', 0.35, 420);
+    [[62, 0, .45], [65, .5, .45], [64, 1, .45], [61, 1.5, .9], [62, 2.5, .25], [69, 2.75, .25], [68, 3, .25], [65, 3.25, .25], [62, 3.5, 1.6]]
+      .forEach(([m, st, d]) => { note(m, st, d, 'sawtooth', 0.22, 1400); note(m - 12, st, d, 'square', 0.1, 900); });
+    [50, 53, 56, 62].forEach(m => note(m, 3.5, 1.8, 'sawtooth', 0.12, 1100));
+  } else if (team === 'jester') {
+    // צפצוף ליצנים ואז צחוק "חה חה חה"
+    note(67, 0, 0.18, 'square', 0.35, 2500); note(72, 0.2, 0.25, 'square', 0.35, 2500);
+    for (let i = 0; i < 8; i++) {
+      const st = 0.55 + i * 0.19, f0 = 420 - i * 18 + (i % 2) * 30;
+      const o = ac.createOscillator(), bp = ac.createBiquadFilter(), bp2 = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t0 + st); o.frequency.linearRampToValueAtTime(f0 * 0.85, t0 + st + 0.14);
+      bp.type = 'bandpass'; bp.frequency.value = 850; bp.Q.value = 4; bp2.type = 'bandpass'; bp2.frequency.value = 1300; bp2.Q.value = 5;
+      g.gain.setValueAtTime(0.0001, t0 + st); g.gain.linearRampToValueAtTime(1.2, t0 + st + 0.03); g.gain.exponentialRampToValueAtTime(0.001, t0 + st + 0.15);
+      o.connect(bp); o.connect(bp2); bp.connect(g); bp2.connect(g); g.connect(out); o.start(t0 + st); o.stop(t0 + st + 0.2);
+    }
+    setTimeout(() => {
+      try { const u = new SpeechSynthesisUtterance('חה חה חה חה!'); u.lang = 'he-IL'; u.pitch = 1.8; u.rate = 1.1; speechSynthesis.speak(u); } catch (e) {}
+    }, 2200);
+  }
+}
 // מסיבת ניצחון: המנצחים רוקדים, הליצן (אם לא ניצח) יושב בצד, והמפסידים לא מופיעים
 let danceSig = '', danceAnim = 0;
 function danceScene(s, roles) {
   const cv = $('#endCv'), w = s.winner;
   const sig = JSON.stringify([w, s.roster.map(p => p.id + p.alive)]);
   if (sig === danceSig && danceAnim) return;
+  if (sig !== danceSig) victoryMusic(w.team);
   danceSig = sig;
   cancelAnimationFrame(danceAnim); danceAnim = 0;
   if (w.team === 'race') { cv.style.display = 'none'; return; }
