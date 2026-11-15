@@ -785,5 +785,17 @@ test('שיבוש מצלמות: המתחזה מכבה את המצלמות ל-25 �
   sec(g, 26); v = g.view(a); ok(!v.camsOff && v.camsCd > 0, 'המצלמות לא חזרו או שאין השהיה');
 });
 
+
+test('חיית מחמד נשמרת ונראית לכולם, ובסוף המשחק כל שחקן מקבל סטטיסטיקה אישית', () => {
+  const g = createGame(MAP); const a = g.join('א'), b = g.join('ב');
+  g.act(a, { type: 'pet', pet: 3 }); g.act(b, { type: 'pet', pet: 99 });
+  ok(g.view(b).roster.find(p => p.id === a).pet === 3, 'החיה לא נשמרה');
+  ok(!g.view(a).roster.find(p => p.id === b).pet, 'חיה לא חוקית התקבלה');
+  g.act(a, { type: 'settings', bots: 4, mode: 2, raceGoal: 4 }); g.act(a, { type: 'start' });
+  ok(g.view(b).players.find(p => p.id === a).pet === 3, 'החיה לא מופיעה במשחק');
+  for (let i = 0; i < 600 && g.view(a).phase === 'play'; i++) sec(g, 1);
+  const v = g.view(a); ok(v.phase === 'end' && v.myStats && typeof v.myStats.won === 'boolean' && v.myStats.game > 0, 'אין סטטיסטיקה אישית');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

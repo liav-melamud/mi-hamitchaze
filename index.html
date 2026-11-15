@@ -270,6 +270,23 @@
   #endTour .tourChamp { font-size: 16px; margin: 4px 0 8px; }
   body.frozen::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 5; box-shadow: inset 0 0 140px 50px rgba(170,220,255,.55); background: radial-gradient(ellipse at center, rgba(200,235,255,0) 55%, rgba(200,235,255,.25) 100%); }
   #sabBanner.ice { background: #2b6a9a; }
+  #pets { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  #pets button { font-size: 24px; padding: 4px 8px; min-width: 46px; position: relative; }
+  #pets button.sel, #hats button.sel { outline: 3px solid var(--accent); }
+  #pets button.locked, #hats button.locked { opacity: .45; filter: grayscale(1); }
+  #pets button.locked::after, #hats button.locked::after { content: '🔒'; position: absolute; font-size: 13px; top: -4px; left: -2px; filter: none; }
+  #hats button { position: relative; }
+  #statsModal { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #statsModal.hidden { display: none; }
+  #statsModal .smBox { background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 16px; width: min(560px, 100%); max-height: 88vh; overflow: auto; }
+  .stGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .stGrid div { background: #10152290; border-radius: 10px; padding: 6px 8px; text-align: center; font-size: 13px; color: var(--muted); }
+  .stGrid b { display: block; font-size: 22px; color: var(--text); }
+  .badge { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 10px; margin-bottom: 4px; background: #10152290; }
+  .badge.off { opacity: .45; }
+  .badge .bi { font-size: 26px; } .badge small { color: var(--muted); display: block; }
+  .badge .bar { height: 5px; background: #2a3550; border-radius: 4px; margin-top: 3px; } .badge .bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+  #newBadges .badge { background: #3a3110; border: 1px solid #ffd166; }
   #raceBoard { position: absolute; top: 64px; left: 12px; background: var(--panel); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 12px; font-size: 13px; min-width: 190px; }
   #raceBoard .rt { font-weight: 800; color: var(--accent); margin-bottom: 4px; }
   #raceBoard .rr { display: flex; gap: 6px; align-items: center; padding: 1px 0; }
@@ -347,6 +364,7 @@
 
 <div id="hud" class="hidden">
   <div id="raceBoard" class="hidden"></div>
+  <div id="statsModal" class="hidden"><div class="smBox"><button id="statsClose" style="float:left">✕</button><h2 style="margin:0 0 8px">📊 הסטטיסטיקה שלי</h2><div id="statsBody"></div></div></div>
   <div id="taskbar">משימות הצוות <span id="tasktxt"></span><div class="bar"><i id="taskfill"></i></div></div>
   <div id="rolecard"><div id="rolename"></div><div id="roledesc"></div><ul id="tasklist"></ul></div>
   <div id="topleft">
@@ -405,6 +423,7 @@
     <p id="netHint" class="sub" style="font-size:13px;margin:0 0 12px;min-height:1.2em"></p>
     <input id="nameIn" maxlength="14" placeholder="הכינוי שלך" style="width:100%;margin-bottom:12px" autocomplete="off">
     <button id="demoBtn" style="width:100%;margin-bottom:10px;background:#1f6f4a">🎮 נסה דמו – למד לשחק מול בוטים</button>
+    <button class="statsBtn" style="width:100%;margin-bottom:10px;background:#3a3f7a">📊 הסטטיסטיקה והתגים שלי</button>
     <button id="resumeBtn" class="hidden" style="width:100%;margin-bottom:10px;background:#7a4a10;border:2px solid var(--accent)"></button>
     <label class="sub" style="display:block;margin:0 0 8px;font-size:13px"><input type="checkbox" id="fixedRoom"> 🔒 חדר קבוע (אותו קוד בכל פעם, לשליחה פעם אחת לחברים)</label>
     <button id="hostBtn" class="primary" style="width:100%;margin-bottom:4px">✨ צור חדר חדש ואָרֵח</button>
@@ -429,7 +448,7 @@
     <div id="shareBox" class="urls" style="direction:rtl;text-align:right;font-family:inherit">
       <div class="row" style="justify-content:space-between">
         <span><span id="netBadge" style="font-size:13px;padding:2px 8px;border-radius:10px;background:#2a3550;margin-left:6px"></span>קוד החדר: <b id="roomCode" style="font-size:26px;letter-spacing:5px;color:var(--accent);direction:ltr;display:inline-block"></b></span>
-        <button id="copyBtn">📋 העתק קישור לחברים</button>
+        <span><button id="copyBtn">📋 העתק קישור</button> <button id="waBtn" style="background:#1f8a4c">📲 הזמן בוואטסאפ</button></span>
       </div>
       <div id="shareLink" style="direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:13px;color:var(--muted);margin-top:6px;word-break:break-all"></div>
     </div>
@@ -437,6 +456,9 @@
     <div id="colors"></div>
     <b>בחר כובע</b>
     <div id="hats"></div>
+    <b>חיית מחמד</b> <span class="sub" style="margin:0;font-size:12px">(נפתחות לפי משחקים וניצחונות – 📊 לפרטים)</span>
+    <div id="pets"></div>
+    <button class="statsBtn" style="margin-top:8px">📊 הסטטיסטיקה והתגים שלי</button>
     <b>שחקנים (<span id="pcount">0</span>)</b>
     <div id="plist"></div>
     <b>צ'אט</b>
@@ -590,11 +612,12 @@
     <p id="endReason" class="sub"></p>
     <canvas id="endCv" width="640" height="300" style="width:100%;max-width:640px;display:block;margin:0 auto 8px;border-radius:14px"></canvas>
     <div id="jesterVideo" class="hidden"></div>
+    <div id="newBadges"></div>
     <div id="endTour"></div>
     <div id="endAwards" class="awards"></div>
     <div id="endlist"></div>
     <details id="endTimeline" open><summary style="cursor:pointer;margin:6px 0">📜 ציר הזמן של המשחק</summary><div id="timeline"></div></details>
-    <div class="row" style="justify-content:center"><button id="againBtn" class="primary hidden">🔁 שחק שוב עם אותם אנשים</button><button id="lobbyBtn" class="hidden">חזרה ללובי</button></div>
+    <div class="row" style="justify-content:center"><button id="shareSumBtn" style="background:#1f8a4c">📤 שתף סיכום</button><button id="againBtn" class="primary hidden">🔁 שחק שוב עם אותם אנשים</button><button id="lobbyBtn" class="hidden">חזרה ללובי</button></div>
     <p id="endWait" class="sub hidden">ממתין למארח…</p>
   </div>
 </div>
@@ -638,7 +661,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-192919'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-193230'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1052,6 +1075,27 @@ $('#copyBtn').onclick = () => {
   const t = $('#shareLink').textContent;
   (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('הקישור הועתק!'), () => toast(t));
 };
+$('#waBtn').onclick = () => {
+  const t = '🎮 בוא לשחק איתי "מי המתחזה?"\nקוד החדר: ' + ROOM + '\n' + $('#shareLink').textContent;
+  window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
+};
+// סיכום משחק לשיתוף: מי ניצח, מי היה מי, ומי חיסל את מי
+function summaryText(s) {
+  const w = s.winner; if (!w) return '';
+  const roles = {}; s.players.forEach(p => roles[p.id] = p);
+  const lines = ['🎮 מי המתחזה? – סיכום משחק', $('#endTitle').textContent.trim(), w.reason, '', '👥 מי היה מי:'];
+  s.roster.filter(p => !p.spec).forEach(p => { const r = roles[p.id] || {}; lines.push(`${r.team === 'imp' ? '🔴' : r.team === 'jester' ? '🟠' : r.team === 'mole' ? '🟣' : '🔵'} ${p.name.replace(/^🤖\s*/, '')} – ${r.role || '?'}${p.alive ? '' : ' 💀'}`); });
+  const kills = (s.summary ? s.summary.events : []).filter(e => /^🔪|^🚀/.test(e.text)).map(e => '• ' + e.text);
+  if (kills.length) lines.push('', '⚔️ מה קרה:', ...kills);
+  if (s.summary && s.summary.awards.length) lines.push('', '🏅 ' + s.summary.awards.map(a => a.title + ': ' + a.name).join(' · '));
+  lines.push('', 'בואו לשחק: ' + location.origin + location.pathname);
+  return lines.join('\n');
+}
+$('#shareSumBtn').onclick = async () => {
+  const t = summaryText(S);
+  if (navigator.share) { try { await navigator.share({ text: t }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+  window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
+};
 let leaving = false;
 window.addEventListener('beforeunload', e => { if (!leaving && isHost && !DEMO && S && S.phase !== 'lobby') { e.preventDefault(); e.returnValue = ''; } });
 
@@ -1120,12 +1164,13 @@ function renderLobby(s) {
     lookApplied = true;
     try {
       const l = JSON.parse(localStorage.getItem('mm_look') || '{}');
-      if (l.hat !== undefined) api({ type: 'hat', hat: l.hat });
+      if (l.hat !== undefined && unlocked(HAT_REQ[l.hat], loadStats())) api({ type: 'hat', hat: l.hat });
+      if (l.pet !== undefined && unlocked(PET_REQ[l.pet], loadStats())) api({ type: 'pet', pet: l.pet });
       if (l.color !== undefined && !s.roster.some(p => p.id !== s.me.id && p.colorIdx === l.color)) api({ type: 'color', color: l.color });
     } catch (e) {}
   }
   const sig = JSON.stringify([s.roster, s.hostId, s.settings, s.me.color]);
-  renderHats(s);
+  renderHats(s); renderPets(s);
   if (sig === lobbySig) return;
   lobbySig = sig;
   $('#pcount').textContent = s.roster.length;
@@ -1629,6 +1674,7 @@ function voteScene(e) {
   };
   frame();
 }
+let lastBadgeGame = 0;
 function renderEnd(s) {
   const w = s.winner;
   if (w.team === 'race') $('#endTitle').innerHTML = '<span style="color:var(--accent)">🏁 המרוץ הסתיים!</span>'; else
@@ -1651,6 +1697,8 @@ function renderEnd(s) {
   if (w.ranking) { // מרוץ: דירוג במקום תפקידים
     $('#endlist').innerHTML = w.ranking.map((r, i) => `<div class="pl"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="dot" style="background:${esc(r.color)}"></span><span style="flex:1;text-align:right">${esc(cs(r.color) + r.name)}</span><span class="tag crew">${esc(r.n)} משימות</span></div>`).join('');
   }
+  // סטטיסטיקה אישית ותגים חדשים
+  if (s.myStats && !DEMO) { const nb = recordGame(s.myStats); if (nb.length) $('#newBadges').innerHTML = '<div style="font-weight:800;margin:8px 0 4px">🎉 תג חדש!</div>' + nb.map(b => `<div class="badge"><span class="bi">${b.ic}</span><span><b>${b.name}</b><small>${b.d}: ${b.n}</small></span></div>`).join(''); else if (s.myStats.game !== lastBadgeGame) $('#newBadges').innerHTML = ''; lastBadgeGame = s.myStats.game; }
   // טורניר: טבלת ניקוד מצטברת
   const T = s.tour;
   $('#endTour').innerHTML = !T ? '' : `<div class="tourT">🏆 טורניר – ${T.done ? 'הסתיים!' : 'סיבוב ' + T.round + ' מתוך ' + T.total}</div>` +
@@ -2368,6 +2416,74 @@ $('#ventBtns').onclick = e => {
 
 // ---------- כובעים ----------
 const HATS = ['ללא', 'מסיבה', 'כתר', 'מצחייה', 'ארנב', 'הילה', 'פרח', 'קש', 'משקפיים', 'שף', 'קרניים', 'אוזניות'];
+// ---------- סטטיסטיקה אישית, תגים ופריטים שנפתחים (נשמר בדפדפן) ----------
+const PETS = ['', '🐶', '🐱', '🐧', '🐹', '🦊', '🐸', '🐙', '🦄'];
+const PET_NAMES = ['ללא', 'כלב', 'חתול', 'פינגווין', 'אוגר', 'שועל', 'צפרדע', 'תמנון', 'חד-קרן'];
+const loadStats = () => { try { return Object.assign({ games: 0, wins: 0, impGames: 0, impWins: 0, crewWins: 0, jesterWins: 0, moleWins: 0, kills: 0, tasks: 0, goodVotes: 0, badVotes: 0, ejected: 0, survived: 0, reports: 0, hideWins: 0, streak: 0, best: 0, last: 0, badges: [] }, JSON.parse(localStorage.getItem('mm_stats') || '{}')); } catch (e) { return { games: 0, wins: 0, badges: [] }; } };
+// דרישה לפתיחה: [שם השדה, כמה]
+const HAT_REQ = { 8: ['wins', 2, 'ניצחונות'], 9: ['tasks', 60, 'משימות'], 10: ['impWins', 3, 'ניצחונות כמתחזה'], 11: ['games', 15, 'משחקים'] };
+const PET_REQ = { 1: null, 2: ['games', 1, 'משחקים'], 3: ['games', 3, 'משחקים'], 4: ['wins', 1, 'ניצחונות'], 5: ['impWins', 1, 'ניצחונות כמתחזה'], 6: ['tasks', 50, 'משימות'], 7: ['kills', 10, 'חיסולים'], 8: ['wins', 10, 'ניצחונות'] };
+const unlocked = (req, st) => !req || (st[req[0]] || 0) >= req[1];
+const BADGES = [
+  { id: 'detective', ic: '🕵️', name: 'הבלש הטוב', d: 'הצבעת נכון נגד מתחזים', k: 'goodVotes', n: 10 },
+  { id: 'liar', ic: '🤥', name: 'השקרן הגדול', d: 'ניצחונות כמתחזה', k: 'impWins', n: 5 },
+  { id: 'sus', ic: '👀', name: 'תמיד חשוד', d: 'הודחת בישיבה', k: 'ejected', n: 3 },
+  { id: 'worker', ic: '🛠️', name: 'חרוץ', d: 'משימות שהשלמת', k: 'tasks', n: 100 },
+  { id: 'hunter', ic: '🔪', name: 'צייד', d: 'חיסולים', k: 'kills', n: 20 },
+  { id: 'champ', ic: '🏆', name: 'מנצח סדרתי', d: 'ניצחונות', k: 'wins', n: 10 },
+  { id: 'streak', ic: '🔥', name: 'על גל', d: 'ניצחונות ברצף', k: 'best', n: 3 },
+  { id: 'clown', ic: '🤡', name: 'ליצן החצר', d: 'ניצחון כליצן', k: 'jesterWins', n: 1 },
+  { id: 'survivor', ic: '🧊', name: 'שורד', d: 'שרדת עד סוף המשחק', k: 'survived', n: 10 },
+  { id: 'reporter', ic: '📢', name: 'עיתונאי', d: 'דיווחים על גופות', k: 'reports', n: 10 },
+  { id: 'vet', ic: '🎮', name: 'ותיק', d: 'משחקים', k: 'games', n: 25 },
+  { id: 'wrong', ic: '🤦', name: 'יד קלה על ההדק', d: 'הצבעות נגד חפים מפשע', k: 'badVotes', n: 10 },
+];
+// סוף משחק: מעדכנים את הסטטיסטיקה פעם אחת לכל משחק, ומחזירים תגים חדשים שהושגו
+function recordGame(m) {
+  const st = loadStats();
+  if (!m || st.last === m.game) return [];
+  st.last = m.game; st.games++;
+  if (m.won) { st.wins++; st.streak++; st.best = Math.max(st.best, st.streak); } else st.streak = 0;
+  if (m.team === 'imp') { st.impGames++; if (m.won) st.impWins++; }
+  if (m.team === 'crew' && m.won) st.crewWins++;
+  if (m.team === 'jester' && m.won) st.jesterWins++;
+  if (m.team === 'mole' && m.won) st.moleWins++;
+  if (m.mode === 3 && m.won) st.hideWins++;
+  for (const k of ['kills', 'tasks', 'goodVotes', 'badVotes', 'reports']) st[k] += m[k] || 0;
+  if (m.ejected) st.ejected++;
+  if (m.alive) st.survived++;
+  const fresh = BADGES.filter(b => !st.badges.includes(b.id) && (st[b.k] || 0) >= b.n);
+  fresh.forEach(b => st.badges.push(b.id));
+  try { localStorage.setItem('mm_stats', JSON.stringify(st)); } catch (e) {}
+  return fresh;
+}
+function openStats() {
+  const st = loadStats(), pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+  const cell = (n, l) => `<div><b>${n}</b>${l}</div>`;
+  let h = '<div class="stGrid">' + cell(st.games, 'משחקים') + cell(st.wins, 'ניצחונות') + cell(pct(st.wins, st.games), 'אחוז ניצחון') + cell(st.impWins + '/' + st.impGames, 'ניצחונות כמתחזה') +
+    cell(st.kills, 'חיסולים') + cell(st.tasks, 'משימות') + cell(st.goodVotes, 'הדחות נכונות') + cell(st.badVotes, 'הצבעות שגויות') + cell(st.ejected, 'פעמים שהודחת') + cell(st.best, 'רצף ניצחונות שיא') + '</div>';
+  h += '<h3 style="margin:6px 0">🏅 תגים</h3>' + BADGES.map(b => { const v = Math.min(st[b.k] || 0, b.n), on = st.badges.includes(b.id) || v >= b.n;
+    return `<div class="badge ${on ? '' : 'off'}"><span class="bi">${b.ic}</span><span style="flex:1"><b>${b.name}</b><small>${b.d}: ${v}/${b.n}</small>${on ? '' : `<div class="bar"><i style="width:${100 * v / b.n}%"></i></div>`}</span>${on ? '✅' : ''}</div>`; }).join('');
+  h += '<h3 style="margin:10px 0 6px">🎁 פריטים שנפתחים</h3>' + [...Object.entries(HAT_REQ).map(([i, r]) => ['🎩 כובע ' + HATS[i], r]), ...Object.entries(PET_REQ).filter(([, r]) => r).map(([i, r]) => [PETS[i] + ' ' + PET_NAMES[i], r])]
+    .map(([n, r]) => `<div class="badge ${unlocked(r, st) ? '' : 'off'}"><span style="flex:1">${n}</span><small>${unlocked(r, st) ? '✅ פתוח' : `${Math.min(st[r[0]] || 0, r[1])}/${r[1]} ${r[2]}`}</small></div>`).join('');
+  $('#statsBody').innerHTML = h; show('#statsModal', true);
+}
+document.querySelectorAll('.statsBtn').forEach(b => b.onclick = openStats);
+$('#statsClose').onclick = () => show('#statsModal', false);
+$('#statsModal').onclick = e => { if (e.target.id === 'statsModal') show('#statsModal', false); };
+let petSig = '';
+function renderPets(s) {
+  const st = loadStats(), sig = s.me.pet + '|' + st.games + st.wins;
+  if (sig === petSig) return; petSig = sig;
+  const myPet = (s.roster.find(p => p.id === s.me.id) || {}).pet || 0;
+  $('#pets').innerHTML = PETS.map((e, i) => `<button data-p="${i}" title="${PET_NAMES[i]}${PET_REQ[i] && !unlocked(PET_REQ[i], st) ? ' – נפתח אחרי ' + PET_REQ[i][1] + ' ' + PET_REQ[i][2] : ''}" class="${i === myPet ? 'sel' : ''} ${unlocked(PET_REQ[i], st) ? '' : 'locked'}">${e || '✖️'}</button>`).join('');
+}
+$('#pets').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return; const i = +b.dataset.p, r = PET_REQ[i];
+  if (!unlocked(r, loadStats())) return toast('🔒 נפתח אחרי ' + r[1] + ' ' + r[2] + ' (📊 לפרטים)');
+  api({ type: 'pet', pet: i }); petSig = '';
+  try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.pet = i; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {}
+};
 function drawHat(h, dir) {
   const c = ctx;
   if (!h) return;
@@ -2423,8 +2539,9 @@ function renderHats(s) {
   box.innerHTML = '';
   HATS.forEach((name, i) => {
     const btn = document.createElement('button');
-    btn.className = i === s.me.hat ? 'sel' : '';
+    btn.className = (i === s.me.hat ? 'sel' : '') + (unlocked(HAT_REQ[i], loadStats()) ? '' : ' locked');
     btn.dataset.h = i;
+    if (HAT_REQ[i]) btn.title = 'נפתח אחרי ' + HAT_REQ[i][1] + ' ' + HAT_REQ[i][2];
     const cnv = document.createElement('canvas');
     cnv.width = cnv.height = 112;
     const saved = ctx;
@@ -2437,7 +2554,7 @@ function renderHats(s) {
     box.appendChild(btn);
   });
 }
-$('#hats').onclick = e => { const b = e.target.closest('button'); if (b) { api({ type: 'hat', hat: +b.dataset.h }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.hat = +b.dataset.h; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
+$('#hats').onclick = e => { const b = e.target.closest('button'); if (b && !unlocked(HAT_REQ[+b.dataset.h], loadStats())) { const r = HAT_REQ[+b.dataset.h]; toast('🔒 נפתח אחרי ' + r[1] + ' ' + r[2] + ' (📊 לפרטים)'); return; } if (b) { api({ type: 'hat', hat: +b.dataset.h }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.hat = +b.dataset.h; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
 
 
 // ---------- צ'אט קולי (WebRTC דרך PeerJS) ----------
@@ -2982,6 +3099,10 @@ function drawDrone(x, y, color, dir, opts = {}) {
   if (opts.slip) { ctx.font = '18px serif'; ctx.textAlign = 'center'; ctx.fillText('💫', 0, -42); ctx.rotate(performance.now() / 70); } // מחליק על בננה
   if (opts.ghost) ctx.globalAlpha = 0.45;
   if (opts.vent) ctx.globalAlpha = 0.35;
+  if (opts.pet && PETS[opts.pet] && !opts.ghost && !opts.vent) { // חיית מחמד מקפצת מאחורי הרחפן
+    const hop = Math.abs(Math.sin(performance.now() / 160)) * 6;
+    ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.fillText(PETS[opts.pet], -dir * 32, 18 - hop);
+  }
   const bob = opts.ghost ? Math.sin(performance.now() / 300) * 3 : 0;
   ctx.translate(0, bob);
   // צל
@@ -3495,7 +3616,7 @@ function drawCams(t) {
       if (p.spec || !p.alive || p.vent) continue;
       const d = disp[p.id] || p;
       if (d.x < VIEW.x0 || d.x > VIEW.x1 || d.y < VIEW.y0 || d.y > VIEW.y1) continue;
-      drawDrone(d.x, d.y, p.color, p.dir || 1, { hat: p.hat, scan: p.scan, shield: p.shield });
+      drawDrone(d.x, d.y, p.color, p.dir || 1, { hat: p.hat, scan: p.scan, shield: p.shield, pet: p.pet });
       ctx.textAlign = 'center'; ctx.font = 'bold 13px Rubik, Arial'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
       ctx.strokeText(cs(p.color) + p.name, d.x, d.y - 36); ctx.fillStyle = '#fff'; ctx.fillText(cs(p.color) + p.name, d.x, d.y - 36);
     }
@@ -3574,7 +3695,7 @@ function frame(t) {
     if (p.spec) continue;
     if (!inView(p) && !S.settings.reveal) continue;
     const d = disp[p.id];
-    drawDrone(d.x, d.y, p.color, p.dir || 1, { ghost: !p.alive, shield: p.shield, hat: p.hat, scan: p.scan, vent: p.vent, slip: p.slip });
+    drawDrone(d.x, d.y, p.color, p.dir || 1, { ghost: !p.alive, shield: p.shield, hat: p.hat, scan: p.scan, vent: p.vent, slip: p.slip, pet: p.pet });
     ctx.textAlign = 'center'; ctx.font = 'bold 14px Rubik, Arial';
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.7)';
     const nameCol = p.team === 'imp' && (p.id === me.id || me.team === 'imp' || reveal) ? '#ff6b6b' : '#fff';

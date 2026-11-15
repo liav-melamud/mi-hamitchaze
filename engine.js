@@ -57,7 +57,7 @@ const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', '�
 
 const SPEED = 220, KILL_RANGE = 90, REPORT_RANGE = 110, USE_RANGE = 60;
 const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15, TASK_TIME = 2.5;
-const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12;
+const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12, PET_COUNT = 9;
 // הגדרות תפקידים (כמו במשחק האמיתי): [ברירת מחדל, מינימום, מקסימום]
 const ROLE_SET = {
   engVent: [15, 0, 60], engVentCd: [15, 0, 60],       // מהנדס: כמה זמן אפשר להיות בפתח (0 = בלי הגבלה), והמתנה בין זחילות
@@ -187,7 +187,7 @@ function newPlayer(name, color, isBot) {
     id, key: isBot ? null : secretKey(), name: String(name || 'שחקן').replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, '').slice(0, 14) || 'שחקן', color, isBot,
     x: MAP.BUTTON.x, y: MAP.BUTTON.y, dir: 1, alive: true, role: null, tasks: [],
     input: { dx: 0, dy: 0 }, work: null, killCd: 0, shiftCd: 0, shapeAs: null, shapeUntil: 0,
-    shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * (HAT_COUNT - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
+    shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * (HAT_COUNT - 1)) : 0, pet: isBot && Math.random() < 0.3 ? 1 + Math.floor(Math.random() * (PET_COUNT - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
     bot: isBot ? { plan: [], wait: 0, goal: null, voteAt: 0, chatAt: 0, persona: pick(['suspicious', 'quiet', 'chatty', 'aggressive', 'helpful', 'normal', 'normal']) } : null,
   };
   players[id] = p;
@@ -247,7 +247,7 @@ function startGame(by) {
   if (hide) ev('start', '🙈 מחבואים: ' + nm(imps[0]) + ' הוא המחפש');
   if (race) { raceEndAt = now() + 8 * 60; ev('start', '🏁 מרוץ משימות: ראשון שמגיע ל-' + settings.raceGoal + ' משימות מנצח'); }
   all.forEach(p => {
-    p.alive = true; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
+    p.alive = true; p.ejected = false; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
     p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15;
     if (team(p) === 'crew') {
@@ -416,7 +416,7 @@ function resolveMeeting() {
   }
   let ej = null;
   if (best && best !== 'skip' && !tie && players[best]) {
-    ej = players[best]; ej.alive = false;
+    ej = players[best]; ej.alive = false; ej.ejected = true;
   }
   // סטטיסטיקה: מי הצביע נכון (נגד מתחזה) ומי טעה (נגד איש צוות)
   voters.forEach(v => { const tg = meeting.votes[v.id]; if (tg && tg !== 'skip' && players[tg]) { if (team(players[tg]) === 'imp') v.stats.goodVotes++; else v.stats.badVotes++; } });
@@ -711,6 +711,12 @@ function act(p, a) {
       break;
     }
     case 'cancel': p.work = null; p.sabWork = null; break;
+    case 'pet': { // חיית מחמד שהולכת אחרי הרחפן (נפתחת לפי ניצחונות)
+      if (phase !== 'lobby') return;
+      const n = Number(a.pet);
+      if (n >= 0 && n < PET_COUNT) p.pet = n;
+      break;
+    }
     case 'hat': {
       if (phase !== 'lobby') return;
       const h = Number(a.hat);
@@ -1597,7 +1603,7 @@ function viewFor(v) {
     const disp = p.shapeAs && players[p.shapeAs] ? players[p.shapeAs] : p;
     const o = {
       id: p.id, x: Math.round(p.x), y: Math.round(p.y), dir: p.dir, name: disp.name, color: COLORS[disp.color].c,
-      alive: p.alive, spec: !!p.spectator, bot: p.isBot, work: p.work && !p.work.mini ? p.work.t / taskTime(p.work.ref.i) : 0, hat: disp.hat,
+      alive: p.alive, spec: !!p.spectator, bot: p.isBot, work: p.work && !p.work.mini ? p.work.t / taskTime(p.work.ref.i) : 0, hat: disp.hat, pet: disp.pet || 0,
       scan: p.work && MAP.TASKS[p.work.ref.i].kind === 'scan' ? 1 : 0, vent: p.inVent !== null || p.vanishUntil > t ? 1 : 0,
     };
     if (p.shieldUntil > t) o.shield = 1;
@@ -1645,7 +1651,7 @@ function viewFor(v) {
     darkRooms: Object.keys(darkRooms).filter(r => darkRooms[r] > t),
     doorCool: Object.fromEntries(Object.keys(doorCool).filter(r => doorCool[r] > now() && !(doorsUntil[r] > now())).map(r => [r, Math.ceil(doorCool[r] - now())])),
     toast: v.toast.splice(0),
-    roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat })),
+    roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat, pet: p.pet || 0 })),
     chat,
     near: phase === 'play' ? nearTalk.filter(e => now() - e.t < 6 && e.from !== v.id && Math.hypot(e.x - v.x, e.y - v.y) < HEAR_R).map(e => ({ id: e.id, from: e.from, name: e.name, text: e.text })) : [],
   };
@@ -1677,6 +1683,12 @@ function viewFor(v) {
     const a4 = best('badVotes', 1); if (a4) awards.push({ icon: '🤦', title: 'הצביע נגד חפים מפשע', ...a4 });
     const a5 = best('reports', 1); if (a5) awards.push({ icon: '📢', title: 'הכי הרבה דיווחים', ...a5 });
     out.summary = { duration: Math.round(t - gameStartT), awards, events: events.slice(-60) };
+    // הסטטיסטיקה האישית של המשחק הזה (הדפדפן שומר את הסיכום המצטבר)
+    if (v.stats && !v.spectator && winner) {
+      const w = winner, tm = team(v);
+      const won = w.team === 'race' ? !!(w.ranking && w.ranking[0] && w.ranking[0].name === nm(v)) : w.team === 'jester' ? v.id === w.jester : w.team !== 'nobody' && (tm === w.team || (w.team === 'imp' && tm === 'mole'));
+      out.myStats = { game: Math.round(gameStartT), won, team: tm, role: v.role, mode: settings.mode, kills: v.stats.kills, tasks: v.stats.tasks, goodVotes: v.stats.goodVotes, badVotes: v.stats.badVotes, reports: v.stats.reports, ejected: !!v.ejected, alive: v.alive };
+    }
   }
   if (phase === 'lobby') out.colors = COLORS;
   return out;
