@@ -597,7 +597,7 @@ test('מגן אישי: יודע מתי ואיפה חוסל מי שהוא שומ�
   ok(v.me.ward.name === other.name.replace(/^🤖\s*/, ''), 'ההחלפה לא עבדה: ' + v.me.ward.name);
   ok(!v.me.ward.swap, 'אפשר להחליף שוב');
   // המתחזה מחסל אותו
-  place(g, s2 => { const k = s2.players[imp.id], o = s2.players[other.id]; k.killCd = 0; k.x = o.x + 30; k.y = o.y; k.alive = true; });
+  place(g, s2 => { const k = s2.players[imp.id], o = s2.players[other.id]; k.killCd = 0; k.x = o.x + 30; k.y = o.y; k.alive = true; k.inVent = null; k.vanishUntil = 0; o.inVent = null; o.shieldUntil = 0; o.alive = true; });
   g.setConn(a, true);
   g.act(imp.id, { type: 'kill' }); tick(g, 1);
   v = g.view(a);
@@ -745,6 +745,44 @@ test('טורניר: ניקוד מצטבר בין סיבובים והבוטים �
     if (r < 3) { g.act(a, { type: 'again' }); ok(g.view(a).roster.filter(p => p.bot).map(p => p.name).sort().join() === names1, 'הבוטים החליפו שמות'); }
     else ok(v.tour.done, 'הטורניר לא הסתיים');
   }
+});
+
+
+test('תחנת קרח: אפשר לבחור, חבלת הקפאה מאטה את הצוות, ומשימה זוגית מתקדמת רק עם שותף', () => {
+  const ICE = MAP.byId.ice;
+  const { g, a } = newGame({ bots: 4, role: 'איש צוות', cfg: { map: 'ice', roleOff: ['mole'], jester: false } });
+  ok(g.view(a).map === 'ice', 'המפה לא נבחרה');
+  // משימה זוגית
+  const pi = ICE.TASKS.findIndex(t => t.kind === 'pair'), T = ICE.TASKS[pi];
+  place(g, sn => { const h = sn.players[a]; h.tasks = [{ i: pi, done: false }]; h.x = T.x; h.y = T.y;
+    Object.values(sn.players).forEach(p => { if (p.id !== a) { p.x = 200; p.y = 150; p.killCd = 999; if (p.bot) { p.bot.wait = 999; p.bot.plan = []; } } }); });
+  g.setConn(a, true);
+  g.act(a, { type: 'use' }); sec(g, 7);
+  let v = g.view(a); ok(!v.me.tasks[0].done && v.me.pairWait, 'משימה זוגית התקדמה לבד');
+  ok(v.pairCalls.length === 1, 'אין קריאה לעזרה');
+  const helper = Object.values(JSON.parse(g.snapshot()).players).find(p => p.id !== a);
+  place(g, sn => { sn.players[helper.id].x = T.x + 60; sn.players[helper.id].y = T.y; });
+  g.setConn(a, true); g.act(a, { type: 'use' });
+  sec(g, 9); v = g.view(a); ok(v.me.tasks[0].done, 'משימה זוגית לא הושלמה עם שותף');
+  // הקפאה
+  const imp = Object.values(JSON.parse(g.snapshot()).players).find(p => p.role && ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role));
+  place(g, sn => { sn.sabCd = 0; sn.sab = null; });
+  g.setConn(a, true);
+  g.act(imp.id, { type: 'sab', kind: 'freeze' }); tick(g, 1);
+  ok(g.view(a).sab && g.view(a).sab.type === 'freeze', 'ההקפאה לא התחילה');
+  const x0 = me(g, a).x; g.act(a, { type: 'input', dx: 1, dy: 0 }); tick(g, 15); const dFrozen = Math.abs(me(g, a).x - x0);
+  g.act(a, { type: 'input', dx: -1, dy: 0 }); tick(g, 15); g.act(a, { type: 'input', dx: 0, dy: 0 });
+  place(g, sn => { sn.sab = null; }); g.setConn(a, true);
+  const x1 = me(g, a).x; g.act(a, { type: 'input', dx: 1, dy: 0 }); tick(g, 15); const dNorm = Math.abs(me(g, a).x - x1); g.act(a, { type: 'input', dx: 0, dy: 0 });
+  ok(dFrozen < dNorm * 0.75, `הקפאה לא מאטה (${dFrozen} מול ${dNorm})`);
+});
+
+test('שיבוש מצלמות: המתחזה מכבה את המצלמות ל-25 שניות', () => {
+  const { g, a } = newGame({ bots: 4, role: 'מתחזה', cfg: { roleOff: ['mole'] } });
+  g.act(a, { type: 'sab', kind: 'cams' }); tick(g, 1);
+  let v = g.view(a); ok(v.camsOff > 20, 'המצלמות לא שובשו');
+  g.act(a, { type: 'sab', kind: 'cams' }); tick(g, 1); ok(g.view(a).camsOff <= 25, 'שיבוש כפול');
+  sec(g, 26); v = g.view(a); ok(!v.camsOff && v.camsCd > 0, 'המצלמות לא חזרו או שאין השהיה');
 });
 
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));

@@ -115,9 +115,9 @@ const SAB_TIME_STRONG = 30;
 function startSab(kind, force, strong) {
   if (sab || (sabCd > 0 && !force)) return;
   const secs = strong ? SAB_TIME_STRONG : SAB_TIME;
-  sab = { type: kind, t: kind === 'lights' ? 0 : secs, fixed: MAP.SAB_POINTS[kind].map(() => false) };
-  ev('sab', { lights: '💡 החשמל הופל', oxygen: '💨 הופסק החמצן', reactor: '☢️ הכור התחמם' }[kind]);
-  toastAll(kind === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל' : kind === 'oxygen' ? `💨 הפסקת חמצן! יש ${secs} שניות לתקן בשתי נקודות` : `☢️ הכור מתחמם! יש ${secs} שניות לקרר בשתי נקודות`);
+  sab = { type: kind, t: kind === 'lights' || kind === 'freeze' ? 0 : secs, fixed: MAP.SAB_POINTS[kind].map(() => false) };
+  ev('sab', { lights: '💡 החשמל הופל', oxygen: '💨 הופסק החמצן', reactor: '☢️ הכור התחמם', freeze: '❄️ ההסקה הושבתה' }[kind]);
+  toastAll(kind === 'freeze' ? '❄️ ההסקה הושבתה! כולם קופאים ונעים לאט – תקנו בשני המחממים' : kind === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל' : kind === 'oxygen' ? `💨 הפסקת חמצן! יש ${secs} שניות לתקן בשתי נקודות` : `☢️ הכור מתחמם! יש ${secs} שניות לקרר בשתי נקודות`);
 }
 function fixSab(i) {
   if (!sab || sab.fixed[i]) return;
@@ -146,6 +146,8 @@ let bananas = []; // קליפות בננה של הליצן
 const BANANA_CD = 15, BANANA_LIFE = 60, BANANA_MAX = 3, SLIP_TIME = 0.9, FAKE_BODY_CD = 45;
 let meeting = null, eject = null, winner = null;
 let chat = [];
+let pairCalls = [];
+let camsOffUntil = 0, camsCd = 0; const CAMS_OFF = 25, CAMS_CD = 45; // שיבוש מצלמות של המתחזה // משימות זוגיות שמחכות לשותף
 let noises = []; // רעשים מזויפים של הרעשן
 let posHist = [], killLog = [], histT = 0; // לשומר הזמן: איפה כולם היו בשניות האחרונות, ומי חוסל מתי
 let hideEndAt = 0, noImpGame = false; // מחבואים: מתי נגמר הזמן; הפתעה: האם אין מתחזה בכלל
@@ -260,6 +262,7 @@ function startGame(by) {
   if (hide) imps.forEach(p => { p.frozenUntil = now() + 10; p.killCd = 10; toast(p, '🙈 אתה המחפש! סופר עד 10…'); });
   else all.forEach(p => { p.frozenUntil = 0; });
   if (hide) crew.forEach(p => toast(p, '🙈 מחבואים! ' + nm(imps[0]) + ' הוא המחפש – יש לך 10 שניות להתחבא'));
+  pairCalls = []; camsOffUntil = 0; camsCd = 0;
   bodies = []; bananas = []; meeting = null; eject = null; winner = null; chat = []; usedLines = new Set(); lastMistake = null; jesterHint = false; gusts = []; windT = 10 + Math.random() * 8;
   sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {};
   settings.reveal = false;
@@ -584,8 +587,13 @@ function act(p, a) {
     }
     case 'sab': {
       if (phase !== 'play' || !p.alive || team(p) !== 'imp' || settings.mode === 3) return;
+      if (a.kind === 'cams') { // שיבוש מצלמות: חבלה קטנה, לא משבר
+        if (camsOffUntil > t || camsCd > t) return toast(p, 'שיבוש מצלמות בעוד ' + Math.ceil(Math.max(camsOffUntil, camsCd) - t) + ' שניות');
+        camsOffUntil = t + CAMS_OFF; camsCd = t + CAMS_OFF + CAMS_CD; ev('sab', '📺 המצלמות שובשו');
+        toast(p, '📺 שיבשת את המצלמות ל-' + CAMS_OFF + ' שניות'); return;
+      }
       if (a.kind === 'door') { if (!closeDoors(a.room, p.role === 'saboteur')) toast(p, 'הדלתות עדיין בהשהיה'); return; }
-      if (!['lights', 'oxygen', 'reactor'].includes(a.kind) || !MAP.SAB_POINTS[a.kind].length) return; // במפה הקטנה אין כור
+      if (!['lights', 'oxygen', 'reactor', 'freeze'].includes(a.kind) || !(MAP.SAB_POINTS[a.kind] || []).length) return; // במפה הקטנה אין כור
       const fast = p.role === 'saboteur' && sabCd <= SAB_CD / 2; // מחבל: מחכה חצי מהזמן
       if (sab || (sabCd > 0 && !fast)) return toast(p, 'חבלה נוספת בעוד ' + Math.ceil(p.role === 'saboteur' ? sabCd - SAB_CD / 2 : sabCd) + ' שניות');
       startSab(a.kind, fast, p.role === 'saboteur');
@@ -613,7 +621,7 @@ function act(p, a) {
       if (p.alive && dist(p, MAP.BUTTON) < 80) {
         if (settings.mode === 2) return toast(p, 'במרוץ אין ישיבות – רק משימות!');
         if (settings.mode === 3) return toast(p, 'במחבואים אין ישיבות – רק לברוח ולהתחבא!');
-        if (sab && sab.type !== 'lights') return toast(p, 'אי אפשר לכנס ישיבה בזמן משבר!');
+        if (sab && sab.type !== 'lights' && sab.type !== 'freeze') return toast(p, 'אי אפשר לכנס ישיבה בזמן משבר!');
         if (p.emergencyUsed) return toast(p, 'כבר השתמשת בכפתור החירום');
         p.emergencyUsed = true;
         callMeeting(p, null);
@@ -764,7 +772,7 @@ function act(p, a) {
       if (Array.isArray(a.roleOff)) settings.roleOff = a.roleOff.filter(k => TOGGLE_ROLES.includes(k));
       settings.jester = !!a.jester;
       settings.botLevel = Math.round(cl(a.botLevel, 1, 3, 2));
-      settings.map = a.map === 'small' ? 'small' : 'big';
+      settings.map = ['small', 'ice'].includes(a.map) ? a.map : 'big';
       settings.mode = [1, 2, 3, 4].includes(a.mode) ? a.mode : 1;
       settings.rounds = [1, 3, 5].includes(Number(a.rounds)) ? Number(a.rounds) : 1;
       settings.hideTime = Math.round(cl(a.hideTime, 60, 600, 180));
@@ -1055,8 +1063,9 @@ function botTick(p, dt) {
   if (team(p) === 'imp' && p.alive && !p.inVent && settings.mode !== 3) {
     const sabF = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.6 : 1;
     const sabI = p.role === 'saboteur' ? 2.5 : 1, sabReady = p.role === 'saboteur' ? sabCd <= SAB_CD / 2 : sabCd <= 0;
-    if (!sab && sabReady && Math.random() < 0.0005 * sabF * sabI) startSab(pick(MAP.SAB_POINTS.reactor.length ? ['lights', 'lights', 'oxygen', 'reactor'] : ['lights', 'lights', 'oxygen']), p.role === 'saboteur', p.role === 'saboteur');
+    if (!sab && sabReady && Math.random() < 0.0005 * sabF * sabI) startSab(pick(['lights', 'lights', 'oxygen'].concat(MAP.SAB_POINTS.reactor.length ? ['reactor'] : [], MAP.SAB_POINTS.freeze && MAP.SAB_POINTS.freeze.length ? ['freeze', 'freeze'] : [])), p.role === 'saboteur', p.role === 'saboteur');
     else if (Math.random() < 0.0003 * sabF) closeDoors(pick(Object.keys(MAP.ROOMS)));
+    else if (list().some(q => q.cam && q.alive && team(q) !== 'imp') && Math.random() < 0.002 * sabF) act(p, { type: 'sab', kind: 'cams' });
   }
   // זיהוי תקיעה: יש מסלול אבל כמעט לא זזים 3 שניות
   if (b.plan.length) {
@@ -1065,6 +1074,19 @@ function botTick(p, dt) {
   } else b.pos = null;
   if (b.wait > 0) { b.wait -= dt; return; }
   if (p.work || p.sabWork) return;
+  // מישהו מחכה לשותף למשימה זוגית – בוט קרוב בא לעזור (גם מתחזה יכול לבוא… רגע של אמון)
+  if (b.helping) {
+    const c = pairCalls.find(q => q.by === b.helping);
+    if (!c) b.helping = null;
+    else if (!b.plan.length) { b.wait = 0.8; return; }
+  } else if (pairCalls.length && !sab && Math.random() < 0.03) {
+    const c = pairCalls.find(q => q.by !== p.id && Math.hypot(q.x - p.x, q.y - p.y) < 1200);
+    if (c && !list().some(o => o.bot && o.bot.helping === c.by)) {
+      const to = MAP.roomAt(c.x, c.y); b.helping = c.by; b.goal = null;
+      b.plan = [...(to ? MAP.path(hereRoom(p).id, to.id) : []), { x: c.x + (Math.random() < 0.5 ? -60 : 60), y: c.y + 20 }];
+      return;
+    }
+  }
   if (!b.plan.length && b.escape && b.escape.vent && p.inVent === null) {
     b.escape.vent = false; b.escape.t = 1.5 + Math.random() * 2; act(p, { type: 'vent' });
     if (p.inVent === null) b.escape = null;
@@ -1385,9 +1407,9 @@ function tick() {
     for (const rid of Object.keys(doorsUntil)) if (doorsUntil[rid] <= t) delete doorsUntil[rid];
     hauntDoors = hauntDoors.filter(d => d.until > t);
     for (const rid of Object.keys(darkRooms)) if (darkRooms[rid] <= t) delete darkRooms[rid];
-    if (sab && sab.type !== 'lights') {
+    if (sab && sab.type !== 'lights' && sab.type !== 'freeze') {
       sab.t -= dt;
-      if (sab.t <= 0) { winner = { team: 'imp', reason: SAB_WIN[sab.type] }; phase = 'end'; settings.reveal = true; sab = null; ev('end', '🏁 ' + winner.reason); }
+      if (sab.t <= 0 && sab.type !== 'freeze') { winner = { team: 'imp', reason: SAB_WIN[sab.type] }; phase = 'end'; settings.reveal = true; sab = null; ev('end', '🏁 ' + winner.reason); }
     }
     // רוח מפתחי האוורור: פעם בכמה שניות פתח אחד נושף ודוחף חלש
     windT -= dt;
@@ -1405,6 +1427,7 @@ function tick() {
       }
     }
     noises = noises.filter(n => n.until > t);
+    pairCalls = pairCalls.filter(c => c.until > t && players[c.by] && players[c.by].alive);
     histT -= dt;
     if (histT <= 0) { // תמונת מצב כל חצי שנייה לשומר הזמן
       histT = 0.5; const pos = {};
@@ -1458,7 +1481,7 @@ function tick() {
       const len = p.inVent !== null || p.frozenUntil > t ? 0 : Math.hypot(dx, dy);
       if (len > 0) {
         dx /= len; dy /= len;
-        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1) * (settings.mode === 3 && team(p) === 'imp' ? 1.12 : 1); // גרירת גופה מאטה, החלקה מאיצה, המחפש מהיר
+        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1) * (settings.mode === 3 && team(p) === 'imp' ? 1.12 : 1) * (sab && sab.type === 'freeze' && p.alive && team(p) !== 'imp' ? 0.55 : 1); // גרירת גופה מאטה, החלקה מאיצה, המחפש מהיר
         if (!p.alive || p.spectator) {
           p.x = Math.max(0, Math.min(MAP.WORLD.w, p.x + dx * step));
           p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
@@ -1489,7 +1512,13 @@ function tick() {
       if (p.work) {
         const tk = MAP.TASKS[p.work.ref.i];
         if (dist(p, tk) > USE_RANGE + 5 || p.work.ref.done) p.work = null;
-        else {
+        else if (tk.kind === 'pair' && !list().some(o => o.id !== p.id && o.alive && !o.spectator && o.inVent === null && dist(o, p) < 140)) {
+          // משימה זוגית: בלי שותף ליד – לא מתקדמים, וקוראים לעזרה
+          p.work.wait = (p.work.wait || 0) + dt;
+          const c = pairCalls.find(q => q.by === p.id);
+          if (c) c.until = t + 1; else pairCalls.push({ by: p.id, x: tk.x, y: tk.y, until: t + 1 });
+          if (p.isBot && p.work.wait > 14) { p.work = null; p.bot.wait = 1; }
+        } else {
           p.work.t += dt;
           if ((!p.work.mini || p.isBot) && p.work.t >= (p.isBot && p.work.mini ? botTaskTime() : taskTime(p.work.ref.i))) { const r = p.work.ref; p.work = null; completeTask(p, r); if (phase !== 'play') break; }
         }
@@ -1586,13 +1615,14 @@ function viewFor(v) {
     killCd: Math.ceil(v.killCd), shiftCd: Math.ceil(v.shiftCd), shifted: !!v.shapeAs, gaCd: Math.ceil(v.gaCd),
     emergencyUsed: v.emergencyUsed, work: v.work && !v.work.mini ? v.work.t / taskTime(v.work.ref.i) : 0,
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
-    sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial' }[sab.type], i: v.sabWork.i } : null,
+    sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial', freeze: 'dial' }[sab.type], i: v.sabWork.i } : null,
     sabCd: Math.ceil(sabCd),
     guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t, engVentCd: Math.ceil(v.engVentCd || 0), ventLeft: v.role === 'engineer' && v.inVent !== null && settings.engVent && v.ventSince ? Math.max(0, Math.ceil(settings.engVent - (t - v.ventSince))) : null,
     bananaCd: Math.ceil(v.bananaCd || 0), fakeCd: Math.ceil(v.fakeCd || 0), hauntDoorCd: Math.ceil(v.hauntDoorCd || 0), darkCd: Math.ceil(v.darkCd || 0), dragCd: Math.ceil(v.dragCd || 0), dragging: !!v.drag,
     photos: (v.photos || []).map(ph => ({ ago: Math.round(t - ph.t), room: ph.room, names: ph.names, bodies: ph.bodies })), notes: (v.notes || []).slice(-6),
     color: v.color,
     ward: v.role === 'guardian' && players[v.ward] ? { name: nm(players[v.ward]), alive: players[v.ward].alive, swap: !!v.wardSwap, died: v.wardDied ? v.wardDied.room : null } : null,
+    pairWait: !!(v.work && MAP.TASKS[v.work.ref.i].kind === 'pair' && v.work.wait && pairCalls.some(c => c.by === v.id)),
     rewindUsed: !!v.rewindUsed, noiseCd: Math.ceil(v.noiseCd || 0),
   };
   const out = {
@@ -1604,10 +1634,12 @@ function viewFor(v) {
     tour: tourView(),
     race: settings.mode === 2 && phase === 'play' ? { goal: settings.raceGoal, left: Math.max(0, Math.round(raceEndAt - t)), board: raceRanking().slice(0, 5) } : null,
     gusts: gusts.map(g => g.i),
-    camsOn: list().some(q => q.cam && q.alive),
+    camsOn: list().some(q => q.cam && q.alive) && !(camsOffUntil > t),
+    camsOff: camsOffUntil > t ? Math.ceil(camsOffUntil - t) : 0, camsCd: camsCd > t ? Math.ceil(camsCd - t) : 0,
     sab: sab ? { type: sab.type, t: Math.ceil(sab.t), fixed: sab.fixed.slice() } : null,
     doors: Object.keys(doorsUntil).filter(r => doorsUntil[r] > now()),
     hauntDoors: hauntDoors.filter(d => d.until > t).map(d => ({ x: d.x, y: d.y, w: d.w, h: d.h })),
+    pairCalls: pairCalls.map(c => ({ x: c.x, y: c.y })),
     noises: noises.map(n => ({ x: n.x, y: n.y })),
     bananas: bananas.map(b => ({ x: Math.round(b.x), y: Math.round(b.y) })),
     darkRooms: Object.keys(darkRooms).filter(r => darkRooms[r] > t),

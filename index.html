@@ -268,6 +268,8 @@
   body.cb .vdot { font-size: 9px; line-height: 12px; text-align: center; color: #000; font-weight: 900; }
   #endTour .tourT { font-weight: 800; font-size: 17px; margin: 10px 0 4px; color: #ffd166; }
   #endTour .tourChamp { font-size: 16px; margin: 4px 0 8px; }
+  body.frozen::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 5; box-shadow: inset 0 0 140px 50px rgba(170,220,255,.55); background: radial-gradient(ellipse at center, rgba(200,235,255,0) 55%, rgba(200,235,255,.25) 100%); }
+  #sabBanner.ice { background: #2b6a9a; }
   #raceBoard { position: absolute; top: 64px; left: 12px; background: var(--panel); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 12px; font-size: 13px; min-width: 190px; }
   #raceBoard .rt { font-weight: 800; color: var(--accent); margin-bottom: 4px; }
   #raceBoard .rr { display: flex; gap: 6px; align-items: center; padding: 1px 0; }
@@ -351,7 +353,7 @@
     <div id="revealBadge" class="hidden">👁 מצב חשיפה פעיל – כולם רואים את כל התפקידים</div>
   </div>
   <div id="vitals" class="hidden"></div>
-  <div id="workbar" class="hidden">מבצע משימה…<div class="bar"><i id="workfill"></i></div></div>
+  <div id="workbar" class="hidden"><span id="worktxt">מבצע משימה…</span><div class="bar"><i id="workfill"></i></div></div>
   <div id="ghostBadge" class="hidden">👻 אתה רוח – רק רוחות רואות אותך</div>
   <div id="ventPanel" class="hidden"><b>🕳️ אתה בתוך פתח אוורור – אף אחד לא רואה אותך</b><div class="row" id="ventBtns"></div></div>
   <div id="actions"></div>
@@ -456,7 +458,7 @@
       <label>זמן מחבואים <select data-s="hideTime"><option value="120">2 דק׳</option><option value="180">3 דק׳</option><option value="240">4 דק׳</option><option value="300">5 דק׳</option></select></label>
       <label>🏆 טורניר <select data-s="rounds"><option value="1">בלי (משחק בודד)</option><option value="3">3 סיבובים</option><option value="5">5 סיבובים</option></select></label>
       <label>יעד המרוץ (משימות) <select data-s="raceGoal"><option>6</option><option>10</option><option>15</option><option>20</option></select></label>
-      <label>מפה <select data-s="map"><option value="big">גדולה (14 חדרים)</option><option value="small">קטנה (7 חדרים, לקבוצות קטנות)</option></select></label>
+      <label>מפה <select data-s="map"><option value="big">גדולה (14 חדרים)</option><option value="small">קטנה (7 חדרים, לקבוצות קטנות)</option><option value="ice">❄️ תחנת קרח (12 חדרים)</option></select></label>
       <label>רמת הבוטים <select data-s="botLevel"><option value="1">🐣 מתחיל (מתבלבלים)</option><option value="2">🙂 רגיל</option><option value="3">🦊 ערמומי (זוכרים הכל ומשקרים טוב)</option></select></label>
       <label>תפקידים חדשים <select data-s="newRoles"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>🤡 הליצן <select data-s="jester"><option value="1">כן</option><option value="0">לא</option></select></label>
@@ -636,7 +638,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-191930'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-192919'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1256,7 +1258,8 @@ function renderHud(s) {
   $('#tasktxt').textContent = `(${s.tasks.done}/${s.tasks.total})`;
   $('#taskfill').style.width = (s.tasks.total ? 100 * s.tasks.done / s.tasks.total : 0) + '%';
   show('#revealBadge', s.settings.reveal);
-  show('#workbar', me.work > 0);
+  show('#workbar', me.work > 0 || !!me.pairWait);
+  $('#worktxt').textContent = me.pairWait ? '🤝 משימה זוגית – צריך עוד מישהו לידך! (קראנו לעזרה)' : 'מבצע משימה…';
   $('#workfill').style.width = Math.min(100, me.work * 100) + '%';
   show('#ghostBadge', !me.alive && !me.spec);
   show('#raceBoard', !!s.race || !!s.hide);
@@ -1365,7 +1368,8 @@ function buildSabMap() {
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<div class="sroom" style="left:${pc(r.x, W0)};top:${pc(r.y, H0)};width:${pc(r.w, W0)};height:${pc(r.h, H0)}"><span>${r.name}</span></div>`; }
   SCHEM_BASE = h;
   for (const k in MAP.ROOMS) { const r = MAP.ROOMS[k]; h += `<button class="sbtn sdoor" data-room="${k}" title="נעל דלתות ב${r.name}" style="left:${pc(r.cx, W0)};top:${pc(r.cy + r.h * 0.12, H0)}">🚪</button>`; }
-  const crit = [['reactor', (MAP.SAB_POINTS.reactor[0] || {}).room, '☢️', 'התחממות הכור'], ['oxygen', MAP.SAB_POINTS.oxygen[0].room, '💨', 'הפסקת חמצן'], ['lights', MAP.SAB_POINTS.lights[0].room, '💡', 'הפלת החשמל']].filter(c => c[1]); // במפה הקטנה אין כור
+  const crit = [['freeze', ((MAP.SAB_POINTS.freeze || [])[0] || {}).room, '❄️', 'השבתת ההסקה (כולם הולכים לאט)'], ['reactor', (MAP.SAB_POINTS.reactor[0] || {}).room, '☢️', 'התחממות הכור'], ['oxygen', MAP.SAB_POINTS.oxygen[0].room, '💨', 'הפסקת חמצן'], ['lights', MAP.SAB_POINTS.lights[0].room, '💡', 'הפלת החשמל']].filter(c => c[1]); // במפה הקטנה אין כור
+  { const r = MAP.ROOMS[MAP.roomAt(MAP.CAM_CONSOLE.x, MAP.CAM_CONSOLE.y).id]; h += `<button class="sbtn scams" data-kind="cams" title="שיבוש מצלמות ל-25 שניות" style="left:${pc(r.x, W0)};top:${pc(r.y, H0)}">📺</button>`; }
   for (const [kind, rk, ic, title] of crit) { const r = MAP.ROOMS[rk]; h += `<button class="sbtn scrit" data-kind="${kind}" title="${title}" style="left:${pc(r.x + r.w, W0)};top:${pc(r.y, H0)}">${ic}</button>`; }
   st.innerHTML = h;
   st.onclick = e => {
@@ -1380,6 +1384,7 @@ function updateSabMap(s) {
   const me = s.me, active = !!s.sab;
   $('#sabHint').textContent = active ? 'יש משבר פעיל – אפשר רק לנעול דלתות עד שיתוקן (כל חדר עם קירור של 20 שניות).' : me.sabCd > 0 ? `חבלה גדולה הבאה אפשרית בעוד ${me.sabCd} שניות.` : 'בחר חבלה: משבר גדול (אייקון אדום), או נעילת דלתות של חדרים (🚪) – אפשר כמה שרוצים, ולכל חדר 20 שניות קירור אחרי שהדלתות נפתחות.';
   document.querySelectorAll('#sabStage .scrit').forEach(b => { b.disabled = active || me.sabCd > 0; });
+  document.querySelectorAll('#sabStage .scams').forEach(b => { const w = s.camsOff || s.camsCd; b.disabled = !!w; b.innerHTML = w ? `<small>${w}</small>` : '📺'; });
   document.querySelectorAll('#sabStage .sdoor').forEach(b => {
     const rid = b.dataset.room, closed = (s.doors || []).includes(rid), cool = (s.doorCool || {})[rid] || 0;
     b.classList.toggle('closed', closed); b.disabled = closed || cool > 0;
@@ -1416,11 +1421,13 @@ function closeSabMap() { sabOpen = false; show('#sabMap', false); }
 $('#sabClose').onclick = closeSabMap;
 function renderSab(s) {
   const act = s.phase === 'play' && s.sab;
-  show('#sabBanner', !!act); show('#sabFlash', !!act && s.sab.type !== 'lights');
+  show('#sabBanner', !!act); show('#sabFlash', !!act && s.sab.type !== 'lights' && s.sab.type !== 'freeze');
+  document.body.classList.toggle('frozen', !!act && s.sab.type === 'freeze' && s.me.team !== 'imp');
+  if (act) $('#sabBanner').classList.toggle('ice', s.sab.type === 'freeze');
   if (act) {
     const sb = s.sab, pts = MAP.SAB_POINTS[sb.type];
     $('#sabBanner').classList.toggle('amber', sb.type === 'lights');
-    $('#sabBanner').textContent = sb.type === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל (חדר החשמל)'
+    $('#sabBanner').textContent = sb.type === 'freeze' ? '❄️ ההסקה הושבתה! כולם קופאים – תקנו בשני המחממים: ' + pts.map((p, i) => (sb.fixed[i] ? '✅ ' : '⛔ ') + MAP.ROOMS[p.room].name).join(' · ') : sb.type === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל (חדר החשמל)'
       : (sb.type === 'oxygen' ? '💨 הפסקת חמצן! ' : '☢️ הכור מתחמם! ') + sb.t + 'ש׳ — ' + pts.map((p, i) => (sb.fixed[i] ? '✅ ' : '⛔ ') + MAP.ROOMS[p.room].name).join(' · ');
   }
   if (tmOpen) { if (s.phase !== 'play') closeTaskMap(); else updateTaskMap(s); }
@@ -3213,6 +3220,60 @@ function drawDecor(k, r, t) {
       ctx.restore();
       break;
     }
+    // ---------- תחנת קרח ----------
+    case 'HB': { // מגורים: מיטות קומתיים ושטיח
+      for (let i = 0; i < 3; i++) { box(X + 30 + i * 100, Y + 60, 80, 46, '#5c6f85', '#2b3442', 6); box(X + 34 + i * 100, Y + 64, 26, 38, '#e9eef5', '#9aa8b8', 4); }
+      ctx.fillStyle = 'rgba(200,80,80,.35)'; ctx.beginPath(); ctx.ellipse(r.cx, r.cy + 60, 90, 40, 0, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'LB': { // מעבדה: שולחנות ומבחנות זוהרות
+      box(X + 30, Y + 70, r.w - 60, 40, '#56657a', '#2b3442', 6);
+      for (let i = 0; i < 8; i++) { ctx.fillStyle = ['#7af0ff', '#9dff8a', '#ff9df0'][i % 3]; ctx.globalAlpha = 0.5 + 0.5 * glow; ctx.fillRect(X + 50 + i * 32, Y + 50, 10, 22); ctx.globalAlpha = 1; }
+      break;
+    }
+    case 'MH': { // אולם מרכזי: שולחן עגול גדול
+      disc(r.cx, r.cy + 10, 92, '#55667c', '#2b3442', 5); disc(r.cx, r.cy + 10, 60, '#647892');
+      break;
+    }
+    case 'GH': { // חממה: ערוגות ירוקות ומנורות גידול
+      for (let i = 0; i < 3; i++) { box(X + 30, Y + 60 + i * 60, r.w - 60, 34, '#5a3f2a', '#3a2818', 6); for (let j = 0; j < 9; j++) disc(X + 50 + j * 30, Y + 77 + i * 60, 9, '#3fbf5a', '#1f6a2e', 2); }
+      ctx.fillStyle = `rgba(255,120,220,${0.08 + 0.06 * glow})`; ctx.fillRect(X, Y, r.w, r.h);
+      break;
+    }
+    case 'DR': { // מקדחה: מגדל קידוח וחור בקרח
+      ctx.fillStyle = '#a9d6ef'; ctx.beginPath(); ctx.ellipse(r.cx, r.cy + 30, 60, 30, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#123044'; ctx.beginPath(); ctx.ellipse(r.cx, r.cy + 30, 34, 16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#d6a43a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(r.cx - 50, r.cy + 30); ctx.lineTo(r.cx, r.cy - 80); ctx.lineTo(r.cx + 50, r.cy + 30); ctx.stroke();
+      ctx.save(); ctx.translate(r.cx, r.cy - 20 + Math.sin(t / 120) * 6); ctx.fillStyle = '#9aa4b5'; ctx.fillRect(-6, -40, 12, 80); ctx.restore();
+      break;
+    }
+    case 'SC': { for (let i = 0; i < 3; i++) { box(X + 30 + i * 74, Y + 44, 64, 34, '#3b4255', '#232838', 5); screenBox(X + 36 + i * 74, Y + 48, 52, 26, '#2d6ea8'); } break; }
+    case 'HT': { // חדר הסקה: דוד עם להבה
+      box(r.cx - 60, r.cy - 70, 120, 110, '#6a4a3a', '#2e1e16', 10);
+      const f = ctx.createRadialGradient(r.cx, r.cy, 4, r.cx, r.cy, 46); f.addColorStop(0, `rgba(255,220,120,${glow})`); f.addColorStop(1, 'rgba(255,90,30,0)');
+      ctx.fillStyle = f; ctx.fillRect(r.cx - 50, r.cy - 50, 100, 90);
+      break;
+    }
+    case 'OB': { // מצפה: טלסקופ וכוכבים בחלון
+      ctx.fillStyle = '#0b1230'; ctx.fillRect(X + 30, Y + 40, r.w - 60, 60); stars(X + 30, Y + 40, r.w - 60, 60, 26);
+      ctx.save(); ctx.translate(r.cx, r.cy + 30); ctx.rotate(-0.6); box(-12, -70, 24, 90, '#cfd6e4', '#5a6478', 6); ctx.restore();
+      break;
+    }
+    case 'GR': { // מוסך: אופנוע שלג
+      box(r.cx - 80, r.cy - 20, 160, 50, '#d64545', '#6a1e1e', 14); box(r.cx - 100, r.cy + 30, 200, 12, '#3a3f48', '#1b1f28', 4);
+      break;
+    }
+    case 'GN': { box(X + 40, Y + 60, 120, 90, '#6a6236', '#2e2a14', 8); disc(X + 100, Y + 105, 22, `rgba(255,230,90,${0.4 + 0.5 * glow})`); break; }
+    case 'ST': { // מחסן קירור: ארגזים עם קרח
+      for (const [dx, dy] of [[60, 80], [120, 80], [90, 40], [300, 200], [360, 200]]) { box(X + dx - 24, Y + dy - 24, 48, 48, '#8fb9d4', '#3a6a88', 4); ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(X + dx - 24, Y + dy - 24, 48, 8); }
+      break;
+    }
+    case 'RD': { // רדאר: צלחת מסתובבת
+      ctx.save(); ctx.translate(r.cx, r.cy + 10); ctx.rotate(t / 900);
+      ctx.strokeStyle = '#cfd6e4'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 50, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -46); ctx.stroke();
+      ctx.restore(); disc(r.cx, r.cy + 10, 8, `rgba(90,255,140,${glow})`);
+      break;
+    }
     case 'SH': {
       const cx = r.cx, cy = r.cy + 14;
       disc(cx, cy, 78, '#242a3a', '#555f78', 5);
@@ -3246,14 +3307,23 @@ function drawAO(r) {
 let VIEW = null;
 const inV = (x, y, w, h) => !VIEW || (x < VIEW.x1 && x + w > VIEW.x0 && y < VIEW.y1 && y + h > VIEW.y0);
 function drawMap(t) {
+  const ICE = MAP.theme === 'ice';
+  if (ICE) { // תחנת קרח: שדה שלג בחוץ, דיונות ושלג שיורד
+    ctx.fillStyle = '#c9dbe8'; ctx.fillRect(-500, -500, MAP.WORLD.w + 1000, MAP.WORLD.h + 1000);
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    for (let i = 0; i < 60; i++) { const x = (i * 541) % 2900 - 300, y = (i * 313) % 1900 - 300; ctx.beginPath(); ctx.ellipse(x, y, 60 + (i % 5) * 18, 14 + (i % 3) * 5, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    for (let i = 0; i < 220; i++) { const x = ((i * 397) % 2900 - 300 + t / (30 + i % 20) * 6) % 2900 - 300, y = ((i * 211) % 1900 + t / (12 + i % 9)) % 1900 - 300; ctx.fillRect(x, y, 2 + (i % 2), 2 + (i % 2)); }
+  } else {
   ctx.fillStyle = '#070910'; ctx.fillRect(-500, -500, MAP.WORLD.w + 1000, MAP.WORLD.h + 1000);
   // כוכבים
   ctx.fillStyle = 'rgba(255,255,255,.5)';
   for (let i = 0; i < 160; i++) { const x = (i * 397) % 2600 - 300, y = (i * 211) % 1900 - 300; ctx.fillRect(x, y, (i % 3) + 1, (i % 3) + 1); }
+  }
   // מסדרונות: רצפה, קירות צד ופס מרכזי
   for (const c of MAP.CORRIDORS) {
     if (!inV(c.x - 10, c.y - 10, c.w + 20, c.h + 20)) continue;
-    ctx.fillStyle = '#2b3242'; ctx.fillRect(c.x, c.y, c.w, c.h);
+    ctx.fillStyle = ICE ? '#3c4b5c' : '#2b3242'; ctx.fillRect(c.x, c.y, c.w, c.h);
     ctx.fillStyle = '#171b26';
     if (c.o === 'v') { ctx.fillRect(c.x, c.y, 7, c.h); ctx.fillRect(c.x + c.w - 7, c.y, 7, c.h); }
     else { ctx.fillRect(c.x, c.y, c.w, 10); ctx.fillRect(c.x, c.y + c.h - 7, c.w, 7); }
@@ -3375,7 +3445,7 @@ function drawMap(t) {
     if (S.sab.fixed[i] || !inV(q.x - 70, q.y - 70, 140, 140)) return;
     const pp = 0.5 + 0.5 * Math.sin(t / 180);
     disc(q.x, q.y, 30 + pp * 6, 'rgba(255,60,60,.22)', '#ff4d4d', 3);
-    ctx.fillStyle = '#fff'; ctx.font = '26px Arial'; ctx.textAlign = 'center'; ctx.fillText({ lights: '💡', oxygen: '💨', reactor: '☢️' }[S.sab.type], q.x, q.y + 9);
+    ctx.fillStyle = '#fff'; ctx.font = '26px Arial'; ctx.textAlign = 'center'; ctx.fillText({ lights: '💡', oxygen: '💨', reactor: '☢️', freeze: '❄️' }[S.sab.type], q.x, q.y + 9);
     ctx.font = 'bold 13px Rubik, Arial'; ctx.fillStyle = '#ffd0d0'; ctx.fillText(q.name, q.x, q.y - 42);
   });
   // כפתור חירום
@@ -3407,6 +3477,13 @@ function drawCams(t) {
   const tw = (W - 30) / 2, th = (H - 90) / 2;
   MAP.CAMS.forEach((c, i) => {
     const tx = 10 + (i % 2) * (tw + 10), ty = 56 + ((i / 2) | 0) * (th + 10);
+    if (S.camsOff) { // המתחזה שיבש את המצלמות: רק "שלג" על המסך
+      for (let k = 0; k < 900; k++) { const g2 = (Math.random() * 255) | 0; ctx.fillStyle = `rgb(${g2},${g2},${g2})`; ctx.fillRect(tx + Math.random() * tw, ty + Math.random() * th, 4, 3); }
+      ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(tx + tw / 2 - 130, ty + th / 2 - 24, 260, 44);
+      ctx.fillStyle = '#ff9b9b'; ctx.font = 'bold 17px Rubik, Arial'; ctx.textAlign = 'center'; ctx.fillText(`📺 אין אות – שיבוש (${S.camsOff})`, tx + tw / 2, ty + th / 2 + 4);
+      ctx.strokeStyle = '#a83a3a'; ctx.lineWidth = 2; ctx.strokeRect(tx, ty, tw, th);
+      return;
+    }
     const z = tw / 460;
     ctx.save();
     ctx.beginPath(); ctx.rect(tx, ty, tw, th); ctx.clip();
@@ -3477,6 +3554,7 @@ function frame(t) {
   const inView = p => noDark || D(cam, disp[p.id] || p) <= vision;
 
   for (const b of S.bodies) if (noDark || D(cam, b) <= vision) drawBody(b);
+  if (S.pairCalls && S.pairCalls.length) { ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const bob = Math.sin(performance.now() / 250) * 5; for (const c of S.pairCalls) ctx.fillText('🤝', c.x, c.y - 56 + bob); ctx.textBaseline = 'alphabetic'; }
   if (S.noises && S.noises.length) { ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ph = performance.now() / 200; for (const n of S.noises) { ctx.globalAlpha = 0.55 + 0.45 * Math.sin(ph); ctx.fillText('👣', n.x - 26, n.y); ctx.fillText('🔊', n.x + 26, n.y - 10); } ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic'; }
   if (S.bananas && S.bananas.length) { ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const b of S.bananas) if (noDark || D(cam, b) <= vision) ctx.fillText('🍌', b.x, b.y); ctx.textBaseline = 'alphabetic'; }
 
