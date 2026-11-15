@@ -703,5 +703,49 @@ test('האשמה במיקרופון: בוט שראה ראיה מסכים, בוט
   ok(v.chat.some(c => c.from === w2.id && c.text.includes('איתי')), 'הבוט עם האליבי לא הגן');
 });
 
+
+test('מחבואים: המחפש גלוי לכולם, ממתין 10 שניות, אין ישיבות, ונגמר כשהזמן נגמר', () => {
+  const { g, a } = newGame({ bots: 5, role: 'איש צוות', cfg: { mode: 3, hideTime: 60 } });
+  let v = g.view(a);
+  const sk = v.players.find(p => p.team === 'imp');
+  ok(sk && sk.role === 'המחפש', 'המחפש לא גלוי לכולם');
+  ok(v.hide && v.hide.wait > 0, 'אין ספירה של המחפש');
+  const sn = JSON.parse(g.snapshot()); const x0 = sn.players[sk.id].x;
+  sec(g, 3); ok(Math.abs(JSON.parse(g.snapshot()).players[sk.id].x - x0) < 1, 'המחפש זז לפני הזמן');
+  ok(!Object.values(JSON.parse(g.snapshot()).players).some(p => !['crew', 'seeker'].includes(p.role)), 'יש תפקידים מיוחדים במחבואים');
+  g.act(a, { type: 'use' }); walkTo(g, a, MAP.BUTTON); g.act(a, { type: 'use' }); tick(g, 3); ok(g.view(a).phase === 'play', 'נפתחה ישיבה במחבואים');
+  for (let i = 0; i < 90 && g.view(a).phase === 'play'; i++) sec(g, 1);
+  v = g.view(a); ok(v.phase === 'end', 'המשחק לא נגמר');
+});
+
+test('הפתעה: כשאין מתחזה – הדחה של מישהו מפסידה את כולם', () => {
+  let r;
+  for (let i = 0; i < 80 && !r; i++) { const x = newGame({ bots: 5, cfg: { mode: 4, jester: false } }); if (!JSON.parse(x.g.snapshot()).noImpGame) continue; r = x; }
+  ok(r, 'לא יצא משחק בלי מתחזה');
+  const { g, a } = r;
+  ok(!g.view(a).players.some(p => p.team === 'imp'), 'יש מתחזה');
+  callMeeting(g, a);
+  const tgt = g.view(a).players.find(p => p.id !== a && p.alive);
+  place(g, sn => { Object.values(sn.players).filter(p => p.alive).forEach(p => { sn.meeting.votes[p.id] = tgt.id; }); });
+  g.setConn(a, true);
+  let v; for (let i = 0; i < 30 * 25; i++) { tick(g, 1); v = g.view(a); if (v.phase === 'end') break; }
+  ok(v.phase === 'end' && v.winner.team === 'nobody', 'לא הפסידו כולם: ' + v.phase);
+  ok(!v.eject || v.eject.impLeft == null, 'נחשף כמה מתחזים נשארו');
+});
+
+test('טורניר: ניקוד מצטבר בין סיבובים והבוטים שומרים על השמות', () => {
+  const { g, a } = newGame({ bots: 4, cfg: { rounds: 3, mode: 2, raceGoal: 4 } });
+  const names1 = g.view(a).roster.filter(p => p.bot).map(p => p.name).sort().join();
+  for (let r = 1; r <= 3; r++) {
+    for (let i = 0; i < 600 && g.view(a).phase === 'play'; i++) sec(g, 1);
+    tick(g, 2);
+    const v = g.view(a);
+    ok(v.phase === 'end' && v.tour && v.tour.round === r, 'סיבוב ' + r + ' לא נגמר כמו שצריך');
+    ok(v.tour.table.length >= 5 && v.tour.table.some(e => e.pts > 0), 'אין ניקוד');
+    if (r < 3) { g.act(a, { type: 'again' }); ok(g.view(a).roster.filter(p => p.bot).map(p => p.name).sort().join() === names1, 'הבוטים החליפו שמות'); }
+    else ok(v.tour.done, 'הטורניר לא הסתיים');
+  }
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

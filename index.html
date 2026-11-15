@@ -266,6 +266,8 @@
   #quick button { padding: 5px 9px; font-size: 13px; }
   .screen .card { zoom: var(--ui, 1); }
   body.cb .vdot { font-size: 9px; line-height: 12px; text-align: center; color: #000; font-weight: 900; }
+  #endTour .tourT { font-weight: 800; font-size: 17px; margin: 10px 0 4px; color: #ffd166; }
+  #endTour .tourChamp { font-size: 16px; margin: 4px 0 8px; }
   #raceBoard { position: absolute; top: 64px; left: 12px; background: var(--panel); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 12px; font-size: 13px; min-width: 190px; }
   #raceBoard .rt { font-weight: 800; color: var(--accent); margin-bottom: 4px; }
   #raceBoard .rr { display: flex; gap: 6px; align-items: center; padding: 1px 0; }
@@ -450,7 +452,9 @@
       <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
-      <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option></select></label>
+      <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option><option value="3">🙈 מחבואים (מחפש גלוי)</option><option value="4">🎲 הפתעה (אולי אין מתחזה בכלל!)</option></select></label>
+      <label>זמן מחבואים <select data-s="hideTime"><option value="120">2 דק׳</option><option value="180">3 דק׳</option><option value="240">4 דק׳</option><option value="300">5 דק׳</option></select></label>
+      <label>🏆 טורניר <select data-s="rounds"><option value="1">בלי (משחק בודד)</option><option value="3">3 סיבובים</option><option value="5">5 סיבובים</option></select></label>
       <label>יעד המרוץ (משימות) <select data-s="raceGoal"><option>6</option><option>10</option><option>15</option><option>20</option></select></label>
       <label>מפה <select data-s="map"><option value="big">גדולה (14 חדרים)</option><option value="small">קטנה (7 חדרים, לקבוצות קטנות)</option></select></label>
       <label>רמת הבוטים <select data-s="botLevel"><option value="1">🐣 מתחיל (מתבלבלים)</option><option value="2">🙂 רגיל</option><option value="3">🦊 ערמומי (זוכרים הכל ומשקרים טוב)</option></select></label>
@@ -584,6 +588,7 @@
     <p id="endReason" class="sub"></p>
     <canvas id="endCv" width="640" height="300" style="width:100%;max-width:640px;display:block;margin:0 auto 8px;border-radius:14px"></canvas>
     <div id="jesterVideo" class="hidden"></div>
+    <div id="endTour"></div>
     <div id="endAwards" class="awards"></div>
     <div id="endlist"></div>
     <details id="endTimeline" open><summary style="cursor:pointer;margin:6px 0">📜 ציר הזמן של המשחק</summary><div id="timeline"></div></details>
@@ -631,7 +636,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-191554'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261115-191930'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1196,7 +1201,7 @@ function actionState(s) {
   // נקודת תיקון של חבלה (אותו מרחק כמו במנוע: 70)
   const nearSab = alive && !!s.sab && MAP.SAB_POINTS[s.sab.type].some((q, i) => !s.sab.fixed[i] && D(pos, q) < 68);
   st.use = { show: !me.spec, on: !inVent && (nearSab || nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearSab ? '🔧 תקן' : nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
-  st.report = { show: alive, on: s.bodies.some(b => D(pos, b) <= 110) };
+  st.report = { show: alive && s.settings.mode !== 3, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
   st.vent = { show: alive && ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey), on: inVent || (!me.engVentCd && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : 'פתח') };
@@ -1222,7 +1227,7 @@ function actionState(s) {
   st.ward = { show: alive && me.roleKey === 'guardian' && !!me.ward && me.ward.swap, on: closeP, label: 'החלף שמירה' };
   st.rewind = { show: alive && me.roleKey === 'timekeeper' && !me.rewindUsed, on: true, label: 'החזר זמן' };
   st.noise = { show: alive && me.roleKey === 'noisemaker', on: !inVent && me.noiseCd === 0, label: me.noiseCd ? 'רעש ' + me.noiseCd : 'רעש' };
-  st.sab = { show: alive && me.team === 'imp', on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
+  st.sab = { show: alive && me.team === 'imp' && s.settings.mode !== 3, on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
 }
 
@@ -1254,7 +1259,11 @@ function renderHud(s) {
   show('#workbar', me.work > 0);
   $('#workfill').style.width = Math.min(100, me.work * 100) + '%';
   show('#ghostBadge', !me.alive && !me.spec);
-  show('#raceBoard', !!s.race);
+  show('#raceBoard', !!s.race || !!s.hide);
+  if (s.hide) {
+    const m = Math.floor(s.hide.left / 60), sc = s.hide.left % 60;
+    $('#raceBoard').innerHTML = `<div class="rt">🙈 מחבואים · ${m}:${String(sc).padStart(2, '0')}</div><div class="rr">${s.hide.wait ? '🔢 המחפש יוצא בעוד ' + s.hide.wait : '👀 המחפש מחפש!'}</div><div class="rr">🫣 נשארו ${s.hide.hiders} מתחבאים</div>` + (s.tour ? `<div class="rr">🏆 סיבוב ${s.tour.round}/${s.tour.total}</div>` : '');
+  }
   if (s.race) {
     const m = Math.floor(s.race.left / 60), sc = s.race.left % 60;
     $('#raceBoard').innerHTML = `<div class="rt">🏁 מרוץ משימות · יעד ${s.race.goal} · ${m}:${String(sc).padStart(2, '0')}</div>` +
@@ -1616,7 +1625,7 @@ function voteScene(e) {
 function renderEnd(s) {
   const w = s.winner;
   if (w.team === 'race') $('#endTitle').innerHTML = '<span style="color:var(--accent)">🏁 המרוץ הסתיים!</span>'; else
-  $('#endTitle').innerHTML = w.team === 'jester' ? '<span style="color:#ff9f1c">🤡 הליצן ניצח! 🤡</span>' : w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
+  $('#endTitle').innerHTML = w.team === 'nobody' ? '<span style="color:#ffd166">🤯 לא היה מתחזה בכלל!</span>' : w.surprise ? '<span style="color:var(--crew)">😄 לא היה מתחזה בכלל – ניצחתם!</span>' : s.settings.mode === 3 && w.team === 'imp' ? '<span style="color:var(--imp)">👀 המחפש תפס את כולם!</span>' : s.settings.mode === 3 ? '<span style="color:var(--crew)">🙈 המתחבאים ניצחו!</span>' : w.team === 'jester' ? '<span style="color:#ff9f1c">🤡 הליצן ניצח! 🤡</span>' : w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
   jesterVideo(w.team === 'jester');
   $('#endReason').textContent = w.reason;
   const roles = {};
@@ -1635,6 +1644,13 @@ function renderEnd(s) {
   if (w.ranking) { // מרוץ: דירוג במקום תפקידים
     $('#endlist').innerHTML = w.ranking.map((r, i) => `<div class="pl"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="dot" style="background:${esc(r.color)}"></span><span style="flex:1;text-align:right">${esc(cs(r.color) + r.name)}</span><span class="tag crew">${esc(r.n)} משימות</span></div>`).join('');
   }
+  // טורניר: טבלת ניקוד מצטברת
+  const T = s.tour;
+  $('#endTour').innerHTML = !T ? '' : `<div class="tourT">🏆 טורניר – ${T.done ? 'הסתיים!' : 'סיבוב ' + T.round + ' מתוך ' + T.total}</div>` +
+    (T.done && T.table[0] ? `<div class="tourChamp">👑 האלוף: <span class="dot" style="background:${esc(T.table[0].color)}"></span>${esc(T.table[0].name)} (${T.table[0].pts} נק׳)</div>` : '') +
+    T.table.map((e, i) => `<div class="pl"><span>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'}</span><span class="dot" style="background:${esc(e.color)}"></span><span style="flex:1;text-align:right">${esc(e.name)}</span><span class="tag crew">${e.pts} נק׳${e.gain ? ' (+' + e.gain + ')' : ''}</span></div>`).join('') +
+    `<div class="sub" style="font-size:12px">ניצחון 3 · חיסול 1 · הצבעה נכונה 1 · שרדת 1</div>`;
+  $('#againBtn').textContent = T && !T.done ? '▶ הסיבוב הבא (' + (T.round + 1) + '/' + T.total + ')' : T && T.done ? '🏆 טורניר חדש' : '🔁 שחק שוב עם אותם אנשים';
   show('#lobbyBtn', s.me.host); show('#againBtn', s.me.host);
   show('#endWait', !s.me.host);
 }
@@ -1648,6 +1664,7 @@ function stopVictoryMusic() {
 function victoryMusic(team) {
   stopVictoryMusic();
   if (team === 'race') team = 'crew';
+  if (team === 'nobody') team = 'imp';
   try { musicAC = musicAC || new (window.AudioContext || window.webkitAudioContext)(); musicAC.resume && musicAC.resume(); } catch (e) { return; }
   const ac = musicAC, out = musicOut = ac.createGain(), t0 = ac.currentTime + 0.08;
   out.gain.value = 0.2; out.connect(ac.destination);
@@ -1703,7 +1720,7 @@ function danceScene(s, roles) {
   if (sig !== danceSig) victoryMusic(w.team);
   danceSig = sig;
   cancelAnimationFrame(danceAnim); danceAnim = 0;
-  if (w.team === 'race') { cv.style.display = 'none'; return; }
+  if (w.team === 'race' || w.team === 'nobody') { cv.style.display = 'none'; return; }
   cv.style.display = 'block';
   const all = s.roster.filter(p => !p.spec).map(p => ({ ...p, team: (roles[p.id] || {}).team }));
   const winners = w.team === 'jester' ? all.filter(p => p.id === w.jester || p.team === 'jester') : all.filter(p => p.team === w.team || (w.team === 'imp' && p.team === 'mole'));
