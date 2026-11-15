@@ -663,5 +663,45 @@ test('שתול: יודע מי המתחזים, הם לא יודעים עליו, �
   ok(allDead.phase === 'end' && allDead.winner.team === 'imp', 'המתחזים לא ניצחו: ' + allDead.phase);
 });
 
+
+test('בוטים זוכרים שקר מישיבה קודמת ומזכירים אותו בישיבה הבאה', () => {
+  const { g, a } = newGame({ bots: 5, role: 'מתחזה', cfg: { botLevel: 3, roleOff: ['mole'], jester: false } });
+  place(g, sn => { Object.values(sn.players).forEach(p => { p.killCd = 999; }); });
+  g.setConn(a, true);
+  callMeeting(g, a);
+  place(g, sn => { Object.values(sn.players).forEach(p => { if (p.bot) p.bot.seen = { [a]: 'נשק' }; }); });
+  g.setConn(a, true);
+  g.act(a, { type: 'chat', text: 'הייתי בחשמל כל הזמן' });
+  sec(g, 8);
+  let v = JSON.parse(g.snapshot());
+  ok(v.chat.some(c => c.from !== a && c.text.includes('לא נכון') && c.text.includes('נשק')), 'אף בוט לא תפס את השקר');
+  ok(JSON.parse(g.snapshot()).liars[a], 'השקר לא נשמר');
+  // מסיימים את הישיבה בדילוג ומתחילים ישיבה חדשה
+  place(g, sn => { Object.values(sn.players).filter(p => p.alive).forEach(p => { sn.meeting.votes[p.id] = 'skip'; }); Object.values(sn.players).forEach(p => { p.emergencyUsed = false; }); });
+  g.setConn(a, true);
+  for (let i = 0; i < 30 * 25 && g.view(a).phase !== 'play'; i++) tick(g, 1);
+  ok(g.view(a).phase === 'play', 'הישיבה לא הסתיימה');
+  callMeeting(g, a);
+  let found = false;
+  for (let i = 0; i < 60 && !found; i++) { sec(g, 1); found = JSON.parse(g.snapshot()).chat.some(c => c.from !== a && /שיקר|בפעם שעברה|בישיבה הקודמת/.test(c.text)); }
+  ok(found, 'אף בוט לא הזכיר את השקר מהישיבה הקודמת');
+});
+
+test('האשמה במיקרופון: בוט שראה ראיה מסכים, בוט עם אליבי מגן', () => {
+  const { g, a } = newGame({ bots: 6, role: 'איש צוות', cfg: { botLevel: 3, roleOff: ['mole'], jester: false } });
+  const sn0 = JSON.parse(g.snapshot()); const bs = Object.values(sn0.players).filter(p => p.isBot);
+  const crewB = bs.filter(p => !['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist'].includes(p.role));
+  const x = crewB[0], w1 = crewB[1], w2 = crewB[2];
+  callMeeting(g, a);
+  place(g, sn => { Object.values(sn.players).forEach(p => { if (p.bot) { p.bot.alibi = []; p.bot.sawVent = null; p.bot.chatAt = p.bot.chat2At = p.bot.chat3At = -999; p.bot.voteAt = -999; } });
+    sn.players[w1.id].bot.sawVent = { id: x.id, room: 'כור' }; sn.players[w2.id].bot.alibi = [x.id]; });
+  g.setConn(a, true);
+  g.act(a, { type: 'chat', voice: true, text: x.name.replace(/^🤖\s*/, '') + ' הוא המתחזה תצביעו עליו' });
+  sec(g, 14);
+  const v = JSON.parse(g.snapshot());
+  ok(v.chat.some(c => c.from === w1.id && c.text.includes('פתח')), 'הבוט שראה את הפתח לא הסכים');
+  ok(v.chat.some(c => c.from === w2.id && c.text.includes('איתי')), 'הבוט עם האליבי לא הגן');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
