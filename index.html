@@ -668,7 +668,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261116-172145'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261116-202139'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -706,7 +706,7 @@ function loadRelay() {
   if (ICE_ONLINE || !SIGNAL) return Promise.resolve();
   const ac = new AbortController(); setTimeout(() => ac.abort(), 8000);
   return fetch('https://' + SIGNAL.host + '/ice', { cache: 'no-store', signal: ac.signal }).then(r => r.json()).then(j => {
-    if (j && Array.isArray(j.iceServers) && j.iceServers.length) ICE_ONLINE = { iceServers: j.relay ? j.iceServers : j.iceServers.concat(ICE.iceServers.filter(x => String(x.urls).includes('turn'))), iceCandidatePoolSize: 4 };
+    if (j && Array.isArray(j.iceServers) && j.iceServers.length) ICE_ONLINE = { iceServers: j.iceServers };
   }).catch(() => {});
 }
 const peerOpts = c => {
@@ -733,9 +733,7 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
 // שרתי עזר לחיבור בין רשתות שונות (STUN + שרת ממסר ציבורי) – כדי שהקול יעבוד גם כשכל חבר בבית אחר
 const ICE = { iceServers: [
   { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }, { urls: 'stun:global.stun.twilio.com:3478' },
-  // שרת ממסר ציבורי חינמי (גיבוי): מאפשר חיבור גם מרשתות סלולר וחומות אש קשות. נשלט ע"י שרת ה-TURN האישי כשהוא מוגדר
-  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
-], iceCandidatePoolSize: 4 };
+] };
 let engine = null, peer = null, conn = null, isHost = false, ROOM = null;
 const guests = {};
 const ss = {
