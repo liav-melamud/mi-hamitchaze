@@ -820,7 +820,7 @@ test('מחבואים: חיסול כל שנייה, והמתחבאים נכנסי�
 });
 
 test('מחבואים: מסתור בלתי נראה, רעש בפתחים, ומד קירבה למחפש', () => {
-  const { g, a } = newGame({ bots: 5, role: 'איש צוות', cfg: { mode: 3, hideTime: 300 } });
+  const { g, a } = newGame({ bots: 5, role: 'איש צוות', cfg: { mode: 3, hideTime: 300, code: '12345' } });
   const SP = MAP.SPOTS[0], V = MAP.VENTS[0];
   ok(MAP.SPOTS.length >= 6, 'אין מספיק מסתורים');
   const sn0 = JSON.parse(g.snapshot()); const sk = Object.values(sn0.players).find(p => p.role === 'seeker');
@@ -850,7 +850,7 @@ test('מחבואים: מסתור בלתי נראה, רעש בפתחים, ומד 
 });
 
 test('מחבואים: בוטים מתחבאים חכם, והמחפש הבוט בודק מסתורים', () => {
-  const { g, a } = newGame({ bots: 7, role: 'איש צוות', cfg: { mode: 3, hideTime: 300, botLevel: 3 } });
+  const { g, a } = newGame({ bots: 7, role: 'איש צוות', cfg: { mode: 3, hideTime: 300, botLevel: 3, code: '12345' } });
   let hid = 0, vented = 0;
   for (let i = 0; i < 120; i++) {
     sec(g, 1);
@@ -860,6 +860,15 @@ test('מחבואים: בוטים מתחבאים חכם, והמחפש הבוט ב
   }
   ok(hid > 20, 'הבוטים כמעט לא התחבאו: ' + hid);
   console.log('    (בוט במסתור ' + hid + ' שניות-בוט, בפתח ' + vented + ')');
+});
+
+test('מחבואים: בלי הקוד 12345 אין מקומות מסתור', () => {
+  const { g, a } = newGame({ bots: 5, role: 'איש צוות', cfg: { mode: 3, hideTime: 300 } });
+  const SP = MAP.SPOTS[0];
+  place(g, sn => { sn.players[a].x = SP.x; sn.players[a].y = SP.y; });
+  g.setConn(a, true);
+  g.act(a, { type: 'hide' }); tick(g, 2);
+  ok(g.view(a).me.hiding === 0, 'התחבא בלי קוד');
 });
 
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));

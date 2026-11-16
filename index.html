@@ -483,6 +483,7 @@
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option><option value="3">🙈 מחבואים (ראייה קצרה, חיסול כל שנייה, 5 פתחים)</option><option value="4">🎲 הפתעה (אולי אין מתחזה בכלל!)</option></select></label>
+      <label>🔑 קוד מיוחד <input id="secretCode" type="text" inputmode="numeric" maxlength="12" autocomplete="off" style="width:90px"></label>
       <label>זמן מחבואים <select data-s="hideTime"><option value="120">2 דק׳</option><option value="180">3 דק׳</option><option value="240">4 דק׳</option><option value="300">5 דק׳</option></select></label>
       <label>🏆 טורניר <select data-s="rounds"><option value="1">בלי (משחק בודד)</option><option value="3">3 סיבובים</option><option value="5">5 סיבובים</option></select></label>
       <label>יעד המרוץ (משימות) <select data-s="raceGoal"><option>6</option><option>10</option><option>15</option><option>20</option></select></label>
@@ -667,7 +668,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261115-210511'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261116-162900'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1193,6 +1194,7 @@ function renderLobby(s) {
     el.value = BOOL_S.includes(k) ? (v ? '1' : '0') : String(v);
     el.disabled = !s.me.host;
   });
+  { const sc = $('#secretCode'); if (document.activeElement !== sc) sc.value = s.settings.code || ''; sc.disabled = !s.me.host; }
   const off = s.settings.roleOff || [];
   document.querySelectorAll('#roleToggles input').forEach(el => { el.checked = !off.includes(el.dataset.role); el.disabled = !s.me.host; });
 }
@@ -1205,10 +1207,12 @@ $('#roleToggles').innerHTML = ROLE_TOGGLES.map(([k, n, c]) => `<label class="${c
 const sendSettings = () => {
   const o = { type: 'settings' };
   document.querySelectorAll('#settingsGrid select, #roleSet select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : BOOL_S.includes(el.dataset.s) ? el.value === '1' : +el.value; });
+  o.code = $('#secretCode').value;
   o.roleOff = [...document.querySelectorAll('#roleToggles input')].filter(el => !el.checked).map(el => el.dataset.role);
   api(o);
 };
 document.querySelectorAll('#settingsGrid select, #roleSet select, #roleToggles input').forEach(el => el.onchange = sendSettings);
+$('#secretCode').onchange = sendSettings;
 $('#startBtn').onclick = () => api({ type: 'start' });
 
 // ---------- HUD ----------
@@ -1281,7 +1285,7 @@ function actionState(s) {
   st.fakeBody = { show: jest, on: !inVent && me.fakeCd === 0, label: me.fakeCd ? 'גופה ' + me.fakeCd : 'גופה מזויפת' };
   st.ward = { show: alive && me.roleKey === 'guardian' && !!me.ward && me.ward.swap, on: closeP, label: 'החלף שמירה' };
   st.rewind = { show: alive && me.roleKey === 'timekeeper' && !me.rewindUsed, on: true, label: 'החזר זמן' };
-  st.hide = { show: alive && s.settings.mode === 3 && me.team !== 'imp' && !inVent, on: !!me.hiding || (!me.hideCd && (MAP.SPOTS || []).some(q => D(pos, q) <= 75)), label: me.hiding ? 'צא' : me.hideCd ? 'הסתתר ' + me.hideCd : 'הסתתר' };
+  st.hide = { show: alive && s.settings.mode === 3 && s.settings.code === '12345' && me.team !== 'imp' && !inVent, on: !!me.hiding || (!me.hideCd && (MAP.SPOTS || []).some(q => D(pos, q) <= 75)), label: me.hiding ? 'צא' : me.hideCd ? 'הסתתר ' + me.hideCd : 'הסתתר' };
   st.noise = { show: alive && me.roleKey === 'noisemaker', on: !inVent && me.noiseCd === 0, label: me.noiseCd ? 'רעש ' + me.noiseCd : 'רעש' };
   st.sab = { show: alive && me.team === 'imp' && s.settings.mode !== 3, on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
@@ -3690,7 +3694,7 @@ function frame(t) {
 
   for (const b of S.bodies) if (noDark || D(cam, b) <= vision) drawBody(b);
   if (S.pairCalls && S.pairCalls.length) { ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const bob = Math.sin(performance.now() / 250) * 5; for (const c of S.pairCalls) ctx.fillText('🤝', c.x, c.y - 56 + bob); ctx.textBaseline = 'alphabetic'; }
-  if (S.settings.mode === 3 && MAP.SPOTS) {
+  if (S.settings.mode === 3 && S.settings.code === '12345' && MAP.SPOTS) {
     const ice = MAP.theme === 'ice';
     MAP.SPOTS.forEach((sp, i) => {
       if (!noDark && D(cam, sp) > vision + 40) return;

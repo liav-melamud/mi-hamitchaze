@@ -79,6 +79,8 @@ const roleOn = k => !(settings.roleOff || []).includes(k);
   // בקבוצה קטנה למתחזה קשה יותר, אז זמן ההמתנה בין חיסולים מתקצר קצת
   const HIDE_VENTS = 5, HIDE_VENT_TIME = 15, HIDE_SPOT_TIME = 25, HIDE_SPOT_CD = 6;
 let pings = [], pingId = 0; // רעשים של פתחי אוורור/מחבואים (מחבואים בלבד)
+const spotsOn = () => settings.mode === 3 && settings.code === '12345'; // מקומות מסתור: רק עם הקוד בלובי
+const SPOTS = () => (spotsOn() ? MAP.SPOTS : []);
 const addPing = (x, y, by) => { pings.push({ id: ++pingId, x, y, by, until: now() + 3 }); };
   const killCdFor = () => { if (settings.mode === 3) return 1;  const n = Object.values(players).filter(q => !q.spectator).length; return settings.killCd * (n <= 5 ? 0.7 : n <= 7 ? 0.85 : 1); };
   const isMini = i => !MAP.TASK_TIME[MAP.TASKS[i].kind];
@@ -86,7 +88,7 @@ const addPing = (x, y, by) => { pings.push({ id: ++pingId, x, y, by, until: now(
 let players = {};
 let phase = 'lobby';
 let hostId = null;
-let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, raceGoal: 10, jester: !!(opts && opts.jester) };
+let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, code: '', raceGoal: 10, jester: !!(opts && opts.jester) };
 for (const k in ROLE_SET) settings[k] = ROLE_SET[k][0];
 settings.roleOff = [];
 let usedLines = new Set();
@@ -705,10 +707,10 @@ function act(p, a) {
       break;
     }
     case 'hide': { // מחבואים: להיכנס/לצאת ממקום מסתור
-      if (phase !== 'play' || !p.alive || settings.mode !== 3 || p.role !== 'crew' || p.inVent !== null) return;
+      if (phase !== 'play' || !p.alive || !spotsOn() || p.role !== 'crew' || p.inVent !== null) return;
       if (p.hiding != null) { p.hiding = null; p.hideCd = HIDE_SPOT_CD; addPing(p.x, p.y, p.id); return; }
       if ((p.hideCd || 0) > 0) return toast(p, '🫣 אפשר להסתתר שוב בעוד ' + Math.ceil(p.hideCd) + ' שניות');
-      const sp = nearest(p, MAP.SPOTS.filter((q, i) => !list().some(o => o.hiding === i)), USE_RANGE + 15);
+      const sp = nearest(p, SPOTS().filter((q, i) => !list().some(o => o.hiding === i)), USE_RANGE + 15);
       if (!sp) return;
       p.hiding = MAP.SPOTS.indexOf(sp); p.x = sp.x; p.y = sp.y; p.work = null; p.hideSince = t;
       addPing(sp.x, sp.y, p.id);
@@ -799,6 +801,7 @@ function act(p, a) {
       settings.mode = [1, 2, 3, 4].includes(a.mode) ? a.mode : 1;
       settings.rounds = [1, 3, 5].includes(Number(a.rounds)) ? Number(a.rounds) : 1;
       settings.hideTime = Math.round(cl(a.hideTime, 60, 600, 180));
+      if (a.code !== undefined) settings.code = String(a.code).trim().slice(0, 12);
       settings.raceGoal = Math.round(cl(a.raceGoal, 4, 25, 10));
       for (const k in ROLE_SET) settings[k] = Math.round(cl(a[k] === undefined ? settings[k] : a[k], ROLE_SET[k][1], ROLE_SET[k][2], ROLE_SET[k][0]));
       break;
@@ -986,14 +989,14 @@ function botTick(p, dt) {
         if (T - (p.ventSince || T) > b.ventStay && sd > 300) { act(p, { type: 'vent' }); b.ventStay = undefined; b.wait = 0.5; }
         return;
       }
-      const freeSpot = (maxD) => MAP.SPOTS.map((q, i) => ({ q, i })).filter(o => !list().some(z => z.hiding === o.i) && dist(o.q, p) < maxD).sort((x, y) => dist(x.q, p) - dist(y.q, p))[0];
+      const freeSpot = (maxD) => SPOTS().map((q, i) => ({ q, i })).filter(o => !list().some(z => z.hiding === o.i) && dist(o.q, p) < maxD).sort((x, y) => dist(x.q, p) - dist(y.q, p))[0];
       const goSpot = o => { b.spot = o.i; b.plan = [...(hereRoom(p).id === o.q.room ? [] : MAP.path(hereRoom(p).id, o.q.room)), { x: o.q.x, y: o.q.y }]; b.goal = null; b.wait = 0; b.flee = null; };
-      if (b.spot != null && !b.plan.length) { const sp = MAP.SPOTS[b.spot]; b.spot = null; if (sp && dist(sp, p) < USE_RANGE + 12) { act(p, { type: 'hide' }); return; } }
+      if (b.spot != null && !b.plan.length) { const sp = SPOTS()[b.spot]; b.spot = null; if (sp && dist(sp, p) < USE_RANGE + 12) { act(p, { type: 'hide' }); return; } }
       if (b.toVent && !b.plan.length) { b.toVent = false; act(p, { type: 'vent' }); return; }
       if (sk && sd < 340 && !b.flee && b.spot == null && !b.toVent && lvl > 1) {
         const v = (p.hideVents || 0) < HIDE_VENTS && nearest(p, MAP.VENTS, 240);
         if (v && Math.random() < 0.5) { b.toVent = true; b.plan = [{ x: v.x, y: v.y }]; b.goal = null; b.wait = 0; }
-        else { const o = !(p.hideCd > 0) && freeSpot(260); if (o && Math.random() < 0.6) goSpot(o); }
+        else { const o = !(p.hideCd > 0) && spotsOn() && freeSpot(260); if (o && Math.random() < 0.6) goSpot(o); }
       }
       if (sk && sd < sightR() * 1.1 && !b.flee && b.spot == null && !b.toVent) { b.flee = { from: sk.id, t: 1.5 + Math.random() }; b.plan = []; b.pressButton = false; }
     }
@@ -1010,7 +1013,7 @@ function botTick(p, dt) {
           if (pg) { b.lastPing = pg.id; toPoint(pg.x, pg.y); b.searched = b.searched || {}; }
           else if (!b.plan.length || Math.random() < 0.1) {
             b.searched = b.searched || {};
-            const sp = MAP.SPOTS.map((q, i) => ({ q, i })).filter(o => T - (b.searched[o.i] || -99) > 45).sort((x, y) => dist(p, x.q) - dist(p, y.q))[0];
+            const sp = SPOTS().map((q, i) => ({ q, i })).filter(o => T - (b.searched[o.i] || -99) > 45).sort((x, y) => dist(p, x.q) - dist(p, y.q))[0];
             if (sp) { b.searched[sp.i] = T; toPoint(sp.q.x, sp.q.y); }
           }
         }
@@ -1164,9 +1167,9 @@ function botTick(p, dt) {
     // מתחזה "עושה" משימה מזויפת: עומד ליד העמדה כמה שניות, כמו כולם
     if (b.goal && b.goal.fake) { b.goal = null; b.wait = 3 + Math.random() * 4; return; }
     b.wait = 0.5 + Math.random() * 2.5;
-    if (settings.mode === 3 && team(p) !== 'imp' && !(p.hideCd > 0) && Math.random() < (settings.botLevel === 1 ? 0.35 : settings.botLevel === 2 ? 0.65 : 0.85)) {
+    if (settings.mode === 3 && team(p) !== 'imp' && !(p.hideCd > 0) && spotsOn() && Math.random() < (settings.botLevel === 1 ? 0.35 : settings.botLevel === 2 ? 0.65 : 0.85)) {
       const sk = list().find(o => o.alive && team(o) === 'imp');
-      const free = MAP.SPOTS.map((q, i) => ({ q, i })).filter(o => !list().some(z => z.hiding === o.i)).sort((x, y) => (sk ? dist(sk, y.q) - dist(sk, x.q) : 0)).slice(0, 5);
+      const free = SPOTS().map((q, i) => ({ q, i })).filter(o => !list().some(z => z.hiding === o.i)).sort((x, y) => (sk ? dist(sk, y.q) - dist(sk, x.q) : 0)).slice(0, 5);
       const o = free.length ? pick(free) : null;
       if (o) { b.spot = o.i; b.plan = [...(hereRoom(p).id === o.q.room ? [] : MAP.path(hereRoom(p).id, o.q.room)), { x: o.q.x, y: o.q.y }]; b.goal = null; b.wait = 0; return; }
     }
