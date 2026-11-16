@@ -871,5 +871,18 @@ test('מחבואים: בלי הקוד 12345 אין מקומות מסתור', () 
   ok(g.view(a).me.hiding === 0, 'התחבא בלי קוד');
 });
 
+test('מחבואים: ב-30 השניות האחרונות המחפש רואה את כולם ומהיר יותר', () => {
+  const { g, a } = newGame({ bots: 5, role: 'איש צוות', cfg: { mode: 3, hideTime: 120, code: '12345' } });
+  const sn0 = JSON.parse(g.snapshot()); const sk = Object.values(sn0.players).find(p => p.role === 'seeker');
+  const SP = MAP.SPOTS[0];
+  place(g, sn => { sn.players[a].x = SP.x; sn.players[a].y = SP.y; sn.players[a].hiding = 0; sn.players[a].hideSince = fake / 1000 + 5; sn.players[sk.id].frozenUntil = 0; sn.hideEndAt = fake / 1000 + 100; });
+  g.setConn(a, true);
+  ok(!g.view(sk.id).players.some(p => p.id === a), 'המתחבא נראה לפני הסוף');
+  place(g, sn => { sn.hideEndAt = fake / 1000 + 20; });
+  g.setConn(a, true); tick(g, 3);
+  ok(g.view(sk.id).hide.final, 'אין סימון סיבוב אחרון');
+  ok(g.view(sk.id).players.some(p => p.id === a), 'המחפש לא רואה את כולם בסוף');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

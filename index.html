@@ -668,7 +668,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261116-162900'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261116-163107'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -706,7 +706,7 @@ function loadRelay() {
   if (ICE_ONLINE || !SIGNAL) return Promise.resolve();
   const ac = new AbortController(); setTimeout(() => ac.abort(), 8000);
   return fetch('https://' + SIGNAL.host + '/ice', { cache: 'no-store', signal: ac.signal }).then(r => r.json()).then(j => {
-    if (j && Array.isArray(j.iceServers) && j.iceServers.length) ICE_ONLINE = { iceServers: j.iceServers };
+    if (j && Array.isArray(j.iceServers) && j.iceServers.length) ICE_ONLINE = { iceServers: j.relay ? j.iceServers : j.iceServers.concat(ICE.iceServers.filter(x => String(x.urls).includes('turn'))), iceCandidatePoolSize: 4 };
   }).catch(() => {});
 }
 const peerOpts = c => {
@@ -732,8 +732,10 @@ fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' }).then(r 
 }).catch(() => {});
 // שרתי עזר לחיבור בין רשתות שונות (STUN + שרת ממסר ציבורי) – כדי שהקול יעבוד גם כשכל חבר בבית אחר
 const ICE = { iceServers: [
-  { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' },
-] };
+  { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }, { urls: 'stun:global.stun.twilio.com:3478' },
+  // שרת ממסר ציבורי חינמי (גיבוי): מאפשר חיבור גם מרשתות סלולר וחומות אש קשות. נשלט ע"י שרת ה-TURN האישי כשהוא מוגדר
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+], iceCandidatePoolSize: 4 };
 let engine = null, peer = null, conn = null, isHost = false, ROOM = null;
 const guests = {};
 const ss = {
@@ -1327,7 +1329,7 @@ function renderHud(s) {
   { const pm = $('#proxMeter'), on = !!s.hide && me.team !== 'imp' && me.alive && !me.spec; pm.classList.toggle('hidden', !on); if (on) [...pm.querySelectorAll('span')].forEach((e, i) => e.classList.toggle('on', i < s.hide.near)); }
   if (s.hide) {
     const m = Math.floor(s.hide.left / 60), sc = s.hide.left % 60;
-    $('#raceBoard').innerHTML = `<div class="rt">🙈 מחבואים · ${m}:${String(sc).padStart(2, '0')}</div><div class="rr">${s.hide.wait ? '🔢 המחפש יוצא בעוד ' + s.hide.wait : '👀 המחפש מחפש!'}</div><div class="rr">🫣 נשארו ${s.hide.hiders} מתחבאים</div>` + (s.tour ? `<div class="rr">🏆 סיבוב ${s.tour.round}/${s.tour.total}</div>` : '');
+    $('#raceBoard').innerHTML = `<div class="rt">🙈 מחבואים · ${m}:${String(sc).padStart(2, '0')}${s.hide.final ? ' ⚡ סיבוב אחרון!' : ''}</div><div class="rr">${s.hide.wait ? '🔢 המחפש יוצא בעוד ' + s.hide.wait : '👀 המחפש מחפש!'}</div><div class="rr">🫣 נשארו ${s.hide.hiders} מתחבאים</div>` + (s.tour ? `<div class="rr">🏆 סיבוב ${s.tour.round}/${s.tour.total}</div>` : '');
   }
   if (s.race) {
     const m = Math.floor(s.race.left / 60), sc = s.race.left % 60;
@@ -3686,7 +3688,7 @@ function frame(t) {
 
   const noDark = !me.alive || me.spec;
   let vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
-  if (S.settings.mode === 3) vision = me.team === 'imp' ? (S.hide && S.hide.wait > 0 ? 22 : 150) : 165; // מחבואים: טווח ראייה קטן לכולם
+  if (S.settings.mode === 3) vision = me.team === 'imp' ? (S.hide && S.hide.wait > 0 ? 22 : S.hide && S.hide.final ? 4000 : 150) : 165; // מחבואים: טווח ראייה קטן לכולם
   if (S.sab && S.sab.type === 'lights' && me.team !== 'imp') vision = 95;
   { const myRoom = MAP.roomAt(cam.x, cam.y); if (myRoom && (S.darkRooms || []).includes(myRoom.id) && me.team !== 'imp') vision = 95; } // חדר שהרדוף כיבה בו את האור
   const reveal = S.settings.reveal || noDark;

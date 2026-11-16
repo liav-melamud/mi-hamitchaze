@@ -79,6 +79,8 @@ const roleOn = k => !(settings.roleOff || []).includes(k);
   // בקבוצה קטנה למתחזה קשה יותר, אז זמן ההמתנה בין חיסולים מתקצר קצת
   const HIDE_VENTS = 5, HIDE_VENT_TIME = 15, HIDE_SPOT_TIME = 25, HIDE_SPOT_CD = 6;
 let pings = [], pingId = 0; // רעשים של פתחי אוורור/מחבואים (מחבואים בלבד)
+let hideFinalSaid = false;
+const finalPhase = () => settings.mode === 3 && phase === 'play' && hideEndAt > 0 && hideEndAt - now() <= 30;
 const spotsOn = () => settings.mode === 3 && settings.code === '12345'; // מקומות מסתור: רק עם הקוד בלובי
 const SPOTS = () => (spotsOn() ? MAP.SPOTS : []);
 const addPing = (x, y, by) => { pings.push({ id: ++pingId, x, y, by, until: now() + 3 }); };
@@ -263,7 +265,7 @@ function startGame(by) {
   });
   // המגן האישי מקבל שחקן לשמור עליו
   all.filter(p => p.role === 'guardian').forEach(p => { const w = pick(all.filter(o => o.id !== p.id)); if (w) { p.ward = w.id; toast(p, '🫂 אתה שומר על ' + nm(w) + '. אם יקרה לו משהו – תדע מיד'); } });
-  pings = []; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
+  pings = []; hideFinalSaid = false; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
   if (hide) { imps.forEach(p => { p.frozenUntil = now() + 10; p.killCd = 10; toast(p, '🙈 אתה המחפש! עיניים עצומות 10 שניות, ואז מחפשים…'); }); all.filter(q => team(q) !== 'imp').forEach(q => toast(q, '🔍 המחפש הוא ' + imps.map(nm).join(', ') + ' – מתחבאים! (הסתתר במסתור: M)')); }
   else all.forEach(p => { p.frozenUntil = 0; });
   if (hide) crew.forEach(p => toast(p, '🙈 מחבואים! ' + nm(imps[0]) + ' הוא המחפש – יש לך 10 שניות להתחבא'));
@@ -1464,6 +1466,7 @@ function tick() {
 
   if (phase === 'play') {
     if (settings.mode === 3 && hideEndAt && t >= hideEndAt) checkWin();
+    if (finalPhase() && !hideFinalSaid) { hideFinalSaid = true; toastAll('⚡ 30 שניות אחרונות! המחפש מהיר מתמיד ורואה איפה כל אחד!'); }
     if (settings.mode === 2) { checkWin(); if (phase === 'play' && now() > raceChaosAt) { raceChaosAt = now() + 28 + Math.random() * 14; closeDoors(pick(Object.keys(MAP.ROOMS))); } }
     sabCd = Math.max(0, sabCd - dt);
     bodies = bodies.filter(b => !b.decayAt || b.decayAt > t);
@@ -1547,7 +1550,7 @@ function tick() {
       const len = p.inVent !== null || p.hiding != null || p.frozenUntil > t ? 0 : Math.hypot(dx, dy);
       if (len > 0) {
         dx /= len; dy /= len;
-        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1) * (settings.mode === 3 && team(p) === 'imp' ? 1.12 : 1) * (sab && sab.type === 'freeze' && p.alive && team(p) !== 'imp' ? 0.55 : 1); // גרירת גופה מאטה, החלקה מאיצה, המחפש מהיר
+        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1) * (settings.mode === 3 && team(p) === 'imp' ? (finalPhase() ? 1.7 : 1.12) : 1) * (sab && sab.type === 'freeze' && p.alive && team(p) !== 'imp' ? 0.55 : 1); // גרירת גופה מאטה, החלקה מאיצה, המחפש מהיר
         if (!p.alive || p.spectator) {
           p.x = Math.max(0, Math.min(MAP.WORLD.w, p.x + dx * step));
           p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
@@ -1658,7 +1661,7 @@ function viewFor(v) {
   const ps = [];
   for (const p of list()) {
     if (phase === 'play' && !p.alive && v.alive && p.id !== v.id) continue; // רוחות נסתרות מהחיים
-    if ((p.inVent !== null || p.hiding != null) && p.id !== v.id && !seeAll && !(team(v) === 'imp' && team(p) === 'imp' && p.hiding == null)) continue; // בתוך פתח/מסתור – בלתי נראה
+    if ((p.inVent !== null || p.hiding != null) && p.id !== v.id && !seeAll && !(team(v) === 'imp' && (finalPhase() || (team(p) === 'imp' && p.hiding == null)))) continue; // בתוך פתח/מסתור – בלתי נראה
     if (p.vanishUntil > t && p.id !== v.id && team(v) !== 'imp' && !seeAll) continue; // נעלם – בלתי נראה
     const disp = p.shapeAs && players[p.shapeAs] ? players[p.shapeAs] : p;
     const o = {
@@ -1696,7 +1699,7 @@ function viewFor(v) {
     bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c, rot: b.decayAt ? 1 : 0 })),
     tasks: settings.mode === 2 ? { done: v.stats ? v.stats.tasks : 0, total: settings.raceGoal } : { done: taskDone, total: taskTotal },
     map: settings.map,
-    hide: settings.mode === 3 && phase === 'play' ? { near: (() => { const sk = list().filter(q => q.alive && !q.spectator && team(q) === 'imp'); if (!sk.length || team(v) === 'imp') return 0; const d = Math.min(...sk.map(q => dist(q, v))); return d < 170 ? 5 : d < 270 ? 4 : d < 390 ? 3 : d < 540 ? 2 : d < 750 ? 1 : 0; })(), left: Math.max(0, Math.round(hideEndAt - t)), wait: Math.max(0, Math.ceil(Math.max(...list().map(q => (q.frozenUntil || 0) - t)))), hiders: list().filter(q => q.alive && !q.spectator && team(q) !== 'imp').length } : null,
+    hide: settings.mode === 3 && phase === 'play' ? { final: finalPhase(), near: (() => { const sk = list().filter(q => q.alive && !q.spectator && team(q) === 'imp'); if (!sk.length || team(v) === 'imp') return 0; const d = Math.min(...sk.map(q => dist(q, v))); return d < 170 ? 5 : d < 270 ? 4 : d < 390 ? 3 : d < 540 ? 2 : d < 750 ? 1 : 0; })(), left: Math.max(0, Math.round(hideEndAt - t)), wait: Math.max(0, Math.ceil(Math.max(...list().map(q => (q.frozenUntil || 0) - t)))), hiders: list().filter(q => q.alive && !q.spectator && team(q) !== 'imp').length } : null,
     tour: tourView(),
     race: settings.mode === 2 && phase === 'play' ? { goal: settings.raceGoal, left: Math.max(0, Math.round(raceEndAt - t)), board: raceRanking().slice(0, 5) } : null,
     gusts: gusts.map(g => g.i),
