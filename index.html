@@ -494,7 +494,8 @@
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
     </div>
     <details id="roleSet"><summary><b>🎭 הגדרות תפקידים</b> <span class="sub" style="margin:0">– אילו תפקידים במשחק, וכמה זמן כל יכולת</span></summary>
-      <div class="rgroup"><div class="rname">✅ תפקידים במשחק <span class="sub" style="margin:0">(בטל סימון כדי להוציא תפקיד)</span></div><div id="roleToggles" class="roleToggles"></div></div>
+      <div class="rgroup"><div class="rname">✅ תפקידים במשחק <span class="sub" style="margin:0">(בטל סימון כדי להוציא תפקיד)</span></div><div id="roleToggles" class="roleToggles"></div>
+      <div id="modBox" class="rgroup hidden"><div class="rname">🧪 מודים – 20 תפקידים נוספים <span class="sub" style="margin:0">(פתוחים עם הקוד)</span></div><div id="modToggles" class="roleToggles"></div></div></div>
       <div class="rgroup"><div class="rname">🫂 מגן אישי · ⏪ שומר הזמן · 🔊 רעשן</div><div class="roleGrid">
           <label>החזרת זמן אחורה <select data-s="rewindSecs"><option value="5">5ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option></select></label>
           <label>המתנה בין רעשים <select data-s="noiseCd"><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option></select></label>
@@ -668,10 +669,15 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261116-202139'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261116-212832'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
+const hasCode = c => String((S && S.settings && S.settings.code) || '').split(/[\s,]+/).includes(c);
+const MOD_LIST = [['sprinter', '🏃 רץ', 'c'], ['medic', '🩺 רופא', 'c'], ['scout', '🔭 סייר', 'c'], ['lucky', '🍀 בר מזל', 'c'], ['trapper', '🪤 מלכודן', 'c'], ['radar', '📡 מכ"ם', 'c'], ['taskmaster', '⚡ אשף משימות', 'c'], ['jailer', '🔒 סוהר', 'c'], ['empath', '😨 רגיש', 'c'],
+  ['sniper', '🎯 צלף', 'imp'], ['poisoner', '☠️ מרעיל', 'imp'], ['blinker', '🌀 מתעתע', 'imp'], ['cleaner', '🧹 מנקה', 'imp'], ['zapper', '⚡ חשמלאי', 'imp'], ['vampire', '🧛 ערפד', 'imp'], ['bomber', '💣 מפוצץ', 'imp'],
+  ['martyr', '🕊️ קורבן', 'n'], ['vulture', '🦅 נשר', 'n'], ['survivor', '🛟 ניצול', 'n'], ['instigator', '🗣️ מסית', 'n']];
+const MOD_IMP = MOD_LIST.filter(r => r[2] === 'imp').map(r => r[0]);
 // מצב רשת: 'local' – כולם באותו Wi-Fi (בלי שום הגדרה); 'online' – חברים מרחוק (דרך שרת ההכוונה הפרטי)
 let LOCAL = null; // פרטי שרת בית, אם הדף נטען ממנו (לא חובה)
 let NET = 'local';
@@ -1196,22 +1202,24 @@ function renderLobby(s) {
   });
   { const sc = $('#secretCode'); if (document.activeElement !== sc) sc.value = s.settings.code || ''; sc.disabled = !s.me.host; }
   const off = s.settings.roleOff || [];
-  document.querySelectorAll('#roleToggles input').forEach(el => { el.checked = !off.includes(el.dataset.role); el.disabled = !s.me.host; });
+  document.querySelectorAll('#roleToggles input, #modToggles input').forEach(el => { el.checked = !off.includes(el.dataset.role); el.disabled = !s.me.host; });
+  $('#modBox').classList.toggle('hidden', !hasCode('54321'));
 }
 $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) { api({ type: 'color', color: +b.dataset.c }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.color = +b.dataset.c; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
 document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 16 }, (_, i) => `<option>${i}</option>`).join('');
 const BOOL_S = ['confirm', 'openVotes', 'newRoles', 'jester'];
 const ROLE_TOGGLES = [['engineer', '🔧 מהנדס'], ['scientist', '🧪 מדען'], ['angel', '😇 מלאך שומר'], ['photographer', '📸 צלם'], ['detective', '🔎 בלש'], ['judge', '⚖️ שופט'], ['bodyguard', '🛡 שומר ראש'], ['guardian', '🫂 מגן אישי'], ['timekeeper', '⏪ שומר הזמן'],
   ['shifter', '🎭 משנה צורה', 'imp'], ['phantom', '👻 נעלם', 'imp'], ['viper', '🐍 מרקיב', 'imp'], ['noisemaker', '🔊 רעשן', 'imp'], ['saboteur', '💣 מחבל', 'imp'], ['poltergeist', '🌀 רדוף', 'imp'], ['mole', '🕵️ שתול', 'mole']];
+$('#modToggles').innerHTML = MOD_LIST.map(([k, n, c]) => `<label class="${c === 'imp' ? 'imp' : ''}"><input type="checkbox" data-role="${k}" checked> ${n}</label>`).join('');
 $('#roleToggles').innerHTML = ROLE_TOGGLES.map(([k, n, c]) => `<label class="${c || ''}"><input type="checkbox" data-role="${k}" checked> ${n}</label>`).join('');
 const sendSettings = () => {
   const o = { type: 'settings' };
   document.querySelectorAll('#settingsGrid select, #roleSet select').forEach(el => { o[el.dataset.s] = el.dataset.s === 'map' ? el.value : BOOL_S.includes(el.dataset.s) ? el.value === '1' : +el.value; });
   o.code = $('#secretCode').value;
-  o.roleOff = [...document.querySelectorAll('#roleToggles input')].filter(el => !el.checked).map(el => el.dataset.role);
+  o.roleOff = [...document.querySelectorAll('#roleToggles input, #modToggles input')].filter(el => !el.checked).map(el => el.dataset.role);
   api(o);
 };
-document.querySelectorAll('#settingsGrid select, #roleSet select, #roleToggles input').forEach(el => el.onchange = sendSettings);
+document.querySelectorAll('#settingsGrid select, #roleSet select, #roleToggles input, #modToggles input').forEach(el => el.onchange = sendSettings);
 $('#secretCode').onchange = sendSettings;
 $('#startBtn').onclick = () => api({ type: 'start' });
 
@@ -1239,6 +1247,7 @@ const ACTIONS = [
   { k: 'rewind', ic: '⏪', label: 'החזר זמן', key: 'Y' },
   { k: 'noise', ic: '🔊', label: 'רעש', key: 'N', red: true },
   { k: 'hide', ic: '🫣', label: 'הסתתר', key: 'M' },
+  { k: 'mod', ic: '✨', label: 'יכולת', key: 'O' },
 ];
 $('#actions').innerHTML = ACTIONS.map(a =>
   `<button data-a="${a.k}" class="${a.red ? 'red' : ''}"><span class="ic">${a.ic}</span><span class="lb">${a.label}</span><span class="k">${a.key}</span></button>`).join('');
@@ -1263,7 +1272,7 @@ function actionState(s) {
   st.report = { show: alive && s.settings.mode !== 3, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && (me.hideVentsLeft != null || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey)), on: inVent || (!me.engVentCd && me.hideVentsLeft !== 0 && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : me.hideVentsLeft != null ? 'פתח (' + me.hideVentsLeft + ')' : 'פתח') };
+  st.vent = { show: alive && (me.hideVentsLeft != null || MOD_IMP.includes(me.roleKey) || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey)), on: inVent || (!me.engVentCd && me.hideVentsLeft !== 0 && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : me.hideVentsLeft != null ? 'פתח (' + me.hideVentsLeft + ')' : 'פתח') };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
@@ -1285,7 +1294,8 @@ function actionState(s) {
   st.fakeBody = { show: jest, on: !inVent && me.fakeCd === 0, label: me.fakeCd ? 'גופה ' + me.fakeCd : 'גופה מזויפת' };
   st.ward = { show: alive && me.roleKey === 'guardian' && !!me.ward && me.ward.swap, on: closeP, label: 'החלף שמירה' };
   st.rewind = { show: alive && me.roleKey === 'timekeeper' && !me.rewindUsed, on: true, label: 'החזר זמן' };
-  st.hide = { show: alive && s.settings.mode === 3 && s.settings.code === '12345' && me.team !== 'imp' && !inVent, on: !!me.hiding || (!me.hideCd && (MAP.SPOTS || []).some(q => D(pos, q) <= 75)), label: me.hiding ? 'צא' : me.hideCd ? 'הסתתר ' + me.hideCd : 'הסתתר' };
+  st.hide = { show: alive && s.settings.mode === 3 && hasCode('12345') && me.team !== 'imp' && !inVent, on: !!me.hiding || (!me.hideCd && (MAP.SPOTS || []).some(q => D(pos, q) <= 75)), label: me.hiding ? 'צא' : me.hideCd ? 'הסתתר ' + me.hideCd : 'הסתתר' };
+  st.mod = { show: alive && !!me.mod && !inVent, on: !!me.mod && !(me.mod.cd > 0 || me.mod.left === 0), label: me.mod ? me.mod.ic + ' ' + me.mod.label + (me.mod.until ? ' ' + me.mod.until : me.mod.cd ? ' ' + me.mod.cd : '') + (me.mod.left != null ? ' (' + me.mod.left + ')' : '') : 'יכולת' };
   st.noise = { show: alive && me.roleKey === 'noisemaker', on: !inVent && me.noiseCd === 0, label: me.noiseCd ? 'רעש ' + me.noiseCd : 'רעש' };
   st.sab = { show: alive && me.team === 'imp' && s.settings.mode !== 3, on: true, label: me.sabCd > 0 && !s.sab ? 'חבלה ' + me.sabCd : 'חבלה' };
   return st;
@@ -2972,8 +2982,8 @@ $('#quick').onclick = e => {
 };
 
 // ---------- הגדרות מקשים (נשמרות בדפדפן) ----------
-const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB', hauntDoor: 'KeyJ', hauntLight: 'KeyL', drag: 'KeyZ', banana: 'KeyK', fakeBody: 'KeyT', ward: 'KeyU', rewind: 'KeyY', noise: 'KeyN', hide: 'KeyM' };
-const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)', hauntDoor: 'נעילת דלת (רדוף)', hauntLight: 'כיבוי אור בחדר (רדוף)', drag: 'גרירת גופה (רדוף)', banana: 'קליפת בננה (ליצן)', fakeBody: 'גופה מזויפת (ליצן)', ward: 'החלפת שמירה (מגן אישי)', rewind: 'החזרת זמן (שומר הזמן)', noise: 'רעש מזויף (רעשן)', hide: 'הסתתרות (מחבואים)' };
+const DEFAULT_KEYS = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', use: 'KeyE', report: 'KeyR', kill: 'KeyQ', vent: 'KeyV', shift: 'KeyF', shield: 'KeyG', vitals: 'KeyC', sab: 'KeyX', map: 'Tab', photo: 'KeyP', investigate: 'KeyI', vanish: 'KeyH', guard: 'KeyB', hauntDoor: 'KeyJ', hauntLight: 'KeyL', drag: 'KeyZ', banana: 'KeyK', fakeBody: 'KeyT', ward: 'KeyU', rewind: 'KeyY', noise: 'KeyN', hide: 'KeyM', mod: 'KeyO' };
+const KEY_NAMES = { up: 'למעלה', down: 'למטה', left: 'שמאלה', right: 'ימינה', use: 'שימוש / משימה', report: 'דיווח על גופה', kill: 'חיסול', vent: 'פתח אוורור', shift: 'שינוי צורה', shield: 'מגן (מלאך)', vitals: 'סימנים חיוניים', sab: 'חבלה (מתחזה)', map: 'מפת משימות', photo: 'צילום (הצלם)', investigate: 'חקירה (בלש)', vanish: 'היעלמות (נעלם)', guard: 'הגנה (שומר ראש)', hauntDoor: 'נעילת דלת (רדוף)', hauntLight: 'כיבוי אור בחדר (רדוף)', drag: 'גרירת גופה (רדוף)', banana: 'קליפת בננה (ליצן)', fakeBody: 'גופה מזויפת (ליצן)', ward: 'החלפת שמירה (מגן אישי)', rewind: 'החזרת זמן (שומר הזמן)', noise: 'רעש מזויף (רעשן)', hide: 'הסתתרות (מחבואים)', mod: 'יכולת מיוחדת (תפקידי מודים)' };
 let KEYS = { ...DEFAULT_KEYS };
 try { Object.assign(KEYS, JSON.parse(localStorage.getItem('mm_keys') || '{}')); } catch (e) {}
 let capturing = null;
@@ -3030,7 +3040,7 @@ function sendInput() {
 }
 // מצב אדמין: רק במשפט הסודי בצ'אט או בדיבור (ראו adminPhrase במנוע). אין יותר קיצור מקשים או מגע.
 
-const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard', 'hauntDoor', 'hauntLight', 'drag', 'banana', 'fakeBody', 'ward', 'rewind', 'noise', 'hide'].find(a => KEYS[a] === code);
+const actionForKey = code => ['use', 'report', 'kill', 'vent', 'shift', 'shield', 'vitals', 'sab', 'map', 'photo', 'investigate', 'vanish', 'guard', 'hauntDoor', 'hauntLight', 'drag', 'banana', 'fakeBody', 'ward', 'rewind', 'noise', 'hide', 'mod'].find(a => KEYS[a] === code);
 const MOVE_CODES = () => [KEYS.up, KEYS.down, KEYS.left, KEYS.right, 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || capturing) return;
@@ -3694,6 +3704,7 @@ function frame(t) {
 
   const noDark = !me.alive || me.spec;
   let vision = (me.team === 'imp' ? 430 : 310) * (me.team === 'imp' ? 1 : (S.settings.vision || 1));
+  vision *= (me.visMul || 1);
   if (S.settings.mode === 3) vision = me.team === 'imp' ? (S.hide && S.hide.wait > 0 ? 22 : S.hide && S.hide.final ? 4000 : 150) : 165; // מחבואים: טווח ראייה קטן לכולם
   if (S.sab && S.sab.type === 'lights' && me.team !== 'imp') vision = 95;
   { const myRoom = MAP.roomAt(cam.x, cam.y); if (myRoom && (S.darkRooms || []).includes(myRoom.id) && me.team !== 'imp') vision = 95; } // חדר שהרדוף כיבה בו את האור
@@ -3702,7 +3713,7 @@ function frame(t) {
 
   for (const b of S.bodies) if (noDark || D(cam, b) <= vision) drawBody(b);
   if (S.pairCalls && S.pairCalls.length) { ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const bob = Math.sin(performance.now() / 250) * 5; for (const c of S.pairCalls) ctx.fillText('🤝', c.x, c.y - 56 + bob); ctx.textBaseline = 'alphabetic'; }
-  if (S.settings.mode === 3 && S.settings.code === '12345' && MAP.SPOTS) {
+  if (S.settings.mode === 3 && hasCode('12345') && MAP.SPOTS) {
     const ice = MAP.theme === 'ice';
     MAP.SPOTS.forEach((sp, i) => {
       if (!noDark && D(cam, sp) > vision + 40) return;
@@ -3713,6 +3724,9 @@ function frame(t) {
       ctx.restore();
     });
   }
+  if (S.traps && S.traps.length) { ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const tr of S.traps) { ctx.globalAlpha = 0.7; ctx.fillText('🪤', tr.x, tr.y); } ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic'; }
+  if (S.bombs && S.bombs.length) { const tt = performance.now(); for (const b of S.bombs) { const f = 0.5 + 0.5 * Math.sin(tt / (60 + b.left * 40)); ctx.fillStyle = 'rgba(255,60,40,' + (0.15 + 0.25 * f) + ')'; ctx.beginPath(); ctx.arc(b.x, b.y, 110, 0, 7); ctx.fill(); ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText('💣', b.x, b.y); ctx.font = 'bold 22px sans-serif'; ctx.fillText(b.left, b.x, b.y - 34); ctx.textBaseline = 'alphabetic'; } }
+  if (S.radar && S.radar.length) { const tt = performance.now(); for (const r of S.radar) { ctx.strokeStyle = 'rgba(80,255,170,.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(r.x, r.y, 14 + 6 * Math.sin(tt / 150), 0, 7); ctx.stroke(); ctx.fillStyle = 'rgba(80,255,170,.8)'; ctx.beginPath(); ctx.arc(r.x, r.y, 6, 0, 7); ctx.fill(); } }
   if (S.pings && S.pings.length) { const tt = performance.now(); for (const n of S.pings) { const k = ((tt / 700) + n.id * 0.37) % 1; const nr = Math.max(0.25, 1 - D(n, cam) / (me.team === 'imp' ? 1000 : 380)); ctx.strokeStyle = 'rgba(255,230,120,' + ((0.8 - k * 0.7) * nr) + ')'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(n.x, n.y, 20 + k * 90, 0, 7); ctx.stroke(); ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('🔊', n.x, n.y - 24 - k * 10); } }
   if (S.noises && S.noises.length) { ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ph = performance.now() / 200; for (const n of S.noises) { ctx.globalAlpha = 0.55 + 0.45 * Math.sin(ph); ctx.fillText('👣', n.x - 26, n.y); ctx.fillText('🔊', n.x + 26, n.y - 10); } ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic'; }
   if (S.bananas && S.bananas.length) { ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const b of S.bananas) if (noDark || D(cam, b) <= vision) ctx.fillText('🍌', b.x, b.y); ctx.textBaseline = 'alphabetic'; }

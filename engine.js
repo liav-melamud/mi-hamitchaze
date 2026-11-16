@@ -73,6 +73,34 @@ const ROLE_SET = {
 // תפקידים שאפשר לכבות אחד-אחד בהגדרות (המתחזה ואיש הצוות הרגילים תמיד קיימים, לליצן יש מתג משלו)
 const TOGGLE_ROLES = ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'mole'];
 const roleOn = k => !(settings.roleOff || []).includes(k);
+// ---- מודים: 20 תפקידים נוספים, נפתחים רק עם הקוד 54321 בלובי ----
+const hasCode = c => String(settings.code || '').split(/[\s,]+/).includes(c);
+const modsOn = () => hasCode('54321');
+const MOD = { // [שם, קבוצה, אייקון, כפתור, קירור, מספר שימושים (0 = ללא הגבלה), תיאור]
+  sprinter: ['רץ', 'crew', '🏃', 'ספרינט', 30, 0, 'לחץ O כדי לרוץ מהר פי 1.7 למשך 5 שניות (אחרי זה 30 שניות המתנה). מעולה לברוח – או להגיע לגופה לפני כולם.'],
+  medic: ['רופא', 'crew', '🩺', 'החייאה', 0, 1, 'פעם אחת במשחק: עמוד ליד גופה ולחץ O – השחקן חוזר לחיים במקום. אבל כל החיבורים בסביבה יראו אותך שם…'],
+  scout: ['סייר', 'crew', '🔭', '', 0, 0, 'ראיית הלילה שלך חדה: טווח הראייה שלך גדול ב-40% מכולם. תפקיד פסיבי.'],
+  lucky: ['בר מזל', 'crew', '🍀', '', 0, 0, 'מזל! ניסיון החיסול הראשון עליך נכשל (ואתה מקבל התראה), אחרי זה אתה כמו כולם. תפקיד פסיבי.'],
+  trapper: ['מלכודן', 'crew', '🪤', 'מלכודת', 8, 2, 'שים עד 2 מלכודות בלתי נראות (O). מי שדורך על אחת קופא ל-5 שניות, ואתה מקבל הודעה מי נתפס ואיפה.'],
+  radar: ['מכ"ם', 'crew', '📡', 'סרוק', 45, 3, 'לחץ O: למשך 5 שניות אתה רואה נקודות של כל השחקנים החיים על המפה, גם דרך קירות. 3 פעמים במשחק.'],
+  taskmaster: ['אשף משימות', 'crew', '⚡', '', 0, 0, 'כל המשימות שלך נגמרות בחצי מהזמן. תפקיד פסיבי.'],
+  jailer: ['סוהר', 'crew', '🔒', 'נעל חדר', 45, 0, 'לחץ O כדי לנעול את הדלתות של החדר שאתה בו (כמו מחבל) – תופס מתחזה בפנים, או חוסם מסלול בריחה.'],
+  empath: ['רגיש', 'crew', '😨', 'חוש', 25, 0, 'לחץ O: תקבל הרגשה אם יש מתחזה (או שתול) במרחק של כ-260 מסביבך. לא אומר מי.'],
+  sniper: ['צלף', 'imp', '🎯', '', 0, 0, 'מתחזה שמחסל (Q) מרחוק – כמעט פי 2 טווח. אבל אחרי כל חיסול ההמתנה ארוכה ב-40%.'],
+  poisoner: ['מרעיל', 'imp', '☠️', '', 0, 0, 'החיסול שלך (Q) מרעיל: הקורבן מת רק 12 שניות אחרי, במקום אחר – ויש לך זמן להתרחק. הקורבן יודע שהורעל.'],
+  blinker: ['מתעתע', 'imp', '🌀', 'שיגור', 40, 0, 'מתחזה שיכול להשתגר (O) לחדר אקראי אחר על המפה. מעולה לבריחה מזירה.'],
+  cleaner: ['מנקה', 'imp', '🧹', 'נקה גופה', 30, 0, 'מתחזה שיכול לנקות (O) גופה קרובה – כך אי אפשר לדווח עליה.'],
+  zapper: ['חשמלאי', 'imp', '⚡', 'שוק', 40, 0, 'מתחזה: לחץ O כדי להקפיא לכ-3.5 שניות את כל אנשי הצוות שבטווח 170 מסביבך.'],
+  vampire: ['ערפד', 'imp', '🧛', '', 0, 0, 'מתחזה שמתחזק מדם: אחרי כל חיסול ההמתנה לחיסול הבא קצרה ב-40%. תפקיד פסיבי.'],
+  bomber: ['מפוצץ', 'imp', '💣', 'פצצה', 0, 1, 'מתחזה: פעם אחת במשחק הנח פצצה (O) – אחרי 6 שניות היא מתפוצצת ומחסלת כל איש צוות בטווח 110. כולם רואים אותה!'],
+  martyr: ['קורבן', 'jester', '🕊️', '', 0, 0, 'אתה לא צוות ולא מתחזה: אתה מנצח לבד אם חיסלו אותך (על ידי מתחזה)! הצטרף לחשד, תסתובב ליד מתחזים… אבל אל תיתן להדיח אותך.'],
+  vulture: ['נשר', 'jester', '🦅', 'אכול גופה', 5, 0, 'אתה לא צוות ולא מתחזה: אכול (O) 3 גופות ותנצח לבד! הגופה נעלמת, ואי אפשר לדווח עליה.'],
+  survivor: ['ניצול', 'jester', '🛟', '', 0, 0, 'אתה לא צוות ולא מתחזה: אם אתה בחיים בסוף המשחק – אתה מנצח גם, בלי קשר למי שניצח! תישאר חי.'],
+  instigator: ['מסית', 'jester', '🗣️', '', 0, 0, 'אתה לא צוות ולא מתחזה: אם תצליח לגרום להדחה של 2 אנשי צוות חפים מפשע – ואתה עדיין בחיים – אתה מנצח לבד!'],
+};
+const MOD_CREW = Object.keys(MOD).filter(k => MOD[k][1] === 'crew'), MOD_IMP = Object.keys(MOD).filter(k => MOD[k][1] === 'imp'), MOD_NEU = Object.keys(MOD).filter(k => MOD[k][1] === 'jester');
+for (const k in MOD) { ROLES[k] = { name: MOD[k][0], team: MOD[k][1], desc: MOD[k][6], mod: true }; TOGGLE_ROLES.push(k); }
+let traps = [], bombs = [], wrongEjects = 0;
   // רמת אורך משימות (1 קל, 2 רגיל, 3 ארוך): מאריכה משימות עם פס התקדמות, ומשימות של בוטים
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
   const botTaskTime = () => (4 + 4 * settings.taskLevel) * (settings.botLevel === 1 ? 1.3 : settings.botLevel === 3 ? 0.8 : 1);
@@ -235,14 +263,17 @@ function startGame(by) {
   noImpGame = surprise && Math.random() < 0.3; // הפתעה: לפעמים אין מתחזה בכלל, ואף אחד לא יודע
   const nImp = race || noImpGame ? 0 : hide ? 1 : Math.max(1, Math.min(settings.impostors, Math.floor((all.length - 1) / 2)));
   const imps = all.slice(0, nImp), crew = all.slice(nImp);
-  let impPool = shuffle((settings.newRoles ? ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'impostor'].concat(nImp >= 2 ? ['saboteur', 'poltergeist'] : []) : ['impostor', 'shifter', 'impostor']).filter(r => r === 'impostor' || roleOn(r)));
+  const mods = modsOn() && !race && !hide;
+  let impPool = shuffle((settings.newRoles ? ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'impostor'].concat(nImp >= 2 ? ['saboteur', 'poltergeist'] : []) : ['impostor', 'shifter', 'impostor']).filter(r => r === 'impostor' || roleOn(r)).concat(mods ? MOD_IMP.filter(roleOn) : []));
   imps.forEach((p, i) => { p.role = hide ? 'seeker' : impPool[i % impPool.length]; });
   if (imps.length && imps.every(p => NON_KILLERS.includes(p.role))) imps[0].role = 'impostor'; // חייב להיות לפחות מתחזה אחד שיכול לחסל
-  const specials = shuffle((settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'] : ['engineer', 'scientist', 'angel']).filter(roleOn));
+  const specials = shuffle((settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'] : ['engineer', 'scientist', 'angel']).concat(mods ? MOD_CREW : []).filter(roleOn));
   const nSpecial = settings.newRoles ? Math.max(1, Math.round(crew.length * 0.7)) : specials.length;
   crew.forEach((p, i) => { p.role = !race && !hide && i < Math.min(specials.length, nSpecial) && crew.length > 1 ? specials[i] : 'crew'; });
   // הליצן (אפשר לכבות בהגדרות): אחד מהצוות הופך לליצן, רק כשיש מספיק שחקנים
   if (settings.jester && !race && !hide && crew.length >= 3 && all.length >= 5) crew[Math.floor(Math.random() * crew.length)].role = 'jester';
+  // מודים: תפקידים ניטרליים (עם מטרה משלהם)
+  if (mods && crew.length >= 4 && all.length >= 5) { const cand = shuffle(crew.filter(q => q.role === 'crew')), nn = shuffle(MOD_NEU.filter(roleOn)); for (let i = 0; i < (crew.length >= 8 ? 2 : 1) && cand[i] && nn[i]; i++) cand[i].role = nn[i]; }
   // השתול: אחד מהצוות שבעצם עובד בשביל המתחזים (רק כשיש מספיק שחקנים)
   if (settings.newRoles && roleOn('mole') && !race && !hide && nImp > 0 && all.length >= 6) { const c = shuffle(crew.filter(p => p.role !== 'jester'))[0]; if (c && crew.length >= 4) c.role = 'mole'; }
 
@@ -256,7 +287,7 @@ function startGame(by) {
   all.forEach(p => {
     p.alive = true; p.ejected = false; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
-    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.hiding = null; p.hideSince = 0; p.hideCd = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15;
+    p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.hiding = null; p.hideSince = 0; p.hideCd = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15; p.modCd = 0; p.modUsed = 0; p.sprintUntil = 0; p.radarUntil = 0; p.luckUsed = false; p.poisonAt = 0; p.poisonBy = null; p.eaten = 0;
     if (team(p) === 'crew') {
       p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false }));
       taskTotal += p.tasks.length;
@@ -265,7 +296,7 @@ function startGame(by) {
   });
   // המגן האישי מקבל שחקן לשמור עליו
   all.filter(p => p.role === 'guardian').forEach(p => { const w = pick(all.filter(o => o.id !== p.id)); if (w) { p.ward = w.id; toast(p, '🫂 אתה שומר על ' + nm(w) + '. אם יקרה לו משהו – תדע מיד'); } });
-  pings = []; hideFinalSaid = false; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
+  traps = []; bombs = []; wrongEjects = 0; pings = []; hideFinalSaid = false; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
   if (hide) { imps.forEach(p => { p.frozenUntil = now() + 10; p.killCd = 10; toast(p, '🙈 אתה המחפש! עיניים עצומות 10 שניות, ואז מחפשים…'); }); all.filter(q => team(q) !== 'imp').forEach(q => toast(q, '🔍 המחפש הוא ' + imps.map(nm).join(', ') + ' – מתחבאים! (הסתתר במסתור: M)')); }
   else all.forEach(p => { p.frozenUntil = 0; });
   if (hide) crew.forEach(p => toast(p, '🙈 מחבואים! ' + nm(imps[0]) + ' הוא המחפש – יש לך 10 שניות להתחבא'));
@@ -330,7 +361,11 @@ function checkWin() {
   else if (imps === 0) w = { team: 'crew', reason: 'כל המתחזים הודחו!' };
   else if (taskTotal > 0 && taskDone >= taskTotal) w = { team: 'crew', reason: 'הצוות השלים את כל המשימות!' };
   else if (imps >= crew) w = { team: 'imp', reason: 'המתחזים השתלטו על התחנה!' };
-  if (w) { winner = w; phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + w.reason); return true; }
+  if (w) {
+    const sv = list().filter(q => q.role === 'survivor' && q.alive && !q.spectator);
+    if (sv.length) { w.also = sv.map(q => q.id); w.reason += ' · 🛟 ' + sv.map(nm).join(', ') + ' שרד וניצח גם!'; }
+    winner = w; phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + w.reason); return true;
+  }
   return false;
 }
 
@@ -423,7 +458,7 @@ function resolveMeeting() {
   }
   let ej = null;
   if (best && best !== 'skip' && !tie && players[best]) {
-    ej = players[best]; ej.alive = false; ej.ejected = true;
+    ej = players[best]; ej.alive = false; ej.ejected = true; if (team(ej) === 'crew') wrongEjects++;
   }
   // סטטיסטיקה: מי הצביע נכון (נגד מתחזה) ומי טעה (נגד איש צוות)
   voters.forEach(v => { const tg = meeting.votes[v.id]; if (tg && tg !== 'skip' && players[tg]) { if (team(players[tg]) === 'imp') v.stats.goodVotes++; else v.stats.badVotes++; } });
@@ -459,6 +494,11 @@ function endEject() {
   // הליצן הודח – הוא מנצח לבד והמשחק נגמר
   if (jw) {
     winner = { team: 'jester', reason: `🤡 ${jw.name} היה הליצן – הדחתם אותו, והוא ניצח!`, jester: jw.id };
+    phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); return;
+  }
+  const inst = wrongEjects >= 2 && list().find(q => q.role === 'instigator' && q.alive && !q.spectator);
+  if (inst) {
+    winner = { team: 'jester', reason: `🗣️ ${nm(inst)} היה המסית – גרם להדחה של 2 חפים מפשע, והוא ניצח לבד!`, jester: inst.id };
     phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); return;
   }
   // הפתעה בלי מתחזה: הדחתם מישהו חף מפשע – כולם מפסידים
@@ -641,16 +681,18 @@ function act(p, a) {
       if (p.role === 'poltergeist') return toast(p, 'הרדוף לא מחסל – נעל דלת, כבה אור או גרור גופה!');
       if (p.vanishUntil > t) return toast(p, 'אי אפשר לחסל בזמן שאתה נעלם');
       if (p.frozenUntil > t) return toast(p, 'עוד רגע… סופר עד 10');
-      const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null && (o.hiding == null || dist(o, p) < 60)), KILL_RANGE);
+      const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null && (o.hiding == null || dist(o, p) < 60)), p.role === 'sniper' ? 190 : KILL_RANGE);
       if (!tgt) return;
       if (tgt.shieldUntil > t) {
         p.killCd = 10; toast(p, '🛡 המטרה מוגנת!');
         if (tgt.guardedBy && players[tgt.guardedBy] && players[tgt.guardedBy].alive) { toast(players[tgt.guardedBy], '🛡 הצלת את ' + nm(tgt) + ' מחיסול!'); ev('guard', `🛡 שומר הראש הציל את ${nm(tgt)} מחיסול`); }
         return;
       }
+      if (tgt.role === 'lucky' && !tgt.luckUsed) { tgt.luckUsed = true; p.killCd = 10; toast(p, '🍀 למטרה יש מזל – החיסול נכשל!'); toast(tgt, '🍀 מזל! שרדת ניסיון חיסול. תיזהר, זה לא יקרה שוב'); return; }
+      if (p.role === 'poisoner') { tgt.poisonAt = t + 12; tgt.poisonBy = p.id; p.killCd = killCdFor(); toast(p, '☠️ הרעלת את ' + nm(tgt) + ' – הוא ימות בעוד 12 שניות'); toast(tgt, '🤢 הורעלת! נשארו לך 12 שניות לחיות – תספר למישהו מי היה לידך!'); return; }
       tgt.alive = false; tgt.work = null; tgt.cam = false;
       bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + settings.rotTime : 0, t, killer: p.id });
-      p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor();
+      p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor() * (p.role === 'vampire' ? 0.6 : p.role === 'sniper' ? 1.4 : 1);
       p.stats.kills++; ev('kill', `🔪 ${nm(p)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
       // לבלש: מי שהיה ליד הזירה נרשם כחשוד קל
       list().forEach(q => { if (q.alive && !q.spectator && dist(q, tgt) < 700) q.nearKill = (q.nearKill || 0) + 1; });
@@ -668,9 +710,11 @@ function act(p, a) {
         const msg = '💔 ' + nm(tgt) + ' (שאתה שומר עליו) חוסל ב' + kRoom + '!';
         toast(g, msg); g.notes = g.notes || []; g.notes.push(msg); if (g.notes.length > 6) g.notes.shift();
       } });
+      if (tgt.role === 'martyr' && martyrWin(tgt)) break;
       checkWin();
       break;
     }
+    case 'mod': modUse(p); break;
     case 'banana': { // הליצן משאיר קליפת בננה
       if (phase !== 'play' || !p.alive || p.role !== 'jester' || p.inVent !== null || (p.bananaCd || 0) > 0) return;
       const mine = bananas.filter(b => b.by === p.id);
@@ -697,7 +741,7 @@ function act(p, a) {
     }
     case 'vent': {
       const hideVent = settings.mode === 3 && p.role === 'crew'; // מחבואים: המתחבאים יכולים להיכנס לפתחים 5 פעמים
-      if (phase !== 'play' || !p.alive || !(hideVent || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(p.role))) return;
+      if (phase !== 'play' || !p.alive || !(hideVent || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(p.role) || (MOD[p.role] && MOD[p.role][1] === 'imp'))) return;
       if (p.inVent !== null) { if (settings.mode === 3) addPing(p.x, p.y, p.id); p.inVent = null; witnessVent(p); return; } // יציאה מהפתח
       if (hideVent) { if ((p.hideVents || 0) >= HIDE_VENTS) return toast(p, '🕳️ נגמרו לך הכניסות לפתחים'); }
       if (p.role === 'engineer' && p.engVentCd > 0) return toast(p, '🕳️ אפשר לזחול שוב בעוד ' + Math.ceil(p.engVentCd) + ' שניות');
@@ -841,6 +885,70 @@ function doRewind(p) {
   noises = []; bananas = [];
   toastAll('⏪ שומר הזמן החזיר את כולם ' + back + ' שניות אחורה!' + (revived.length ? ' ' + revived.map(nm).join(', ') + ' חזר לחיים!' : ''));
   ev('rewind', '⏪ ' + nm(p) + ' החזיר את הזמן ' + back + ' שניות' + (revived.length ? ' – ' + revived.map(nm).join(', ') + ' חזר לחיים' : ''));
+}
+function martyrWin(m) {
+  winner = { team: 'jester', reason: `🕊️ ${nm(m)} היה הקורבן – חיסלו אותו, והוא ניצח לבד!`, jester: m.id };
+  phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); return true;
+}
+// הריגה שלא דרך כפתור החיסול (הרעלה, פצצה)
+function slay(tgt, killer) {
+  if (!tgt.alive || phase !== 'play') return;
+  const t = now();
+  tgt.alive = false; tgt.work = null; tgt.cam = false; tgt.poisonAt = 0; tgt.inVent = null;
+  bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: 0, t, killer: killer.id });
+  if (killer.stats) killer.stats.kills++;
+  ev('kill', `🔪 ${nm(killer)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
+  killLog.push({ id: tgt.id, t, killer: killer.id });
+  list().forEach(q => { if (q.alive && !q.spectator && dist(q, tgt) < 700) q.nearKill = (q.nearKill || 0) + 1; });
+  toast(tgt, '💀 חוסלת! עכשיו אתה רוח – אפשר להמשיך במשימות ולצפות בכולם.');
+  if (tgt.role === 'martyr' && martyrWin(tgt)) return;
+  checkWin();
+}
+// יכולת מיוחדת של תפקידי המודים (כפתור O)
+function modUse(p) {
+  const def = MOD[p.role], t = now();
+  if (!def || phase !== 'play' || !p.alive || p.inVent !== null || !def[3]) return;
+  if ((p.modCd || 0) > 0) return toast(p, 'היכולת בהשהיה עוד ' + Math.ceil(p.modCd) + ' שניות');
+  if (def[5] && (p.modUsed || 0) >= def[5]) return toast(p, 'נגמרו לך השימושים');
+  const room = MAP.roomAt(p.x, p.y);
+  const body = nearest(p, bodies.filter(b => !b.fake), 110);
+  let ok = false;
+  switch (p.role) {
+    case 'sprinter': p.sprintUntil = t + 5; toast(p, '🏃 רץ!'); ok = true; break;
+    case 'medic': {
+      const q = body && players[body.id];
+      if (!q || q.alive) return toast(p, 'אין גופה קרובה להחיות');
+      q.alive = true; q.x = body.x; q.y = body.y; q.ejected = false; q.work = null; bodies.splice(bodies.indexOf(body), 1);
+      toast(q, '🩺 הרופא החיה אותך! אתה שוב בחיים'); toast(p, '🩺 החזרת את ' + nm(q) + ' לחיים!');
+      ev('medic', `🩺 ${nm(p)} החיה את ${nm(q)}`); ok = true; break;
+    }
+    case 'trapper': traps.push({ x: p.x, y: p.y, by: p.id }); toast(p, '🪤 הנחת מלכודת. תקבל הודעה מי יפול בה'); ok = true; break;
+    case 'radar': p.radarUntil = t + 5; toast(p, '📡 המכ"ם פעיל ל-5 שניות'); ok = true; break;
+    case 'jailer': if (!room || !closeDoors(room.id)) return toast(p, 'אי אפשר לנעול את החדר הזה עכשיו'); toast(p, '🔒 נעלת את ' + room.name); ok = true; break;
+    case 'empath': {
+      const near = list().some(o => o.id !== p.id && o.alive && !o.spectator && evil(o) && dist(o, p) < 260);
+      toast(p, near ? '😨 יש כאן מישהו מסוכן קרוב אליך!' : '😌 אין מתחזה בטווח'); ok = true; break;
+    }
+    case 'blinker': {
+      const rs = Object.values(MAP.ROOMS).filter(r => !room || r.id !== room.id); let spot = null;
+      for (let i = 0; i < 40 && !spot; i++) { const r = pick(rs), x = r.x + 60 + Math.random() * (r.w - 120), y = r.y + 60 + Math.random() * (r.h - 120); if (MAP.walkable(x, y)) spot = { x, y }; }
+      if (!spot) return; p.x = spot.x; p.y = spot.y; p.work = null; toast(p, '🌀 השתגרת!'); ok = true; break;
+    }
+    case 'cleaner': if (!body) return toast(p, 'אין גופה קרובה לנקות'); bodies.splice(bodies.indexOf(body), 1); toast(p, '🧹 הגופה נוקתה'); ok = true; break;
+    case 'zapper': {
+      const hit = list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null && dist(o, p) < 170);
+      if (!hit.length) return toast(p, 'אין אף אחד קרוב');
+      hit.forEach(o => { o.frozenUntil = t + 3.5; o.work = null; toast(o, '⚡ קיבלת שוק חשמלי!'); }); toast(p, '⚡ הקפאת ' + hit.length + ' שחקנים'); ok = true; break;
+    }
+    case 'bomber': bombs.push({ x: p.x, y: p.y, by: p.id, at: t + 6 }); toast(p, '💣 הנחת פצצה – תרחק! היא מתפוצצת בעוד 6 שניות'); ok = true; break;
+    case 'vulture': {
+      if (!body) return toast(p, 'אין גופה קרובה לאכול');
+      bodies.splice(bodies.indexOf(body), 1); p.eaten = (p.eaten || 0) + 1; toast(p, '🦅 אכלת גופה (' + p.eaten + '/3)');
+      if (p.eaten >= 3) { winner = { team: 'jester', reason: `🦅 ${nm(p)} היה הנשר – אכל 3 גופות, והוא ניצח לבד!`, jester: p.id }; phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); }
+      ok = true; break;
+    }
+  }
+  if (ok) { p.modUsed = (p.modUsed || 0) + 1; p.modCd = def[4]; }
 }
 function makeNoise(p, roomId) {
   const here = MAP.roomAt(p.x, p.y);
@@ -1057,7 +1165,7 @@ function botTick(p, dt) {
           act(p, { type: 'kill' });
           if (!p.alive || phase !== 'play') return;
           b.hunting = null;
-          const canVent = ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role);
+          const canVent = ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role) || (MOD[p.role] && MOD[p.role][1] === 'imp');
           const v = canVent && settings.botLevel > 1 && nearest(p, MAP.VENTS, 220);
           if (v) { b.plan = [{ x: v.x, y: v.y }]; b.escape = { t: 6, vent: true }; }
           else { b.escape = { t: 5 }; const far = Object.values(MAP.ROOMS).sort((x, y) => dist(p, { x: y.cx, y: y.cy }) - dist(p, { x: x.cx, y: x.cy }))[0]; b.plan = [...MAP.path(hereRoom(p).id, far.id), { x: far.cx, y: far.cy }]; b.goal = null; }
@@ -1088,6 +1196,15 @@ function botTick(p, dt) {
     if (p.role === 'photographer' && p.photoCd <= 0 && Math.random() < 0.012 && list().some(o => o.id !== p.id && o.alive && dist(o, p) < 300)) act(p, { type: 'photo' });
     if (p.role === 'timekeeper' && !p.rewindUsed && killLog.some(k => now() - k.t < 6 && now() - k.t > 1.5) && Math.random() < 0.03) act(p, { type: 'rewind' });
     if (p.role === 'noisemaker' && p.noiseCd <= 0 && Math.random() < 0.004) act(p, { type: 'noise' });
+    if (MOD[p.role] && MOD[p.role][3] && !(p.modCd > 0) && !(MOD[p.role][5] && (p.modUsed || 0) >= MOD[p.role][5])) {
+      const bd = bodies.find(x => !x.fake && dist(x, p) < 100), near = n => list().filter(o => o.id !== p.id && o.alive && !o.spectator && o.inVent === null && dist(o, p) < n);
+      const R = p.role, rr = Math.random();
+      if ((R === 'sprinter' && (b.flee || rr < 0.002)) || (R === 'medic' && bd && rr < 0.2) || (R === 'trapper' && rr < 0.004) || (R === 'radar' && rr < 0.003) || (R === 'jailer' && rr < 0.002 && near(300).length)
+        || (R === 'empath' && rr < 0.004) || (R === 'blinker' && (b.escape ? rr < 0.1 : rr < 0.0015)) || (R === 'cleaner' && bd && !near(260).filter(o => team(o) !== 'imp').length && rr < 0.3)
+        || (R === 'zapper' && p.killCd < 4 && near(160).filter(o => team(o) !== 'imp').length && rr < 0.03) || (R === 'bomber' && near(100).filter(o => team(o) !== 'imp').length >= 2 && rr < 0.03)
+        || (R === 'vulture' && bd && !near(260).length && rr < 0.2)) act(p, { type: 'mod' });
+      if (R === 'bomber' && bombs.some(x => x.by === p.id)) { b.escape = b.escape || { t: 5 }; }
+    }
     if (p.role === 'detective' && p.investCd <= 0 && Math.random() < 0.012 && list().some(o => o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < 150)) act(p, { type: 'investigate' });
     // צוות: דווח על גופה
     if (team(p) === 'crew' && bodies.some(bd => dist(bd, p) < REPORT_RANGE - 10) && Math.random() < (b.sawKill ? 0.15 : 0.03)) {
@@ -1493,6 +1610,8 @@ function tick() {
         if (MAP.walkable(nx, ny)) { q.x = nx; q.y = ny; }
       }
     }
+    if (traps.length) traps = traps.filter(tr => { const q = list().find(o => o.alive && !o.spectator && o.id !== tr.by && o.inVent === null && dist(o, tr) < 45); if (!q) return true; q.frozenUntil = t + 5; q.work = null; toast(q, '🪤 נפלת במלכודת!'); const o = players[tr.by]; if (o) toast(o, '🪤 ' + nm(q) + ' נתפס במלכודת ב' + ((MAP.roomAt(tr.x, tr.y) || {}).name || 'מסדרון') + '!'); return false; });
+    if (bombs.length) bombs = bombs.filter(b => { if (t < b.at) return true; const k = players[b.by]; list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null && dist(o, b) < 110).forEach(o => { if (k && phase === 'play') slay(o, k); }); return false; });
     noises = noises.filter(n => n.until > t); pings = pings.filter(n => n.until > t);
     pairCalls = pairCalls.filter(c => c.until > t && players[c.by] && players[c.by].alive);
     histT -= dt;
@@ -1520,6 +1639,8 @@ function tick() {
         if (p.inVent === null && p.ventSince) { p.ventSince = 0; p.engVentCd = settings.engVentCd; }
       }
       if (p.vanishUntil && t > p.vanishUntil) { p.vanishUntil = 0; p.vanishCd = settings.vanishCd; }
+      if (p.modCd > 0) p.modCd = Math.max(0, p.modCd - dt);
+      if (p.poisonAt && p.alive && t >= p.poisonAt) slay(p, players[p.poisonBy] || p);
       if (p.role === 'jester') { p.bananaCd = Math.max(0, (p.bananaCd || 0) - dt); p.fakeCd = Math.max(0, (p.fakeCd || 0) - dt); }
       if (p.role === 'poltergeist') { p.hauntDoorCd = Math.max(0, (p.hauntDoorCd || 0) - dt); p.darkCd = Math.max(0, (p.darkCd || 0) - dt); p.dragCd = Math.max(0, (p.dragCd || 0) - (p.drag ? 0 : dt)); }
       p.shiftCd = Math.max(0, p.shiftCd - (p.shapeAs ? 0 : dt));
@@ -1550,7 +1671,7 @@ function tick() {
       const len = p.inVent !== null || p.hiding != null || p.frozenUntil > t ? 0 : Math.hypot(dx, dy);
       if (len > 0) {
         dx /= len; dy /= len;
-        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1) * (settings.mode === 3 && team(p) === 'imp' ? (finalPhase() ? 1.7 : 1.12) : 1) * (sab && sab.type === 'freeze' && p.alive && team(p) !== 'imp' ? 0.55 : 1); // גרירת גופה מאטה, החלקה מאיצה, המחפש מהיר
+        const step = SPEED * settings.speed * dt * (p.drag ? 0.55 : 1) * (p.slip ? 1.7 : 1) * (settings.mode === 3 && team(p) === 'imp' ? (finalPhase() ? 1.7 : 1.12) : 1) * (p.sprintUntil > t ? 1.7 : 1) * (sab && sab.type === 'freeze' && p.alive && team(p) !== 'imp' ? 0.55 : 1); // גרירת גופה מאטה, החלקה מאיצה, המחפש מהיר
         if (!p.alive || p.spectator) {
           p.x = Math.max(0, Math.min(MAP.WORLD.w, p.x + dx * step));
           p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
@@ -1588,7 +1709,7 @@ function tick() {
           if (c) c.until = t + 1; else pairCalls.push({ by: p.id, x: tk.x, y: tk.y, until: t + 1 });
           if (p.isBot && p.work.wait > 14) { p.work = null; p.bot.wait = 1; }
         } else {
-          p.work.t += dt;
+          p.work.t += dt * (p.role === 'taskmaster' ? 2 : 1);
           if ((!p.work.mini || p.isBot) && p.work.t >= (p.isBot && p.work.mini ? botTaskTime() : taskTime(p.work.ref.i))) { const r = p.work.ref; p.work = null; completeTask(p, r); if (phase !== 'play') break; }
         }
       }
@@ -1644,6 +1765,7 @@ function awardTour() {
     let won = false, g = 0;
     if (winner.team === 'race') { const i = rank.indexOf(nm(p)); g += i === 0 ? 3 : i === 1 ? 2 : i === 2 ? 1 : 0; won = i === 0; }
     else if (winner.team === 'jester') won = p.id === winner.jester;
+    if (!won && winner.also && winner.also.includes(p.id)) won = true;
     else if (winner.team !== 'nobody') won = team(p) === winner.team || (winner.team === 'imp' && team(p) === 'mole');
     if (won && winner.team !== 'race') g += 3;
     g += (p.stats.kills || 0) + (p.stats.goodVotes || 0) + (p.alive ? 1 : 0);
@@ -1693,9 +1815,14 @@ function viewFor(v) {
     ward: v.role === 'guardian' && players[v.ward] ? { name: nm(players[v.ward]), alive: players[v.ward].alive, swap: !!v.wardSwap, died: v.wardDied ? v.wardDied.room : null } : null,
     pairWait: !!(v.work && MAP.TASKS[v.work.ref.i].kind === 'pair' && v.work.wait && pairCalls.some(c => c.by === v.id)),
     rewindUsed: !!v.rewindUsed, noiseCd: Math.ceil(v.noiseCd || 0),
+    mod: v.role && MOD[v.role] && MOD[v.role][3] ? { ic: MOD[v.role][2], label: MOD[v.role][3], cd: Math.ceil(v.modCd || 0), left: MOD[v.role][5] ? MOD[v.role][5] - (v.modUsed || 0) : null, until: Math.max(0, Math.ceil((v.sprintUntil || 0) - t), Math.ceil((v.radarUntil || 0) - t)) } : null,
+    visMul: v.role === 'scout' ? 1.4 : 1,
   };
   const out = {
     phase, me, players: ps, settings, hostId,
+    bombs: bombs.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), left: Math.max(0, Math.ceil(b.at - t)) })),
+    traps: v.role === 'trapper' ? traps.filter(tr => tr.by === v.id).map(tr => ({ x: tr.x, y: tr.y })) : [],
+    radar: v.radarUntil > t && v.alive ? list().filter(o => o.id !== v.id && o.alive && !o.spectator).map(o => ({ x: Math.round(o.x), y: Math.round(o.y) })) : [],
     bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c, rot: b.decayAt ? 1 : 0 })),
     tasks: settings.mode === 2 ? { done: v.stats ? v.stats.tasks : 0, total: settings.raceGoal } : { done: taskDone, total: taskTotal },
     map: settings.map,
@@ -1750,7 +1877,7 @@ function viewFor(v) {
     // הסטטיסטיקה האישית של המשחק הזה (הדפדפן שומר את הסיכום המצטבר)
     if (v.stats && !v.spectator && winner) {
       const w = winner, tm = team(v);
-      const won = w.team === 'race' ? !!(w.ranking && w.ranking[0] && w.ranking[0].name === nm(v)) : w.team === 'jester' ? v.id === w.jester : w.team !== 'nobody' && (tm === w.team || (w.team === 'imp' && tm === 'mole'));
+      const won = w.team === 'race' ? !!(w.ranking && w.ranking[0] && w.ranking[0].name === nm(v)) : (w.team === 'jester' ? v.id === w.jester : w.team !== 'nobody' && (tm === w.team || (w.team === 'imp' && tm === 'mole'))) || !!(w.also && w.also.includes(v.id));
       out.myStats = { game: Math.round(gameStartT), won, team: tm, role: v.role, mode: settings.mode, kills: v.stats.kills, tasks: v.stats.tasks, goodVotes: v.stats.goodVotes, badVotes: v.stats.badVotes, reports: v.stats.reports, ejected: !!v.ejected, alive: v.alive };
     }
   }

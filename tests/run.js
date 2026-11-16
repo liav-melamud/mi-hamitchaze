@@ -157,7 +157,7 @@ test('שחקן אנושי מתקן חבלה: כפתור השימוש נדלק ב
   const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
   const src = html.match(/function actionState\(s\) \{[\s\S]*?\n\}\n/)[0];
   let pos = null;
-  const actionState = new Function('MAP', 'meP', 'D', src + '; return actionState;')(MAP, () => pos, (a, b) => Math.hypot(a.x - b.x, a.y - b.y));
+  const actionState = new Function('MAP', 'meP', 'D', 'MOD_IMP', 'hasCode', src + '; return actionState;')(MAP, () => pos, (a, b) => Math.hypot(a.x - b.x, a.y - b.y), [], () => false);
   const { g, ids } = newGame({ bots: 0, humans: 3, cfg: { tasks: 1, newRoles: false } });
   const imp = ids.find(i => g.view(i).me.team === 'imp'), crew = ids.find(i => g.view(i).me.team === 'crew');
   sec(g, 21); g.act(imp, { type: 'sab', kind: 'oxygen' }); tick(g, 2);
@@ -882,6 +882,58 @@ test('מחבואים: ב-30 השניות האחרונות המחפש רואה א
   g.setConn(a, true); tick(g, 3);
   ok(g.view(sk.id).hide.final, 'אין סימון סיבוב אחרון');
   ok(g.view(sk.id).players.some(p => p.id === a), 'המחפש לא רואה את כולם בסוף');
+});
+
+test('מודים: בלי הקוד 54321 אין תפקידי מוד, ועם הקוד הם מופיעים', () => {
+  const MODK = ['sprinter', 'medic', 'scout', 'lucky', 'trapper', 'radar', 'taskmaster', 'jailer', 'empath', 'sniper', 'poisoner', 'blinker', 'cleaner', 'zapper', 'vampire', 'bomber', 'martyr', 'vulture', 'survivor', 'instigator'];
+  let seen = new Set(), leak = 0;
+  for (let i = 0; i < 40; i++) {
+    const { g } = newGame({ bots: 9, cfg: {} }); Object.values(JSON.parse(g.snapshot()).players).forEach(p => { if (MODK.includes(p.role)) leak++; });
+    const m = newGame({ bots: 9, cfg: { code: '54321' } }); Object.values(JSON.parse(m.g.snapshot()).players).forEach(p => { if (MODK.includes(p.role)) seen.add(p.role); });
+  }
+  ok(leak === 0, 'תפקידי מוד הופיעו בלי קוד');
+  ok(seen.size >= 10, 'מעט מדי תפקידי מוד הופיעו: ' + seen.size);
+  ok(MODK.length === 20, 'חייבים להיות 20');
+});
+function modGame(role, extra) {
+  const { g, a } = newGame({ bots: 6, cfg: { code: '54321' } });
+  const ids = Object.keys(JSON.parse(g.snapshot()).players).filter(i => i !== a);
+  place(g, sn => { Object.values(sn.players).forEach((p, i) => { p.x = 100 + 400 * (i % 5); p.y = 100 + 300 * Math.floor(i / 5); if (p.bot) { p.bot.plan = []; p.bot.wait = 9999; } p.killCd = 0; p.modCd = 0; p.modUsed = 0; if (p.id !== a && p.role !== 'impostor') p.role = 'crew'; });
+    sn.players[a].role = role; sn.players[a].x = 300; sn.players[a].y = 300; if (extra) extra(sn, a, ids); });
+  g.setConn(a, true);
+  return { g, a, ids };
+}
+const snap = g => JSON.parse(g.snapshot());
+test('מודים: רץ מהיר יותר, רופא מחיה, מלכודן מקפיא, מנקה/נשר מורידים גופה', () => {
+  let { g, a } = modGame('sprinter');
+  const x0 = snap(g).players[a].x; g.act(a, { type: 'input', dx: 1, dy: 0 }); sec(g, 0.3); const d1 = snap(g).players[a].x - x0;
+  const m2 = modGame('sprinter'); m2.g.act(m2.a, { type: 'mod' }); const y0 = snap(m2.g).players[m2.a].x; m2.g.act(m2.a, { type: 'input', dx: 1, dy: 0 }); sec(m2.g, 0.3); const d2 = snap(m2.g).players[m2.a].x - y0;
+  ok(d2 > d1 * 1.3, 'הספרינט לא האיץ: ' + d1 + ' מול ' + d2);
+  let v = modGame('medic', (sn, a2, ids) => { sn.players[ids[0]].alive = false; sn.players[ids[0]].x = 320; sn.players[ids[0]].y = 300; sn.bodies = [{ id: ids[0], x: 320, y: 300, color: 0, decayAt: 0, t: 0 }]; });
+  v.g.act(v.a, { type: 'mod' });
+  ok(snap(v.g).players[v.ids[0]].alive, 'הרופא לא החיה');
+  v = modGame('trapper'); v.g.act(v.a, { type: 'mod' });
+  place(v.g, sn => { sn.players[v.ids[0]].x = 300; sn.players[v.ids[0]].y = 300; }); v.g.setConn(v.a, true); tick(v.g, 3);
+  ok(snap(v.g).players[v.ids[0]].frozenUntil > 0, 'המלכודת לא תפסה');
+  v = modGame('vulture', (sn, a2, ids) => { sn.bodies = ids.slice(0, 3).map((id, i) => ({ id, x: 310, y: 300, color: 0, decayAt: 0, t: 0 })); ids.slice(0, 3).forEach(id => { sn.players[id].alive = false; }); });
+  for (let i = 0; i < 3; i++) { v.g.act(v.a, { type: 'mod' }); const sn = snap(v.g); sn.players[v.a].modCd = 0; place(v.g, s2 => { s2.players[v.a].modCd = 0; }); v.g.setConn(v.a, true); }
+  ok(v.g.view(v.a).phase === 'end' && v.g.view(v.a).winner.jester === v.a, 'הנשר לא ניצח אחרי 3 גופות');
+});
+test('מודים: מרעיל הורג אחרי 12 שניות, מפוצץ מחסל בטווח, קורבן מנצח, בר מזל שורד', () => {
+  let v = modGame('poisoner', (sn, a2, ids) => { sn.players[a2].role = 'poisoner'; sn.players[a2].frozenUntil = 0; sn.players[ids[0]].x = 330; sn.players[ids[0]].y = 300; });
+  v.g.act(v.a, { type: 'kill' });
+  ok(snap(v.g).players[v.ids[0]].alive, 'מת מיד');
+  sec(v.g, 13); ok(!snap(v.g).players[v.ids[0]].alive, 'לא מת מהרעל');
+  v = modGame('bomber', (sn, a2, ids) => { sn.players[a2].role = 'bomber'; sn.players[ids[0]].x = 330; sn.players[ids[0]].y = 300; sn.players[ids[1]].x = 1500; sn.players[ids[1]].y = 900; });
+  v.g.act(v.a, { type: 'mod' }); sec(v.g, 7);
+  ok(!snap(v.g).players[v.ids[0]].alive && snap(v.g).players[v.ids[1]].alive, 'הפצצה לא עבדה נכון');
+  v = modGame('sniper', (sn, a2, ids) => { sn.players[a2].frozenUntil = 0; sn.players[ids[0]].x = 450; sn.players[ids[0]].y = 300; });
+  v.g.act(v.a, { type: 'kill' }); ok(!snap(v.g).players[v.ids[0]].alive, 'הצלף לא פגע מרחוק');
+  v = modGame('crew', (sn, a2, ids) => { sn.players[a2].role = 'impostor'; sn.players[a2].frozenUntil = 0; sn.players[ids[0]].role = 'martyr'; sn.players[ids[0]].x = 330; sn.players[ids[0]].y = 300; });
+  v.g.act(v.a, { type: 'kill' }); const w = v.g.view(v.a).winner;
+  ok(w && w.jester === v.ids[0], 'הקורבן לא ניצח');
+  v = modGame('crew', (sn, a2, ids) => { sn.players[a2].role = 'impostor'; sn.players[a2].frozenUntil = 0; sn.players[ids[0]].role = 'lucky'; sn.players[ids[0]].x = 330; sn.players[ids[0]].y = 300; });
+  v.g.act(v.a, { type: 'kill' }); ok(snap(v.g).players[v.ids[0]].alive, 'בר מזל מת בניסיון הראשון');
 });
 
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
