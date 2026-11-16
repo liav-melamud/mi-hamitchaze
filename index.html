@@ -668,7 +668,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261116-165648'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261116-172145'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1119,7 +1119,7 @@ function switchMap(id) {
 }
 function onState(s) {
   if (s.map) switchMap(s.map);
-  if (s.pings && s.pings.length) { const mx = Math.max(...s.pings.map(n => n.id)); if (mx > (window._lastPing || 0)) { pingSound(); window._lastPing = mx; } }
+  if (s.pings && s.pings.length) { const last = window._lastPing || 0; let mx = last; for (const n of s.pings) if (n.id > last) { mx = Math.max(mx, n.id); const dx = n.x - s.me.x, dy = n.y - s.me.y, d = Math.hypot(dx, dy), rng = s.me.team === 'imp' ? 1000 : 380; pingSound(Math.max(0.03, 1 - d / rng), Math.max(-1, Math.min(1, dx / 500))); } window._lastPing = mx; }
   S = s;
   $('#join').classList.add('hidden');
   for (const p of s.players) {
@@ -1293,8 +1293,16 @@ function actionState(s) {
   return st;
 }
 
-function pingSound() {
-  try { const ac = window._pAC = window._pAC || new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(), g = ac.createGain(); o.type = 'square'; o.frequency.setValueAtTime(220, ac.currentTime); o.frequency.exponentialRampToValueAtTime(90, ac.currentTime + 0.18); g.gain.setValueAtTime(0.12, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.22); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + 0.25); } catch (e) {}
+function pingSound(near = 1, pan = 0) { // ככל שהרעש קרוב – חזק יותר (כמו באמונג אס), ומגיע מהצד שממנו הוא בא
+  try {
+    const ac = window._pAC = window._pAC || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime, v = 0.02 + 0.5 * near * near;
+    o.type = 'square'; o.frequency.setValueAtTime(110 + 140 * near, t); o.frequency.exponentialRampToValueAtTime(70, t + 0.2);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.1 + 0.15 * near);
+    let last = o; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500 + 2500 * near; o.connect(lp); last = lp;
+    last.connect(g); let out = g; if (ac.createStereoPanner) { const pn = ac.createStereoPanner(); pn.pan.value = pan; g.connect(pn); out = pn; }
+    out.connect(ac.destination); o.start(t); o.stop(t + 0.3);
+  } catch (e) {}
 }
 function doAction(k) {
   if (!S || S.phase !== 'play') return;
@@ -3707,7 +3715,7 @@ function frame(t) {
       ctx.restore();
     });
   }
-  if (S.pings && S.pings.length) { const tt = performance.now(); for (const n of S.pings) { const k = ((tt / 700) + n.id * 0.37) % 1; ctx.strokeStyle = 'rgba(255,230,120,' + (0.8 - k * 0.7) + ')'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(n.x, n.y, 20 + k * 90, 0, 7); ctx.stroke(); ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('🔊', n.x, n.y - 24 - k * 10); } }
+  if (S.pings && S.pings.length) { const tt = performance.now(); for (const n of S.pings) { const k = ((tt / 700) + n.id * 0.37) % 1; const nr = Math.max(0.25, 1 - D(n, cam) / (me.team === 'imp' ? 1000 : 380)); ctx.strokeStyle = 'rgba(255,230,120,' + ((0.8 - k * 0.7) * nr) + ')'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(n.x, n.y, 20 + k * 90, 0, 7); ctx.stroke(); ctx.font = '30px serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('🔊', n.x, n.y - 24 - k * 10); } }
   if (S.noises && S.noises.length) { ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const ph = performance.now() / 200; for (const n of S.noises) { ctx.globalAlpha = 0.55 + 0.45 * Math.sin(ph); ctx.fillText('👣', n.x - 26, n.y); ctx.fillText('🔊', n.x + 26, n.y - 10); } ctx.globalAlpha = 1; ctx.textBaseline = 'alphabetic'; }
   if (S.bananas && S.bananas.length) { ctx.font = '26px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const b of S.bananas) if (noDark || D(cam, b) <= vision) ctx.fillText('🍌', b.x, b.y); ctx.textBaseline = 'alphabetic'; }
 
