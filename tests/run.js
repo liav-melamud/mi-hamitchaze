@@ -936,5 +936,22 @@ test('מודים: מרעיל הורג אחרי 12 שניות, מפוצץ מחס�
   v.g.act(v.a, { type: 'kill' }); ok(snap(v.g).players[v.ids[0]].alive, 'בר מזל מת בניסיון הראשון');
 });
 
+test('אף שחקן לא מקבל את אותו תפקיד מיוחד פעמיים ברצף (גם עם מודים)', () => {
+  let repeats = 0, games = 0;
+  for (const code of ['', '54321']) for (let k = 0; k < 6; k++) {
+    const g = createGame(MAP); const a = g.join('מארח'); const b = g.join('חבר'); const c = g.join('עוד');
+    g.act(a, { type: 'settings', impostors: 1, bots: 0, tasks: 4, newRoles: true, code });
+    let prev = null;
+    for (let r = 0; r < 4; r++) {
+      g.act(a, { type: 'start' });
+      const roles = Object.fromEntries(Object.values(JSON.parse(g.snapshot()).players).map(p => [p.id, p.role]));
+      if (prev) for (const id in roles) if (roles[id] !== 'crew' && roles[id] === prev[id]) repeats++;
+      prev = roles; games++;
+      g.act(a, { type: 'lobby' });
+    }
+  }
+  ok(games > 0 && repeats === 0, 'תפקיד חזר פעמיים ברצף ' + repeats + ' פעמים מתוך ' + games);
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

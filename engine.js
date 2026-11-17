@@ -100,7 +100,7 @@ const MOD = { // [שם, קבוצה, אייקון, כפתור, קירור, מספ
 };
 const MOD_CREW = Object.keys(MOD).filter(k => MOD[k][1] === 'crew'), MOD_IMP = Object.keys(MOD).filter(k => MOD[k][1] === 'imp'), MOD_NEU = Object.keys(MOD).filter(k => MOD[k][1] === 'jester');
 for (const k in MOD) { ROLES[k] = { name: MOD[k][0], team: MOD[k][1], desc: MOD[k][6], mod: true }; TOGGLE_ROLES.push(k); }
-let traps = [], bombs = [], wrongEjects = 0;
+let traps = [], bombs = [], wrongEjects = 0, lastRoles = {};
   // רמת אורך משימות (1 קל, 2 רגיל, 3 ארוך): מאריכה משימות עם פס התקדמות, ומשימות של בוטים
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
   const botTaskTime = () => (4 + 4 * settings.taskLevel) * (settings.botLevel === 1 ? 1.3 : settings.botLevel === 3 ? 0.8 : 1);
@@ -277,6 +277,21 @@ function startGame(by) {
   // השתול: אחד מהצוות שבעצם עובד בשביל המתחזים (רק כשיש מספיק שחקנים)
   if (settings.newRoles && roleOn('mole') && !race && !hide && nImp > 0 && all.length >= 6) { const c = shuffle(crew.filter(p => p.role !== 'jester'))[0]; if (c && crew.length >= 4) c.role = 'mole'; }
 
+  // אף אחד לא מקבל את אותו תפקיד מיוחד פעמיים ברצף: מחליפים עם שחקן מאותה קבוצה, או מחליפים לתפקיד אחר שלא חולק
+  if (!race && !hide) {
+    const key = q => (q.isBot ? 'b:' + q.name : q.id), prev = q => lastRoles[key(q)];
+    const spare = { crew: shuffle(specials.filter(r => !all.some(q => q.role === r))), imp: shuffle(impPool.filter(r => !all.some(q => q.role === r))) };
+    for (const tm of ['crew', 'imp', 'jester']) {
+      const grp = all.filter(q => team(q) === tm);
+      for (const p of grp) {
+        if (!p.role || p.role === 'crew' || p.role !== prev(p)) continue;
+        const sw = shuffle(grp).find(q => q !== p && q.role !== p.role && prev(q) !== p.role && prev(p) !== q.role && !(tm === 'imp' && NON_KILLERS.includes(q.role) && grp.filter(z => !NON_KILLERS.includes(z.role) && z !== p).length === 0));
+        if (sw) { const r = p.role; p.role = sw.role; sw.role = r; continue; }
+        const nr = (spare[tm] || []).find(r => r !== prev(p) && !(tm === 'imp' && NON_KILLERS.includes(r) && grp.every(z => z === p || NON_KILLERS.includes(z.role))));
+        if (nr) { spare[tm].splice(spare[tm].indexOf(nr), 1); p.role = nr; }
+      }
+    }
+  }
   events = []; gameStartT = now(); ev('start', '🚀 המשחק התחיל');
   taskTotal = 0; taskDone = 0;
   // בקבוצה קטנה כל איש צוות מקבל יותר משימות, כדי שהצוות לא יסיים מהר מדי (לפחות 20 משימות בסך הכל)
@@ -305,6 +320,7 @@ function startGame(by) {
   sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {};
   settings.reveal = false;
   spawnAround(all);
+  all.forEach(q => { lastRoles[q.isBot ? 'b:' + q.name : q.id] = q.role; });
   phase = 'play';
 }
 
