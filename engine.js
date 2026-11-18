@@ -184,6 +184,7 @@ let chat = [];
 let pairCalls = [];
 let camsOffUntil = 0, camsCd = 0; const CAMS_OFF = 25, CAMS_CD = 45; // שיבוש מצלמות של המתחזה // משימות זוגיות שמחכות לשותף
 let noises = []; // רעשים מזויפים של הרעשן
+let noiseSeq = 0;
 let posHist = [], killLog = [], histT = 0; // לשומר הזמן: איפה כולם היו בשניות האחרונות, ומי חוסל מתי
 let hideEndAt = 0, noImpGame = false; // מחבואים: מתי נגמר הזמן; הפתעה: האם אין מתחזה בכלל
 let tour = null, endAwarded = false;   // טורניר: ניקוד מצטבר בין סיבובים
@@ -975,7 +976,7 @@ function makeNoise(p, roomId) {
   }
   if (!room) return;
   const t = now();
-  noises.push({ x: room.cx, y: room.cy, room: room.id, until: t + 6 });
+  noises.push({ id: ++noiseSeq, x: room.cx, y: room.cy, room: room.id, until: t + 6 });
   p.noiseCd = settings.noiseCd;
   toast(p, '🔊 השמעת רעש ב' + room.name);
   ev('noise', '🔊 ' + nm(p) + ' השמיע רעש מזויף ב' + room.name);
@@ -1852,7 +1853,7 @@ function viewFor(v) {
     doors: Object.keys(doorsUntil).filter(r => doorsUntil[r] > now()),
     hauntDoors: hauntDoors.filter(d => d.until > t).map(d => ({ x: d.x, y: d.y, w: d.w, h: d.h })),
     pairCalls: pairCalls.map(c => ({ x: c.x, y: c.y })),
-    noises: noises.map(n => ({ x: n.x, y: n.y })),
+    noises: noises.map(n => ({ id: n.id, x: n.x, y: n.y })),
     pings: settings.mode === 3 && phase === 'play' ? pings.filter(n => n.by !== v.id && Math.hypot(n.x - v.x, n.y - v.y) < (team(v) === 'imp' ? 1000 : 380)).map(n => ({ id: n.id, x: n.x, y: n.y })) : [],
     bananas: bananas.map(b => ({ x: Math.round(b.x), y: Math.round(b.y) })),
     darkRooms: Object.keys(darkRooms).filter(r => darkRooms[r] > t),

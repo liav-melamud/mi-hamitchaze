@@ -669,7 +669,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261117-075055'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261118-160336'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1123,6 +1123,7 @@ function switchMap(id) {
 }
 function onState(s) {
   if (s.map) switchMap(s.map);
+  if (s.noises && s.noises.length) { const last = window._lastNoise || 0; let mx = last; for (const n of s.noises) if (n.id > last) { mx = Math.max(mx, n.id); const dx = n.x - s.me.x, dy = n.y - s.me.y, d = Math.hypot(dx, dy); if (s.me.team === 'imp' || d <= 1300) stepsSound(Math.max(0.05, 1 - d / 1300), Math.max(-1, Math.min(1, dx / 500))); } window._lastNoise = mx; }
   if (s.pings && s.pings.length) { const last = window._lastPing || 0; let mx = last; for (const n of s.pings) if (n.id > last) { mx = Math.max(mx, n.id); const dx = n.x - s.me.x, dy = n.y - s.me.y, d = Math.hypot(dx, dy), rng = s.me.team === 'imp' ? 1000 : 380; pingSound(Math.max(0.03, 1 - d / rng), Math.max(-1, Math.min(1, dx / 500))); } window._lastPing = mx; }
   S = s;
   $('#join').classList.add('hidden');
@@ -1301,6 +1302,22 @@ function actionState(s) {
   return st;
 }
 
+function stepsSound(near = 1, pan = 0) { // צעדים מזויפים של הרעשן – חזקים כשקרוב, חלשים כשרחוק
+  try {
+    const ac = window._pAC = window._pAC || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    const buf = ac.createBuffer(1, ac.sampleRate * 0.12, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ac.sampleRate * 0.025));
+    const v = 0.05 + 0.9 * near * near, t0 = ac.currentTime;
+    for (let k = 0; k < 8; k++) {
+      const src = ac.createBufferSource(), g = ac.createGain(), lp = ac.createBiquadFilter(), t = t0 + k * 0.32;
+      src.buffer = buf; lp.type = 'lowpass'; lp.frequency.value = 350 + 1200 * near + (k % 2) * 150;
+      g.gain.value = v * (k % 2 ? 0.8 : 1);
+      src.connect(lp); lp.connect(g); let out = g;
+      if (ac.createStereoPanner) { const pn = ac.createStereoPanner(); pn.pan.value = pan; g.connect(pn); out = pn; }
+      out.connect(ac.destination); src.start(t);
+    }
+  } catch (e) {}
+}
 function pingSound(near = 1, pan = 0) { // ככל שהרעש קרוב – חזק יותר (כמו באמונג אס), ומגיע מהצד שממנו הוא בא
   try {
     const ac = window._pAC = window._pAC || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
