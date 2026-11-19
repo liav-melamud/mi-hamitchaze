@@ -196,6 +196,26 @@
   .slrow input::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 4px solid #2b4c7a; cursor: pointer; }
   .bar.big { height: 26px; margin: 16px 0; }
   .tfbtn { width: 100%; height: 76px; font-size: 24px; border-radius: 18px; }
+
+  .scrubBox { position: relative; width: 300px; height: 200px; margin: 12px auto; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, #cfd8e3, #9fb0c4 55%, #c7d2de); box-shadow: inset 0 0 0 3px #3a4a70; touch-action: none; }
+  .scrubBox canvas { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+  .scrubPct { position: absolute; top: 6px; right: 8px; background: rgba(0,0,0,.55); border-radius: 8px; padding: 2px 8px; font-weight: 800; font-size: 14px; direction: ltr; }
+  .safe { text-align: center; margin: 10px 0; }
+  .safeDial { width: 170px; height: 170px; border-radius: 50%; margin: 8px auto; position: relative; background: radial-gradient(circle at 35% 30%, #8d98a8, #4a5568 70%); box-shadow: 0 0 0 6px #2a3550, inset 0 0 18px rgba(0,0,0,.5); transition: transform .08s linear; }
+  .safeDial i { position: absolute; left: 50%; top: 6px; width: 3px; height: 14px; margin-left: -1.5px; background: #ffb547; border-radius: 2px; transform-origin: 50% 79px; }
+  .safeMark { width: 0; height: 0; margin: 0 auto -6px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 14px solid var(--accent); position: relative; z-index: 1; }
+  .safeNum { font-size: 40px; font-weight: 800; direction: ltr; margin: 4px 0; }
+  .safeCode { font-size: 18px; direction: ltr; letter-spacing: 2px; color: var(--muted); margin: 2px 0 8px; }
+  .safeCode b { color: var(--ok); }
+  .safeBtns { display: flex; gap: 10px; justify-content: center; align-items: center; direction: ltr; }
+  .safeBtns button { width: 64px; height: 56px; font-size: 24px; }
+  .pipes { display: grid; gap: 4px; margin: 12px auto; width: max-content; direction: ltr; }
+  .pipes button { width: 62px; height: 62px; padding: 0; background: #1a2336; border: 2px solid #3a4a70; border-radius: 8px; }
+  .pipes svg { width: 100%; height: 100%; display: block; }
+  .pipes .src, .pipes .dst { display: flex; align-items: center; font-size: 26px; }
+  .dlBox { margin: 14px 0; text-align: center; }
+  .dlSt { font-size: 15px; margin: 8px 0; min-height: 1.4em; font-weight: 700; }
+  .dlSt.bad { color: var(--imp); }
   .numgrid { display: grid; grid-template-columns: repeat(3, 86px); gap: 10px; justify-content: center; margin: 16px 0; }
   .numgrid button { height: 76px; font-size: 30px; font-weight: 800; }
   .numgrid button.ok { background: #1f6f4a; opacity: .8; }
@@ -672,7 +692,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261119-163353'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261119-163821'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1948,10 +1968,10 @@ function buildRound() {
   show('#mini', true);
   (MINI_BUILD[miniCur.kind] || buildCode)($('#miniBody'), tk);
 }
-const SAB_TITLES = { switches: '💡 החזרת החשמל', code: '💨 תיקון מערכת החמצן', dial: '☢️ קירור הכור' };
+const SAB_TITLES = { switches: '💡 החזרת החשמל', code: '💨 תיקון מערכת החמצן', sliders: '☢️ קירור הכור', tapfill: '🔥 הפעלת המחמם' };
 function openSabMini(m) {
   miniOpen = -1; miniSabIdx = m.i; miniKind = m.kind;
-  showMini(SAB_TITLES[m.kind] || 'תיקון', m.kind, { switches: 'wires', code: 'bubbles', dial: 'sparks' }[m.kind]);
+  showMini(SAB_TITLES[m.kind] || 'תיקון', m.kind, { switches: 'wires', code: 'bubbles', sliders: 'sparks', tapfill: 'gears' }[m.kind]);
 }
 function buildSwitches(b) {
   const st = Array.from({ length: 5 }, () => Math.random() < 0.5);
@@ -2473,7 +2493,124 @@ function buildLights(b) {
   draw();
   if (window.__dbg) window.__dbg.solve = () => { pre.forEach(tap); };
 }
-const MINI_BUILD = { maze: buildMaze, valve: buildValve, balance: buildBalance, bins: buildBins, quiz: buildQuiz, track: buildTrack, charge: buildCharge, swipe: buildSwipe, slide: buildSlide, lights: buildLights, wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern };
+
+// ----- משימות "מציאותיות": ניקוי, כספת עם קוד, חיבור צינורות, העלאת קבצים -----
+function buildScrub(b, tk) {
+  b.innerHTML = '<p class="sub" style="margin:8px 0">נקה את הלכלוך: גרור את העכבר (או האצבע) על המשטח עד שהוא נקי</p><div class="scrubBox"><canvas id="scrubC" width="300" height="200"></canvas><div class="scrubPct" id="scrubP">0%</div></div>';
+  const c = $('#scrubC'), x = c.getContext('2d');
+  x.fillStyle = '#5b4a2e'; x.fillRect(0, 0, 300, 200);
+  for (let i = 0; i < 90; i++) { x.fillStyle = `rgba(${60 + (i * 37) % 50},${45 + (i * 23) % 40},${25 + (i * 11) % 25},.55)`; x.beginPath(); x.arc((i * 97) % 300, (i * 61) % 200, 14 + (i % 5) * 7, 0, 7); x.fill(); }
+  let down = false, last = null, done = false;
+  const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * 300 / r.width, (e.clientY - r.top) * 200 / r.height]; };
+  const pct = () => {
+    const d = x.getImageData(0, 0, 300, 200).data; let n = 0, t = 0;
+    for (let yy = 4; yy < 200; yy += 8) for (let xx = 4; xx < 300; xx += 8) { t++; if (d[(yy * 300 + xx) * 4 + 3] < 60) n++; }
+    return Math.round(100 * n / t);
+  };
+  const wipe = e => {
+    if (!down || done || !alive(tk)) return;
+    const [px, py] = pos(e);
+    x.globalCompositeOperation = 'destination-out'; x.lineWidth = 34; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(last ? last[0] : px, last ? last[1] : py); x.lineTo(px, py); x.stroke();
+    last = [px, py];
+    const p = pct(); $('#scrubP').textContent = p + '%';
+    if (p >= 94) { done = true; x.clearRect(0, 0, 300, 200); $('#scrubP').textContent = '100%'; miniDone(); }
+  };
+  c.addEventListener('pointerdown', e => { down = true; last = null; try { c.setPointerCapture(e.pointerId); } catch (er) {} wipe(e); });
+  c.addEventListener('pointermove', wipe);
+  c.addEventListener('pointerup', () => { down = false; last = null; });
+  c.addEventListener('pointercancel', () => { down = false; last = null; });
+}
+function buildCombo(b, tk) {
+  const N = 40, code = [0, 0, 0].map(() => 1 + Math.floor(Math.random() * (N - 1)));
+  let cur = Math.floor(Math.random() * N), step = 0;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">פתח את הכספת: סובב את הגלגל למספר הנכון ולחץ "אשר". שלושה מספרים לפי הסדר.</p><div class="safe"><div class="safeCode" id="sfCode"></div><div class="safeMark"></div><div class="safeDial" id="sfDial"><i></i></div><div class="safeNum" id="sfNum"></div><div class="safeBtns"><button id="sfL">◀</button><button id="sfOk" class="primary">אשר</button><button id="sfR">▶</button></div></div>';
+  const dial = $('#sfDial');
+  const draw = () => {
+    dial.style.transform = `rotate(${-cur * 360 / N}deg)`; $('#sfNum').textContent = String(cur).padStart(2, '0');
+    $('#sfCode').innerHTML = code.map((v, i) => i < step ? `<b>${String(v).padStart(2, '0')}</b>` : String(v).padStart(2, '0')).join(' – ');
+  };
+  const move = d => { cur = (cur + d + N) % N; draw(); };
+  const hold = (el, d) => {
+    let iv = null, to = null;
+    const stop = () => { clearTimeout(to); clearInterval(iv); };
+    el.onpointerdown = () => { move(d); to = setTimeout(() => { iv = setInterval(() => { if (!alive(tk)) { stop(); return; } move(d); }, 70); }, 320); };
+    el.onpointerup = el.onpointerleave = el.onpointercancel = stop;
+  };
+  hold($('#sfL'), -1); hold($('#sfR'), 1);
+  $('#sfOk').onclick = () => {
+    if (cur === code[step]) { step++; if (step >= 3) { draw(); miniDone(); return; } }
+    else { step = 0; dial.animate([{ transform: dial.style.transform + ' translateX(-8px)' }, { transform: dial.style.transform + ' translateX(8px)' }, { transform: dial.style.transform }], 220); }
+    draw();
+  };
+  draw();
+  miniKeyHook = e => { if (e.code === 'ArrowLeft' || e.code === 'KeyA') move(-1); else if (e.code === 'ArrowRight' || e.code === 'KeyD') move(1); else if (e.code === 'Enter') $('#sfOk').click(); };
+}
+function buildPipes(b, tk) {
+  const C = 4, R = 3;
+  // מסלול אקראי מהפינה השמאלית-עליונה לימנית-תחתונה (רק ימינה/למטה), והצינורות עליו מסובבים אקראית
+  const path = []; let cx = 0, cy = 0; path.push([0, 0]);
+  const dirs = []; // 1=ימינה, 2=למטה
+  while (cx < C - 1 || cy < R - 1) { const d = cx === C - 1 ? 2 : cy === R - 1 ? 1 : (Math.random() < 0.5 ? 1 : 2); dirs.push(d); if (d === 1) cx++; else cy++; path.push([cx, cy]); }
+  const OPP = { 0: 2, 1: 3, 2: 0, 3: 1 };
+  const tiles = Array.from({ length: R }, () => Array(C).fill(0)); // מסכה: ביט לכל כיוון (0 למעלה,1 ימינה,2 למטה,3 שמאלה)
+  path.forEach(([x, y], i) => { const inD = i === 0 ? 3 : OPP[dirs[i - 1]], outD = i === dirs.length ? 1 : dirs[i]; tiles[y][x] = (1 << inD) | (1 << outD); });
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) if (!tiles[y][x]) tiles[y][x] = Math.random() < 0.5 ? 0b0101 : 0b0011;
+  const rot = m => ((m << 1) | (m >> 3)) & 15;
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) { let k = 1 + Math.floor(Math.random() * 3); while (k--) tiles[y][x] = rot(tiles[y][x]); }
+  // אם במקרה כבר פתור – מסובבים אחד
+  const solved = () => {
+    const seen = new Set(), q = [[0, 0]]; if (!(tiles[0][0] & 8)) return { ok: false, seen };
+    seen.add('0,0');
+    while (q.length) {
+      const [x, y] = q.shift(), m = tiles[y][x];
+      for (const [d, dx, dy] of [[0, 0, -1], [1, 1, 0], [2, 0, 1], [3, -1, 0]]) {
+        if (!(m & (1 << d))) continue; const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= C || ny >= R || seen.has(nx + ',' + ny)) continue;
+        if (tiles[ny][nx] & (1 << OPP[d])) { seen.add(nx + ',' + ny); q.push([nx, ny]); }
+      }
+    }
+    return { ok: seen.has((C - 1) + ',' + (R - 1)) && (tiles[R - 1][C - 1] & 2) > 0, seen };
+  };
+  if (solved().ok) tiles[0][0] = rot(tiles[0][0]);
+  const svg = (m, wet) => {
+    const col = wet ? '#3bb6ff' : '#8795ad', e = [[31, 0, 31, 31], [62, 31, 31, 31], [31, 62, 31, 31], [0, 31, 31, 31]];
+    return `<svg viewBox="0 0 62 62">${[0, 1, 2, 3].filter(d => m & (1 << d)).map(d => `<line x1="${e[d][0]}" y1="${e[d][1]}" x2="${e[d][2]}" y2="${e[d][3]}" stroke="${col}" stroke-width="12" stroke-linecap="round"/>`).join('')}<circle cx="31" cy="31" r="7" fill="${col}"/></svg>`;
+  };
+  b.innerHTML = '<p class="sub" style="margin:8px 0">חבר את הצינורות: לחץ על אריח כדי לסובב אותו, עד שהמים זורמים מהברז 💧 אל המיכל 🛢️</p><div class="pipes" id="pipeG"></div>';
+  const g = $('#pipeG'); g.style.gridTemplateColumns = `auto repeat(${C}, 62px) auto`;
+  const draw = () => {
+    const { seen } = solved();
+    let h = '';
+    for (let y = 0; y < R; y++) {
+      h += y === 0 ? '<div class="src">💧</div>' : '<div></div>';
+      for (let x = 0; x < C; x++) h += `<button data-x="${x}" data-y="${y}">${svg(tiles[y][x], seen.has(x + ',' + y))}</button>`;
+      h += y === R - 1 ? '<div class="dst">🛢️</div>' : '<div></div>';
+    }
+    g.innerHTML = h;
+  };
+  g.onclick = e => {
+    const t = e.target.closest('button'); if (!t) return;
+    const x = +t.dataset.x, y = +t.dataset.y; tiles[y][x] = rot(tiles[y][x]); draw();
+    if (solved().ok) { g.querySelectorAll('button').forEach(z => z.disabled = true); setTimeout(() => { if (alive(tk)) miniDone(); }, 500); }
+  };
+  draw();
+}
+function buildDownload(b, tk) {
+  let v = 0, stall = false, stops = [28 + Math.random() * 8, 55 + Math.random() * 8, 82 + Math.random() * 6], si = 0;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">מעלים את הקבצים לשרת. אם החיבור נופל – לחץ "חבר מחדש".</p><div class="dlBox"><div class="bar big"><i id="dlFill"></i></div><div class="dlSt" id="dlSt">📡 מעלה… 0%</div><button id="dlBtn" class="primary hidden">🔌 חבר מחדש</button></div>';
+  const fill = $('#dlFill'), st = $('#dlSt'), btn = $('#dlBtn');
+  const iv = setInterval(() => {
+    if (!alive(tk)) { clearInterval(iv); return; }
+    if (stall) return;
+    v = Math.min(100, v + 1.3);
+    fill.style.width = v + '%'; st.className = 'dlSt'; st.textContent = '📡 מעלה… ' + Math.floor(v) + '%';
+    if (v >= 100) { clearInterval(iv); st.textContent = '✅ הועלה'; miniDone(); return; }
+    if (si < stops.length && v >= stops[si]) { si++; stall = true; st.className = 'dlSt bad'; st.textContent = '⚠️ החיבור נפל!'; btn.classList.remove('hidden'); }
+  }, 60);
+  btn.onclick = () => { st.className = 'dlSt'; st.textContent = '🔌 מתחבר…'; btn.classList.add('hidden'); setTimeout(() => { stall = false; }, 700); };
+}
+const MINI_BUILD = { scrub: buildScrub, combo: buildCombo, pipes: buildPipes, download: buildDownload,  maze: buildMaze, valve: buildValve, balance: buildBalance, bins: buildBins, quiz: buildQuiz, track: buildTrack, charge: buildCharge, swipe: buildSwipe, slide: buildSlide, lights: buildLights, wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern };
 
 function miniKey(e) {
   if (e.code === 'Escape') { closeMini(); return; }

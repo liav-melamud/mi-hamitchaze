@@ -1823,7 +1823,7 @@ function viewFor(v) {
     killCd: Math.ceil(v.killCd), shiftCd: Math.ceil(v.shiftCd), shifted: !!v.shapeAs, gaCd: Math.ceil(v.gaCd),
     emergencyUsed: v.emergencyUsed, work: v.work && !v.work.mini ? v.work.t / taskTime(v.work.ref.i) : 0,
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
-    sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'dial', freeze: 'dial' }[sab.type], i: v.sabWork.i } : null,
+    sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'sliders', freeze: 'tapfill' }[sab.type], i: v.sabWork.i } : null,
     sabCd: Math.ceil(sabCd),
     guardCd: Math.ceil(v.guardCd || 0), photoCd: Math.ceil(v.photoCd || 0), investCd: Math.ceil(v.investCd || 0), vanishCd: Math.ceil(v.vanishCd || 0), vanished: v.vanishUntil > t, engVentCd: Math.ceil(v.engVentCd || 0), hideVentsLeft: settings.mode === 3 && v.role === 'crew' ? HIDE_VENTS - (v.hideVents || 0) : null, hiding: v.hiding != null ? 1 : 0, hideCd: Math.ceil(v.hideCd || 0), ventLeft: v.role === 'engineer' && v.inVent !== null && settings.engVent && v.ventSince ? Math.max(0, Math.ceil(settings.engVent - (t - v.ventSince))) : null,
     bananaCd: Math.ceil(v.bananaCd || 0), fakeCd: Math.ceil(v.fakeCd || 0), hauntDoorCd: Math.ceil(v.hauntDoorCd || 0), darkCd: Math.ceil(v.darkCd || 0), dragCd: Math.ceil(v.dragCd || 0), dragging: !!v.drag,

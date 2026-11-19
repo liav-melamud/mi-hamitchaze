@@ -79,6 +79,19 @@
     // משימות זוגיות: צריך עוד שחקן לידך כדי שהן יתקדמו
     { room: 'HT', x: 1250, y: 760, name: '🤝 הפעלת דוד משותף', kind: 'pair' },
     { room: 'MH', x: 1300, y: 330, name: '🤝 הרמת אנטנה', kind: 'pair' },
+    // משימות ריאליסטיות: ניקוי, כספת עם קוד, חיבור צינורות והעלאת קבצים
+    { room: 'HB', x: 400, y: 270, name: 'ניקוי חלון', kind: 'scrub', theme: 'bubbles' },
+    { room: 'LB', x: 800, y: 270, name: 'גיבוי נתוני מחקר', kind: 'download', theme: 'matrix' },
+    { room: 'MH', x: 1560, y: 150, name: 'חיבור צינור הסקה', kind: 'pipes', theme: 'conveyor' },
+    { room: 'GH', x: 2000, y: 150, name: 'פתיחת כספת זרעים', kind: 'combo', theme: 'stars' },
+    { room: 'DR', x: 200, y: 640, name: 'תיקון צינור שמן', kind: 'pipes', theme: 'conveyor' },
+    { room: 'SC', x: 760, y: 700, name: 'גיבוי הקלטות', kind: 'download', theme: 'matrix' },
+    { room: 'HT', x: 1330, y: 650, name: 'ניקוי פתח אוורור', kind: 'scrub', theme: 'bubbles' },
+    { room: 'OB', x: 1760, y: 700, name: 'פתיחת כספת מכשירים', kind: 'combo', theme: 'stars' },
+    { room: 'GR', x: 300, y: 1200, name: 'ניקוי מנוע אופנוע', kind: 'scrub', theme: 'gears' },
+    { room: 'GN', x: 900, y: 1130, name: 'חיבור צינור סולר', kind: 'pipes', theme: 'conveyor' },
+    { room: 'ST', x: 1450, y: 1130, name: 'פתיחת מנעול מחסן', kind: 'combo', theme: 'stars' },
+    { room: 'RD', x: 1950, y: 1200, name: 'עדכון תוכנת רדאר', kind: 'download', theme: 'radar' },
   ] : [
     { room: 'A', x: 1500, y: 650, name: '🤝 אישור כפול במחשב', kind: 'pair' },
     { room: 'T', x: 1150, y: 1080, name: '🤝 הרמת ארגז כבד', kind: 'pair' },
@@ -100,6 +113,21 @@
     { room: 'T', x: 1380, y: 1060, name: 'תדלוק מיכל', kind: 'charge', theme: 'conveyor' },
     { room: 'C', x: 1850, y: 1120, name: 'כוונון אנטנה', kind: 'dial' },
     { room: 'SH', x: 2420, y: 1250, name: 'הפעלת מגנים', kind: 'wires' },
+    // משימות ריאליסטיות: ניקוי, כספת עם קוד, חיבור צינורות והעלאת קבצים
+    { room: 'M', x: 900, y: 270, name: 'ניקוי חדר ניתוח', kind: 'scrub', theme: 'bubbles' },
+    { room: 'F', x: 1350, y: 150, name: 'חיבור צינור מים', kind: 'pipes', theme: 'conveyor' },
+    { room: 'A', x: 1450, y: 770, name: 'גיבוי נתונים', kind: 'download', theme: 'matrix' },
+    { room: 'EL', x: 690, y: 1090, name: 'פתיחת כספת הנתיכים', kind: 'combo', theme: 'stars' },
+    { room: 'R', x: 250, y: 780, name: 'ניקוי צינורות קירור', kind: 'scrub', theme: 'bubbles' },
+    { room: 'N', x: 2380, y: 780, name: 'עדכון תוכנת ניווט', kind: 'download', theme: 'radar' },
+    { room: 'SH', x: 2250, y: 1230, name: 'ניקוי לוחות מגן', kind: 'scrub', theme: 'sparks' },
+    { room: 'T', x: 1200, y: 1260, name: 'פתיחת כספת הציוד', kind: 'combo', theme: 'stars' },
+    { room: 'D', x: 250, y: 1100, name: 'תיקון צינור דלק', kind: 'pipes', theme: 'conveyor' },
+    { room: 'C', x: 1700, y: 1250, name: 'ניקוי אנטנה', kind: 'scrub', theme: 'bubbles' },
+    { room: 'W', x: 1950, y: 250, name: 'פתיחת ארון נשק', kind: 'combo', theme: 'stars' },
+    { room: 'O', x: 2380, y: 230, name: 'חיבור צינור חמצן', kind: 'pipes', theme: 'conveyor' },
+    { room: 'U', x: 200, y: 250, name: 'העלאת יומן מנוע', kind: 'download', theme: 'matrix' },
+    { room: 'SE', x: 700, y: 720, name: 'גיבוי הקלטות מצלמה', kind: 'download', theme: 'radar' },
   ];
   if (small) for (let i = TASKS.length - 1; i >= 0; i--) if (!ROOMS[TASKS[i].room]) TASKS.splice(i, 1);
   const TASK_TIME = { hold: 2.5, scan: 6, pair: 3.5 };
