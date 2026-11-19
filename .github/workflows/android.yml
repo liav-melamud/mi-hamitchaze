@@ -33,4 +33,4 @@ jobs:
           gh release create app android/out/mi-hamitchaze.apk \
             --repo "${{ github.repository }}" --latest \
             --title "אפליקציית אנדרואיד – מי המתחזה?" \
-            --notes "התקנה ישירה ל-Android (בלי Google Play). האפליקציה פותחת את המשחק האונליין."
+            --notes "התקנה ישירה ל-Android (בלי Google Play). האפליקציה פותחת את המשחק האונליין, ובלי אינטרנט – מצב אופליין מול בוטים."

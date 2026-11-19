@@ -429,6 +429,7 @@
     <p id="netHint" class="sub" style="font-size:13px;margin:0 0 12px;min-height:1.2em"></p>
     <input id="nameIn" maxlength="14" placeholder="הכינוי שלך" style="width:100%;margin-bottom:12px" autocomplete="off">
     <button id="demoBtn" style="width:100%;margin-bottom:10px;background:#1f6f4a">🎮 נסה דמו – למד לשחק מול בוטים</button>
+    <button id="offBtn" style="width:100%;margin-bottom:10px;background:#5a3a7a">📴 שחק אופליין – בלי אינטרנט, מול בוטים</button>
     <button class="statsBtn" style="width:100%;margin-bottom:10px;background:#3a3f7a">📊 הסטטיסטיקה והתגים שלי</button>
     <button id="resumeBtn" class="hidden" style="width:100%;margin-bottom:10px;background:#7a4a10;border:2px solid var(--accent)"></button>
     <label class="sub" style="display:block;margin:0 0 8px;font-size:13px"><input type="checkbox" id="fixedRoom"> 🔒 חדר קבוע (אותו קוד בכל פעם, לשליחה פעם אחת לחברים)</label>
@@ -669,7 +670,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261118-160336'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261119-132144'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -765,7 +766,7 @@ function getName() {
 }
 
 // מריץ את מנוע המשחק בדפדפן הזה (מארח או דמו)
-function runEngine(name, demo, resume) {
+function runEngine(name, demo, resume, offline) {
   isHost = true;
   engine = createGame(MAP, { demo, jester: clownWeek() });
   if (resume && resume.snapshot) { try { engine.restore(resume.snapshot); } catch (e) { console.warn('restore failed', e); } }
@@ -774,7 +775,7 @@ function runEngine(name, demo, resume) {
   // שעון ב-Worker כדי שהמשחק ימשיך לרוץ גם כשהלשונית של המארח ברקע
   let tickN = 0;
   const saveSnap = () => {
-    if (demo) return;
+    if (demo || offline) return;
     try {
       localStorage.setItem('mm_snap_' + ROOM, engine.snapshot());
       localStorage.setItem('mm_host_last', JSON.stringify({ room: ROOM, t: Date.now(), name, pid: ID }));
@@ -817,6 +818,16 @@ function startDemo() {
   renderTut();
 }
 
+let OFFLINE = false;
+function startOffline() { // משחק מלא על המכשיר בלבד: בלי שרת, בלי אינטרנט – מול בוטים
+  OFFLINE = true; ROOM = 'OFFL';
+  runEngine(getName(), false, null, true);
+  $('#netBadge').textContent = '📴 אופליין';
+  $('#roomCode').textContent = 'אופליין';
+  $('#shareLink').textContent = 'בלי חיבור לאינטרנט – מוסיפים בוטים בהגדרות ולוחצים התחל';
+  $('#copyBtn').parentNode.classList.add('hidden'); $('#netBadge').style.background = '#5a3a7a';
+  try { engine.act(ID, { type: 'settings', bots: 5 }); } catch (e) {}
+}
 function renderTut() {
   const st = TUT[tutStep];
   show('#tut', DEMO && !!st);
@@ -1043,6 +1054,7 @@ $('#hostBtn').onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(tr
   } else hostGame(getName());
 }); };
 $('#demoBtn').onclick = startDemo;
+$('#offBtn').onclick = startOffline;
 function renderNet() {
   $('#netOnline').classList.toggle('primary', NET === 'online');
   $('#netLocal').classList.toggle('primary', NET === 'local');
@@ -1158,7 +1170,7 @@ function onState(s) {
   renderSab(s);
   document.body.classList.toggle('cams-on', !!(s.me.cam && s.phase === 'play'));
   if (s.phase === 'play') { const mp = s.players.find(p => p.id === s.me.id), rr = mp && MAP.roomAt(mp.x, mp.y); if (rr) lastRoomName = rr.name; }
-  show('#micBtn', !DEMO);
+  show('#micBtn', !DEMO && !OFFLINE);
   applyVoice();
   ttsSync(s);
   recSync(s);

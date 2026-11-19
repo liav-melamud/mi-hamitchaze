@@ -22,7 +22,9 @@ import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
+import android.webkit.MimeTypeMap;
 import android.webkit.WebResourceError;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -49,6 +51,7 @@ public class MainActivity extends Activity {
     private boolean ttsReady = false;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private long lastBack = 0;
+    private boolean offlineAssets = false; // אין אינטרנט: מגישים את המשחק מהקבצים שבתוך האפליקציה
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,8 +107,31 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (!offlineAssets) return null;
+                Uri u = request.getUrl();
+                if (!HOST.equals(u.getHost()) || !"GET".equalsIgnoreCase(request.getMethod())) return null;
+                String path = u.getPath() == null ? "" : u.getPath();
+                String base = "/mi-hamitchaze/";
+                if (!path.startsWith(base)) return null;
+                String name = path.substring(base.length());
+                if (name.isEmpty()) name = "index.html";
+                try {
+                    java.io.InputStream in = getAssets().open("web/" + name);
+                    String ext = MimeTypeMap.getFileExtensionFromUrl(name);
+                    String mime = "js".equals(ext) ? "application/javascript" : "webmanifest".equals(ext) ? "application/manifest+json" : MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+                    if (mime == null) mime = "application/octet-stream";
+                    return new WebResourceResponse(mime, "utf-8", in);
+                } catch (Exception e) {
+                    return null;
+                }
+            }
+
+            @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) showOffline();
+                if (!request.isForMainFrame()) return;
+                if (!offlineAssets) { offlineAssets = true; view.loadUrl(HOME); return; } // אין אינטרנט – פותחים את הגרסה שבתוך האפליקציה
+                showOffline();
             }
         });
 
@@ -114,7 +140,7 @@ public class MainActivity extends Activity {
 
     private void showOffline() {
         String html = "<html dir='rtl'><body style='background:#0b0e16;color:#e9eef7;font-family:sans-serif;text-align:center;padding:40px'>"
-                + "<h2>אין חיבור לאינטרנט</h2><p>המשחק עובד רק אונליין. בדוק את החיבור ונסה שוב.</p>"
+                + "<h2>אין חיבור לאינטרנט</h2><p>לא הצלחתי לפתוח את המשחק. בדוק את החיבור ונסה שוב.</p>"
                 + "<p><a href='" + HOME + "' style='display:inline-block;padding:14px 28px;background:#ffb547;color:#1a1205;border-radius:12px;font-weight:bold;text-decoration:none'>נסה שוב</a></p>"
                 + "</body></html>";
         web.loadDataWithBaseURL(HOME, html, "text/html", "utf-8", null);
