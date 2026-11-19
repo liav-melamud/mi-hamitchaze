@@ -670,7 +670,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261119-132144'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261119-134336'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1350,6 +1350,14 @@ function doAction(k) {
   if (st && st.show && st.on) api({ type: k });
 }
 
+function jestLike(me) { // יעד שונה לכל תפקיד "לבד" (קורבן, נשר, ניצול, מסית) – לא טקסט הליצן
+  const r = me.roleKey;
+  if (r === 'martyr') return '<li>🕊️ המטרה שלך: שיחסלו אותך (מתחזה) – אז אתה מנצח לבד!</li><li>הסתובב ליד מתחזים, תעורר חשד… אבל אל תיתן להדיח אותך בישיבה.</li>';
+  if (r === 'vulture') return '<li>🦅 אכול 3 גופות (O) ותנצח לבד – אכלת ' + (me.eaten || 0) + '/3</li><li>הגופה נעלמת ואי אפשר לדווח עליה. אל תיתפס.</li>';
+  if (r === 'survivor') return '<li>🛟 תישאר בחיים עד סוף המשחק – ואתה מנצח גם, בלי קשר למי שניצח!</li><li>הימנע ממתחזים ומהצבעות נגדך.</li>';
+  if (r === 'instigator') return '<li>🗣️ גרום להדחה של 2 אנשי צוות חפים מפשע – ואתה בחיים – ואתה מנצח לבד! הודחו עד עכשיו: ' + (me.wrong || 0) + '/2</li><li>האשם, תשכנע, תפיל את הצוות זה על זה.</li>';
+  return '<li>' + esc(me.role || '') + '</li>';
+}
 function renderHud(s) {
   const me = s.me;
   $('#rolecard').classList.toggle('imp', me.team === 'imp' || me.team === 'mole');
@@ -1360,7 +1368,7 @@ function renderHud(s) {
   const extra = me.team === 'mole' ? '<li>🕵️ אתה השתול. המתחזים: ' + (mates.map(p => esc(p.realName || p.name)).join(', ') || '—') + '. הם לא יודעים שאתה איתם! המשימות שלך רק להסוואה.</li>'
     : me.ward ? '<li>🫂 אתה שומר על: <b>' + esc(me.ward.name) + '</b>' + (me.ward.alive ? '' : ' 💀 (חוסל ב' + esc(me.ward.died || '?') + ')') + (me.ward.swap ? ' · אפשר להחליף פעם אחת (U)' : '') + '</li>'
     : me.roleKey === 'timekeeper' ? '<li>⏪ ' + (me.rewindUsed ? 'כבר השתמשת בהחזרת הזמן' : 'החזרת זמן אחת זמינה (Y) – שמור אותה לרגע הנכון!') + '</li>' : '';
-  $('#tasklist').innerHTML = me.team === 'jester' ? '<li>🤡 גרום להם להדיח אותך בישיבה – ואז אתה מנצח!</li><li>🕳️ קפוץ לפתחים כשרואים אותך · 🍌 בננה (K): מי שמחליק חושד בך · 🎈 גופה מזויפת (T): נראית אמיתית לגמרי</li><li>אל תמות: אם מחסלים אותך, הפסדת.</li>' : me.team === 'imp'
+  $('#tasklist').innerHTML = me.team === 'jester' && me.roleKey !== 'jester' ? jestLike(me) : me.team === 'jester' ? '<li>🤡 גרום להם להדיח אותך בישיבה – ואז אתה מנצח!</li><li>🕳️ קפוץ לפתחים כשרואים אותך · 🍌 בננה (K): מי שמחליק חושד בך · 🎈 גופה מזויפת (T): נראית אמיתית לגמרי</li><li>אל תמות: אם מחסלים אותך, הפסדת.</li>' : me.team === 'imp'
     ? '<li>חסל את אנשי הצוות או השווה את מספרם.</li>' + (mates.length ? '<li>שותפים: ' + mates.map(p => esc(p.realName || p.name)).join(', ') + '</li>' : '')
     : extra + me.tasks.map(t => `<li class="${t.done ? 'done' : ''}">${esc(t.name)}</li>`).join('');
   $('#tasktxt').textContent = `(${s.tasks.done}/${s.tasks.total})`;
@@ -1742,8 +1750,8 @@ let lastBadgeGame = 0;
 function renderEnd(s) {
   const w = s.winner;
   if (w.team === 'race') $('#endTitle').innerHTML = '<span style="color:var(--accent)">🏁 המרוץ הסתיים!</span>'; else
-  $('#endTitle').innerHTML = w.team === 'nobody' ? '<span style="color:#ffd166">🤯 לא היה מתחזה בכלל!</span>' : w.surprise ? '<span style="color:var(--crew)">😄 לא היה מתחזה בכלל – ניצחתם!</span>' : s.settings.mode === 3 && w.team === 'imp' ? '<span style="color:var(--imp)">👀 המחפש תפס את כולם!</span>' : s.settings.mode === 3 ? '<span style="color:var(--crew)">🙈 המתחבאים ניצחו!</span>' : w.team === 'jester' ? '<span style="color:#ff9f1c">🤡 הליצן ניצח! 🤡</span>' : w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
-  jesterVideo(w.team === 'jester');
+  $('#endTitle').innerHTML = w.team === 'nobody' ? '<span style="color:#ffd166">🤯 לא היה מתחזה בכלל!</span>' : w.surprise ? '<span style="color:var(--crew)">😄 לא היה מתחזה בכלל – ניצחתם!</span>' : s.settings.mode === 3 && w.team === 'imp' ? '<span style="color:var(--imp)">👀 המחפש תפס את כולם!</span>' : s.settings.mode === 3 ? '<span style="color:var(--crew)">🙈 המתחבאים ניצחו!</span>' : w.team === 'jester' ? '<span style="color:#ff9f1c">' + ({ martyr: '🕊️ הקורבן ניצח!', vulture: '🦅 הנשר ניצח!', instigator: '🗣️ המסית ניצח!' }[w.role] || '🤡 הליצן ניצח! 🤡') + '</span>' : w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
+  jesterVideo(w.team === 'jester' && (!w.role || w.role === 'jester'));
   $('#endReason').textContent = w.reason;
   const roles = {};
   s.players.forEach(p => roles[p.id] = p);
@@ -1843,7 +1851,7 @@ function danceScene(s, roles) {
   cv.style.display = 'block';
   const all = s.roster.filter(p => !p.spec).map(p => ({ ...p, team: (roles[p.id] || {}).team }));
   const winners = w.team === 'jester' ? all.filter(p => p.id === w.jester || p.team === 'jester') : all.filter(p => p.team === w.team || (w.team === 'imp' && p.team === 'mole'));
-  const jester = w.team === 'jester' ? null : all.find(p => p.team === 'jester');
+  const jester = w.team === 'jester' ? null : all.find(p => (roles[p.id] || {}).roleKey === 'jester');
   const W = jester ? 520 : 640, start = performance.now();
   const conf = Array.from({ length: 70 }, (_, i) => ({ x: (i * 97) % 640, y: -((i * 53) % 300), v: 40 + (i % 7) * 12, c: ['#ffd646', '#4dd2ff', '#ff6bd6', '#7dff7a', '#ff9f1c'][i % 5], r: i }));
   const frame = () => {

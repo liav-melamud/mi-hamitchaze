@@ -510,12 +510,12 @@ function endEject() {
   phase = 'play';
   // הליצן הודח – הוא מנצח לבד והמשחק נגמר
   if (jw) {
-    winner = { team: 'jester', reason: `🤡 ${jw.name} היה הליצן – הדחתם אותו, והוא ניצח!`, jester: jw.id };
+    winner = { team: 'jester', reason: `🤡 ${jw.name} היה הליצן – הדחתם אותו, והוא ניצח!`, jester: jw.id, role: 'jester' };
     phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); return;
   }
   const inst = wrongEjects >= 2 && list().find(q => q.role === 'instigator' && q.alive && !q.spectator);
   if (inst) {
-    winner = { team: 'jester', reason: `🗣️ ${nm(inst)} היה המסית – גרם להדחה של 2 חפים מפשע, והוא ניצח לבד!`, jester: inst.id };
+    winner = { team: 'jester', reason: `🗣️ ${nm(inst)} היה המסית – גרם להדחה של 2 חפים מפשע, והוא ניצח לבד!`, jester: inst.id, role: 'instigator' };
     phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); return;
   }
   // הפתעה בלי מתחזה: הדחתם מישהו חף מפשע – כולם מפסידים
@@ -904,7 +904,7 @@ function doRewind(p) {
   ev('rewind', '⏪ ' + nm(p) + ' החזיר את הזמן ' + back + ' שניות' + (revived.length ? ' – ' + revived.map(nm).join(', ') + ' חזר לחיים' : ''));
 }
 function martyrWin(m) {
-  winner = { team: 'jester', reason: `🕊️ ${nm(m)} היה הקורבן – חיסלו אותו, והוא ניצח לבד!`, jester: m.id };
+  winner = { team: 'jester', reason: `🕊️ ${nm(m)} היה הקורבן – חיסלו אותו, והוא ניצח לבד!`, jester: m.id, role: 'martyr' };
   phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); return true;
 }
 // הריגה שלא דרך כפתור החיסול (הרעלה, פצצה)
@@ -961,7 +961,7 @@ function modUse(p) {
     case 'vulture': {
       if (!body) return toast(p, 'אין גופה קרובה לאכול');
       bodies.splice(bodies.indexOf(body), 1); p.eaten = (p.eaten || 0) + 1; toast(p, '🦅 אכלת גופה (' + p.eaten + '/3)');
-      if (p.eaten >= 3) { winner = { team: 'jester', reason: `🦅 ${nm(p)} היה הנשר – אכל 3 גופות, והוא ניצח לבד!`, jester: p.id }; phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); }
+      if (p.eaten >= 3) { winner = { team: 'jester', reason: `🦅 ${nm(p)} היה הנשר – אכל 3 גופות, והוא ניצח לבד!`, jester: p.id, role: 'vulture' }; phase = 'end'; settings.reveal = true; ev('end', '🏁 ' + winner.reason); }
       ok = true; break;
     }
   }
@@ -1834,6 +1834,7 @@ function viewFor(v) {
     rewindUsed: !!v.rewindUsed, noiseCd: Math.ceil(v.noiseCd || 0),
     mod: v.role && MOD[v.role] && MOD[v.role][3] ? { ic: MOD[v.role][2], label: MOD[v.role][3], cd: Math.ceil(v.modCd || 0), left: MOD[v.role][5] ? MOD[v.role][5] - (v.modUsed || 0) : null, until: Math.max(0, Math.ceil((v.sprintUntil || 0) - t), Math.ceil((v.radarUntil || 0) - t)) } : null,
     visMul: v.role === 'scout' ? 1.4 : 1,
+    eaten: v.eaten || 0, wrong: wrongEjects,
   };
   const out = {
     phase, me, players: ps, settings, hostId,
