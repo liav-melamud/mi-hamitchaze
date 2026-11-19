@@ -429,6 +429,7 @@
     <p id="netHint" class="sub" style="font-size:13px;margin:0 0 12px;min-height:1.2em"></p>
     <input id="nameIn" maxlength="14" placeholder="הכינוי שלך" style="width:100%;margin-bottom:12px" autocomplete="off">
     <button id="demoBtn" style="width:100%;margin-bottom:10px;background:#1f6f4a">🎮 נסה דמו – למד לשחק מול בוטים</button>
+    <button id="langBtn" style="width:100%;margin-bottom:10px;background:#2a3550">🌐 English / עברית</button>
     <button id="offBtn" style="width:100%;margin-bottom:10px;background:#5a3a7a">📴 שחק אופליין – בלי אינטרנט, מול בוטים</button>
     <button class="statsBtn" style="width:100%;margin-bottom:10px;background:#3a3f7a">📊 הסטטיסטיקה והתגים שלי</button>
     <button id="resumeBtn" class="hidden" style="width:100%;margin-bottom:10px;background:#7a4a10;border:2px solid var(--accent)"></button>
@@ -631,6 +632,7 @@
   </div>
 </div>
 
+<script src="i18n.js"></script>
 <script src="peerjs.min.js"></script>
 <script src="config.js"></script>
 <script src="map.js"></script>
@@ -649,7 +651,7 @@ if (window.AndroidTTS) (function () {
   const synth = {
     get speaking() { return Object.keys(cbs).length > 0; }, get pending() { return false; },
     getVoices() { return []; }, onvoiceschanged: null, pause() {}, resume() {},
-    speak(u) { const id = 'u' + (++n); cbs[id] = u; try { AndroidTTS.speak(String(u.text), +u.pitch || 1, +u.rate || 1, id); } catch (e) { delete cbs[id]; } },
+    speak(u) { const id = 'u' + (++n); cbs[id] = u; try { if (AndroidTTS.setLang) AndroidTTS.setLang(window.MM_LANG === 'en' ? 'en-US' : 'he-IL'); AndroidTTS.speak(String(u.text), +u.pitch || 1, +u.rate || 1, id); } catch (e) { delete cbs[id]; } },
     cancel() { try { AndroidTTS.stop(); } catch (e) {} cbs = {}; },
   };
   // דורסים את המקוריים (הם getter על ה-prototype, אז השמה רגילה לא עובדת)
@@ -670,7 +672,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261119-134336'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261119-163353'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1055,6 +1057,7 @@ $('#hostBtn').onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(tr
 }); };
 $('#demoBtn').onclick = startDemo;
 $('#offBtn').onclick = startOffline;
+$('#langBtn').onclick = () => setLang(window.MM_LANG === 'en' ? 'he' : 'en');
 function renderNet() {
   $('#netOnline').classList.toggle('primary', NET === 'online');
   $('#netLocal').classList.toggle('primary', NET === 'local');
@@ -1834,7 +1837,7 @@ function victoryMusic(team) {
       o.connect(bp); o.connect(bp2); bp.connect(g); bp2.connect(g); g.connect(out); o.start(t0 + st); o.stop(t0 + st + 0.2);
     }
     setTimeout(() => {
-      try { const u = new SpeechSynthesisUtterance('חה חה חה חה!'); u.lang = 'he-IL'; u.pitch = 1.8; u.rate = 1.1; speechSynthesis.speak(u); } catch (e) {}
+      try { const u = new SpeechSynthesisUtterance(T('חה חה חה חה!')); u.lang = window.MM_LANG === 'en' ? 'en-US' : 'he-IL'; u.pitch = 1.8; u.rate = 1.1; speechSynthesis.speak(u); } catch (e) {}
     }, 2200);
   }
 }
@@ -2741,7 +2744,7 @@ setInterval(() => {
 let ttsOn = true; try { ttsOn = localStorage.getItem('mm_tts') !== '0'; } catch (e) {}
 let spoken = 0;
 const hashStr = t => { let h = 0; for (const ch of String(t)) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
-const heVoices = () => { try { return speechSynthesis.getVoices().filter(v => /^he/i.test(v.lang) || /hebrew|carmit|עברית|hila|avri/i.test(v.name)); } catch (e) { return []; } };
+const heVoices = () => { try { return speechSynthesis.getVoices().filter(v => window.MM_LANG === 'en' ? /^en/i.test(v.lang) : /^he/i.test(v.lang) || /hebrew|carmit|עברית|hila|avri/i.test(v.name)); } catch (e) { return []; } };
 // מדרגים קולות: קולות "טבעיים/נוירליים/אונליין" קודם, כי הם נשמעים הרבה פחות רובוטיים
 const rankVoice = v => { const n = v.name.toLowerCase(); let sc = 0; if (/natural|neural|online|premium|enhanced|wavenet|siri/.test(n)) sc += 10; if (/google|microsoft|apple|carmit|hila|avri/.test(n)) sc += 2; if (v.localService === false) sc += 1; return sc; };
 function bestVoices() {
@@ -2771,12 +2774,12 @@ function voiceFor(name, vs) {
 let nowTimer = null;
 function speakBot(name, text) {
   if (!ttsOn || !('speechSynthesis' in window)) return;
-  let clean = speechText(text);
+  let clean = speechText(T(String(text)));
   if (!clean || !/[֐-׿a-z0-9]/i.test(clean)) return;
   const key = String(name).replace(/[^֐-׿a-z0-9]/gi, ''), h = hashStr(key);
   const excited = /!/.test(text), question = /\?/.test(text);
   // מילת פתיחה: לא במשפט נרגש (שם מדברים ישר לעניין)
-  if (!excited && clean.length > 12 && Math.random() < 0.3) clean = FILLERS[(h + Math.floor(Math.random() * 3)) % FILLERS.length][0] + ', ' + clean;
+  if (!excited && clean.length > 12 && Math.random() < 0.3) clean = T(FILLERS[(h + Math.floor(Math.random() * 3)) % FILLERS.length][0]) + ', ' + clean;
   const vs = bestVoices(), voice = voiceFor(key, vs);
   // שינוי קטן בגובה ובקצב לכל בוט, ועוד קצת לפי הרגש של המשפט
   const basePitch = 0.88 + (h % 7) * 0.045, baseRate = 0.97 + (h % 5) * 0.035;
@@ -2786,7 +2789,7 @@ function speakBot(name, text) {
   const cap = $('#nowSpeaking');
   parts.forEach((part, k) => {
     const u = new SpeechSynthesisUtterance(part.trim());
-    u.lang = 'he-IL'; if (voice) u.voice = voice;
+    u.lang = window.MM_LANG === 'en' ? 'en-US' : 'he-IL'; if (voice) u.voice = voice;
     const ex = /!/.test(part) || (excited && k === 0), q = /\?/.test(part);
     u.pitch = Math.min(1.4, basePitch + (ex ? 0.08 : 0) + (q ? 0.04 : 0));
     u.rate = Math.min(1.25, baseRate * (ex ? 1.08 : q ? 0.97 : 1) * (part.length > 60 ? 1.04 : 1));
@@ -2825,7 +2828,7 @@ refreshTts();
 // הדפדפן ממיר את מה שאתה אומר לטקסט, והבוטים מגיבים אליו כמו להודעה בצ'אט. פועל בישיבות כשהמיקרופון דלוק.
 // באפליקציית האנדרואיד אין webkitSpeechRecognition, אז יש גשר לזיהוי הדיבור של המכשיר (AndroidSpeech)
 class NativeSR {
-  constructor() { this.lang = 'he-IL'; this.continuous = true; this.interimResults = true; }
+  constructor() { this.lang = window.MM_LANG === 'en' ? 'en-US' : 'he-IL'; this.continuous = true; this.interimResults = true; }
   start() { window.__nsr = this; if (this.onstart) this.onstart(); window.AndroidSpeech.start(this.lang); }
   stop() { try { window.AndroidSpeech.stop(); } catch (e) {} }
 }
@@ -2883,7 +2886,7 @@ function sendHeard(text, fromInterim) {
 }
 function startRec() {
   if (!SR || rec || !recWanted) return;
-  rec = new SR(); rec.lang = 'he-IL'; rec.continuous = true; rec.interimResults = true;
+  rec = new SR(); rec.lang = window.MM_LANG === 'en' ? 'en-US' : 'he-IL'; rec.continuous = true; rec.interimResults = true;
   rec.onstart = () => { listening = true; refreshHeard(); };
   rec.onresult = ev => {
     let interim = '';

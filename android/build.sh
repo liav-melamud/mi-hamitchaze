@@ -16,7 +16,7 @@ rm -rf build out && mkdir -p build/classes build/dex out
 "$BT/aapt2" compile --dir res -o build/res.zip
 # עותק של המשחק בתוך האפליקציה – כדי שאפשר יהיה לשחק אופליין (מול בוטים)
 mkdir -p build/assets/web
-for f in index.html engine.js map.js config.js peerjs.min.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png; do cp "../$f" build/assets/web/; done
+for f in index.html engine.js map.js config.js i18n.js peerjs.min.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png; do cp "../$f" build/assets/web/; done
 "$BT/aapt2" link -o build/base.apk -A build/assets -I "$JAR" --manifest AndroidManifest.xml \
   --min-sdk-version 24 --target-sdk-version 34 --version-code "$RUN" --version-name "$VERSION_NAME" \
   -R build/res.zip --auto-add-overlay

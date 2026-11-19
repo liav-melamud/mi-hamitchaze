@@ -293,6 +293,14 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void setLang(final String tag) {
+            ui.post(() -> {
+                if (tts == null || !ttsReady || tag == null) return;
+                try { tts.setLanguage(Locale.forLanguageTag(tag)); } catch (Exception ignored) { }
+            });
+        }
+
+        @JavascriptInterface
         public void stop() { ui.post(() -> { if (tts != null) tts.stop(); }); }
     }
 
