@@ -135,7 +135,21 @@ public class MainActivity extends Activity {
             }
         });
 
+        // אין רשת בכלל → פותחים מיד את העותק שבתוך האפליקציה (בלי לחכות לשגיאה)
+        offlineAssets = !isOnline();
         web.loadUrl(HOME);
+        // רשת חלשה/תקועה: אם האתר לא נטען תוך 7 שניות – עוברים לעותק המקומי
+        ui.postDelayed(() -> {
+            if (web != null && !offlineAssets && web.getProgress() < 100) { offlineAssets = true; web.loadUrl(HOME); }
+        }, 7000);
+    }
+
+    private boolean isOnline() {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            android.net.NetworkInfo ni = cm == null ? null : cm.getActiveNetworkInfo();
+            return ni != null && ni.isConnected();
+        } catch (Exception e) { return true; }
     }
 
     private void showOffline() {
