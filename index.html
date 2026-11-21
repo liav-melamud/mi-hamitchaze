@@ -692,7 +692,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261119-163821'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261121-122439'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1774,7 +1774,7 @@ function renderEnd(s) {
   const w = s.winner;
   if (w.team === 'race') $('#endTitle').innerHTML = '<span style="color:var(--accent)">🏁 המרוץ הסתיים!</span>'; else
   $('#endTitle').innerHTML = w.team === 'nobody' ? '<span style="color:#ffd166">🤯 לא היה מתחזה בכלל!</span>' : w.surprise ? '<span style="color:var(--crew)">😄 לא היה מתחזה בכלל – ניצחתם!</span>' : s.settings.mode === 3 && w.team === 'imp' ? '<span style="color:var(--imp)">👀 המחפש תפס את כולם!</span>' : s.settings.mode === 3 ? '<span style="color:var(--crew)">🙈 המתחבאים ניצחו!</span>' : w.team === 'jester' ? '<span style="color:#ff9f1c">' + ({ martyr: '🕊️ הקורבן ניצח!', vulture: '🦅 הנשר ניצח!', instigator: '🗣️ המסית ניצח!' }[w.role] || '🤡 הליצן ניצח! 🤡') + '</span>' : w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
-  jesterVideo(w.team === 'jester' && (!w.role || w.role === 'jester'));
+  jesterVideo(w.team === 'jester');
   $('#endReason').textContent = w.reason;
   const roles = {};
   s.players.forEach(p => roles[p.id] = p);
