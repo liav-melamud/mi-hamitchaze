@@ -117,6 +117,7 @@ const addPing = (x, y, by) => { pings.push({ id: ++pingId, x, y, by, until: now(
 
 let players = {};
 let phase = 'lobby';
+let lobbyCache = null;
 let hostId = null;
 let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, code: '', raceGoal: 10, jester: !!(opts && opts.jester) };
 for (const k in ROLE_SET) settings[k] = ROLE_SET[k][0];
@@ -227,6 +228,7 @@ function newPlayer(name, color, isBot) {
     bot: isBot ? { plan: [], wait: 0, goal: null, voteAt: 0, chatAt: 0, persona: pick(['suspicious', 'quiet', 'chatty', 'aggressive', 'helpful', 'normal', 'normal']) } : null,
   };
   players[id] = p;
+  if (phase === 'lobby' && !isBot) lobbySpawn([p]);
   return p;
 }
 
@@ -234,6 +236,48 @@ function toast(p, text) { if (p && !p.isBot) p.toast.push(text); }
 function toastAll(text) { humans().forEach(p => toast(p, text)); }
 
 // ---------- מהלך המשחק ----------
+// ---------- הלובי: חללית קטנה שאפשר ללכת בה ----------
+const LOBBY = { W: 1000, H: 560, x0: 50, x1: 950, y0: 140, y1: 510, table: { x0: 430, x1: 570, y0: 292, y1: 362 } };
+const lobbyWalkable = (x, y, r = 18) => x - r >= LOBBY.x0 && x + r <= LOBBY.x1 && y - r >= LOBBY.y0 && y + r <= LOBBY.y1
+  && !(x + r > LOBBY.table.x0 && x - r < LOBBY.table.x1 && y + r > LOBBY.table.y0 && y - r < LOBBY.table.y1);
+function lobbySpawn(arr) {
+  arr.forEach((p, i) => { p.x = 330 + (i % 8) * 48 + Math.random() * 10; p.y = 440 + Math.floor(i / 8) * 46; p.input = { dx: 0, dy: 0 }; p.work = null; p.inVent = null; });
+}
+const ROLE_IC = { crew: '🧑‍🚀', engineer: '🔧', scientist: '🧪', angel: '😇', photographer: '📸', detective: '🔎', judge: '⚖️', bodyguard: '🛡', guardian: '🫂', timekeeper: '⏪', impostor: '🔪', shifter: '🎭', phantom: '👻', viper: '🐍', noisemaker: '🔊', saboteur: '💣', poltergeist: '🌀', mole: '🕵️', jester: '🤡' };
+// הדמיה של חלוקת התפקידים (אותם מאגרים כמו ב-startGame) – כדי להראות בלובי כמה אחוז לכל תפקיד
+function simRoles(n, mods) {
+  const nImp = Math.max(1, Math.min(settings.impostors, Math.floor((n - 1) / 2)));
+  const impPool = shuffle((settings.newRoles ? ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'impostor'].concat(nImp >= 2 ? ['saboteur', 'poltergeist'] : []) : ['impostor', 'shifter', 'impostor']).filter(r => r === 'impostor' || roleOn(r)).concat(mods ? MOD_IMP.filter(roleOn) : []));
+  const out = [];
+  for (let i = 0; i < nImp; i++) out.push(impPool[i % impPool.length]);
+  if (out.every(r => NON_KILLERS.includes(r))) out[0] = 'impostor';
+  const nCrew = n - nImp;
+  const specials = shuffle((settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'] : ['engineer', 'scientist', 'angel']).concat(mods ? MOD_CREW : []).filter(roleOn));
+  const nSpecial = settings.newRoles ? Math.max(1, Math.round(nCrew * 0.7)) : specials.length;
+  const crew = [];
+  for (let i = 0; i < nCrew; i++) crew.push(i < Math.min(specials.length, nSpecial) && nCrew > 1 ? specials[i] : 'crew');
+  if (settings.jester && nCrew >= 3 && n >= 5) crew[Math.floor(Math.random() * nCrew)] = 'jester';
+  if (mods && nCrew >= 4 && n >= 5) { const idx = shuffle(crew.map((r, i) => r === 'crew' ? i : -1).filter(i => i >= 0)), nn = shuffle(MOD_NEU.filter(roleOn)); for (let i = 0; i < (nCrew >= 8 ? 2 : 1) && idx[i] !== undefined && nn[i]; i++) crew[idx[i]] = nn[i]; }
+  if (settings.newRoles && roleOn('mole') && nImp > 0 && n >= 6 && nCrew >= 4) { const c = shuffle(crew.map((r, i) => r !== 'jester' ? i : -1).filter(i => i >= 0))[0]; if (c !== undefined) crew[c] = 'mole'; }
+  return out.concat(crew);
+}
+function lobbyInfo() {
+  const n = Math.max(3, humans().filter(q => !q.spectator).length + settings.bots), mods = modsOn(), classic = settings.mode === 1 || settings.mode === 4;
+  const cnt = {}, pres = {}, T = 400;
+  if (classic) for (let t = 0; t < T; t++) { const seen = {}; for (const r of simRoles(n, mods)) { cnt[r] = (cnt[r] || 0) + 1; seen[r] = 1; } for (const r in seen) pres[r] = (pres[r] || 0) + 1; }
+  const roles = [];
+  const add = (k, name, tm, ic, desc) => roles.push({ k, name, team: tm, ic, desc, on: roleOn(k) || k === 'crew' || k === 'impostor', game: Math.round(100 * (pres[k] || 0) / T), per: Math.round(100 * (cnt[k] || 0) / (T * n)) });
+  for (const k of Object.keys(ROLES)) {
+    if (k === 'spectator' || k === 'seeker' || MOD[k]) continue;
+    const r = ROLES[k];
+    add(k, r.name, r.team === 'jester' ? 'jester' : r.team, ROLE_IC[k] || '⭐', roleDesc(k));
+  }
+  if (mods) for (const k of Object.keys(MOD)) { const m = MOD[k]; add(k, m[0], m[1], m[2], m[6] + (m[3] ? ` [כפתור: ${m[3]}${m[4] ? ' · המתנה ' + m[4] + ' שניות' : ''}${m[5] ? ' · ' + m[5] + (m[5] > 1 ? ' שימושים' : ' שימוש') : ''}]` : '')); }
+  // תפקיד הליצן בהגדרות הוא מתג נפרד
+  const j = roles.find(r => r.k === 'jester'); if (j) j.on = !!settings.jester;
+  return { n, classic, mode: settings.mode, roles };
+}
+
 function spawnAround(arr) {
   arr.forEach((p, i) => {
     const a = (i / Math.max(1, arr.length)) * Math.PI * 2;
@@ -329,7 +373,7 @@ function backToLobby(by) {
   if (by !== hostId) return;
   Object.values(players).filter(p => p.isBot).forEach(p => delete players[p.id]);
   list().forEach(p => { p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
-  spawnAround(list());
+  lobbySpawn(list());
   phase = 'lobby'; bodies = []; bananas = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
   sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {};
 }
@@ -793,6 +837,7 @@ function act(p, a) {
       break;
     }
     case 'cancel': p.work = null; p.sabWork = null; break;
+    case 'lobbyinfo': p.lobbySig = ''; break;
     case 'pet': { // חיית מחמד שהולכת אחרי הרחפן (נפתחת לפי ניצחונות)
       if (phase !== 'lobby') return;
       const n = Number(a.pet);
@@ -1760,6 +1805,17 @@ function tick() {
   }
 
   if (phase === 'end' && !endAwarded) { endAwarded = true; awardTour(); }
+  // הליכה בלובי
+  if (phase === 'lobby') for (const p of humans()) {
+    let { dx, dy } = p.input || { dx: 0, dy: 0 };
+    const l = Math.hypot(dx, dy);
+    if (l < 0.05) continue;
+    dx /= l; dy /= l;
+    const stp = SPEED * 0.85 * dt;
+    if (lobbyWalkable(p.x + dx * stp, p.y)) p.x += dx * stp;
+    if (lobbyWalkable(p.x, p.y + dy * stp)) p.y += dy * stp;
+    if (Math.abs(dx) > 0.1) p.dir = dx > 0 ? 1 : -1;
+  }
   // ניתוק שחקנים בלובי
   if (phase === 'lobby') {
     humans().forEach(p => { if (!p.conn && t - p.lastSeen > 10) delete players[p.id]; });
@@ -1899,7 +1955,12 @@ function viewFor(v) {
       out.myStats = { game: Math.round(gameStartT), won, team: tm, role: v.role, mode: settings.mode, kills: v.stats.kills, tasks: v.stats.tasks, goodVotes: v.stats.goodVotes, badVotes: v.stats.badVotes, reports: v.stats.reports, ejected: !!v.ejected, alive: v.alive };
     }
   }
-  if (phase === 'lobby') out.colors = COLORS;
+  if (phase === 'lobby') {
+    out.colors = COLORS;
+    const lsig = JSON.stringify([settings, humans().length]);
+    if (!lobbyCache || lobbyCache.sig !== lsig) lobbyCache = { sig: lsig, info: lobbyInfo() };
+    if (v.lobbySig !== lsig) { v.lobbySig = lsig; out.lobbyInfo = lobbyCache.info; }
+  }
   return out;
 }
 

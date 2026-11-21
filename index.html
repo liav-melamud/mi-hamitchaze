@@ -167,6 +167,30 @@
   .sw.on { background: #1a2a1a; border-color: #2a6a3a; }
   .sw.on i { top: 48px; background: #4ade80; box-shadow: 0 0 12px #4ade80; }
   .micHeard { background: rgba(255,214,70,.1); border: 1px solid rgba(255,214,70,.4); color: #ffe9a8; border-radius: 10px; padding: 6px 10px; margin-bottom: 6px; font-size: 14px; }
+
+  #lobby .card { width: min(1100px, 100%); }
+  #ship { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0 12px; }
+  #shipMain { flex: 1; min-width: 0; }
+  #shipSide { width: 250px; flex: none; display: flex; flex-direction: column; gap: 10px; }
+  #shipSide .urls { margin: 0; }
+  #shipCv { width: 100%; aspect-ratio: 1000 / 560; border-radius: 14px; border: 1px solid var(--line); background: #0a0d18; display: block; touch-action: none; cursor: pointer; }
+  .oddsBox { background: #0e1322; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  #oddsMini { max-height: 250px; overflow-y: auto; margin-top: 6px; font-size: 13px; }
+  .orow { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .orow .nm { flex: 1; } .orow .pc { direction: ltr; font-weight: bold; color: var(--accent); } .orow.off { opacity: .4; }
+  .orow.imp .pc { color: var(--imp); } .orow.jester .pc { color: #ff9f1c; }
+  .lmodal { position: fixed; inset: 0; z-index: 40; background: rgba(5,8,16,.78); display: flex; align-items: center; justify-content: center; padding: 14px; }
+  .lmodal.hidden { display: none; }
+  .lmBox { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; width: min(760px, 100%); max-height: 100%; overflow: auto; }
+  .lmBox h2 { margin: 0 0 10px; }
+  .lmClose { position: sticky; float: left; top: 0; }
+  #roleBoard .rg { margin: 12px 0 4px; font-weight: bold; }
+  .rrow { display: flex; gap: 10px; padding: 8px; margin: 6px 0; background: #0e1322; border-radius: 10px; border-right: 4px solid var(--crew); }
+  .rrow.imp { border-right-color: var(--imp); } .rrow.jester { border-right-color: #ff9f1c; } .rrow.off { opacity: .45; }
+  .rrow .ic { font-size: 26px; width: 36px; text-align: center; }
+  .rrow p { margin: 3px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .rrow .pc { font-size: 12px; color: var(--accent); direction: rtl; }
+  @media (max-width: 800px) { #ship { flex-direction: column; } #shipSide { width: 100%; } }
   .lchat { height: 110px; overflow-y: auto; background: #0e1322; border-radius: 10px; padding: 8px 10px; font-size: 14px; }
   .lchat p { margin: 3px 0; }
   #sabStage, #tmStage { position: relative; width: 100%; aspect-ratio: 2700 / 1400; background: #07101f; border: 2px solid #2b4c7a; border-radius: 14px; overflow: hidden;
@@ -473,6 +497,8 @@
     <div id="demoBox" class="urls hidden" style="direction:rtl;text-align:right;font-family:inherit">
       <div class="row" style="justify-content:space-between"><span>🎮 מצב דמו – משחק מול בוטים בלבד</span><button class="exitDemo">יציאה מהדמו</button></div>
     </div>
+    <div id="ship">
+      <aside id="shipSide">
     <div id="shareBox" class="urls" style="direction:rtl;text-align:right;font-family:inherit">
       <div class="row" style="justify-content:space-between">
         <span><span id="netBadge" style="font-size:13px;padding:2px 8px;border-radius:10px;background:#2a3550;margin-left:6px"></span>קוד החדר: <b id="roomCode" style="font-size:26px;letter-spacing:5px;color:var(--accent);direction:ltr;display:inline-block"></b></span>
@@ -480,6 +506,20 @@
       </div>
       <div id="shareLink" style="direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:13px;color:var(--muted);margin-top:6px;word-break:break-all"></div>
     </div>
+        <div class="oddsBox"><b>📊 סיכוי תפקידים</b> <span class="sub" style="margin:0;font-size:12px" id="oddsN"></span><div id="oddsMini"></div></div>
+      </aside>
+      <div id="shipMain">
+        <canvas id="shipCv" width="1000" height="560"></canvas>
+        <div class="row" style="justify-content:center;margin-top:8px">
+          <button data-st="wardrobe">👕 ארון בגדים</button>
+          <button data-st="comp">💻 מחשב</button>
+          <button data-st="board">📋 לוח תפקידים</button>
+          <button id="startBtn2" class="primary hidden">התחל משחק ▶</button>
+        </div>
+        <p class="sub" style="text-align:center;margin:6px 0 0">🚶 הולכים בחללית (<span id="walkKeys">WASD</span> או גרירה במגע) · ליד תחנה לוחצים <b id="useKey">E</b> או נוגעים בה</p>
+      </div>
+    </div>
+    <div id="wardrobeModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>👕 ארון בגדים</h2>
     <b>בחר צבע</b>
     <div id="colors"></div>
     <b>בחר כובע</b>
@@ -487,13 +527,16 @@
     <b>חיית מחמד</b> <span class="sub" style="margin:0;font-size:12px">(נפתחות לפי משחקים וניצחונות – 📊 לפרטים)</span>
     <div id="pets"></div>
     <button class="statsBtn" style="margin-top:8px">📊 הסטטיסטיקה והתגים שלי</button>
+    </div></div>
     <b>שחקנים (<span id="pcount">0</span>)</b>
     <div id="plist"></div>
     <b>צ'אט</b>
     <div id="micHeardL" class="micHeard hidden"></div>
     <div id="lobbyChat" class="lchat"></div>
     <div class="row" style="margin:6px 0 12px"><input id="lobbyIn" maxlength="140" placeholder="כתוב הודעה… (או דבר אם המיקרופון דלוק)" style="flex:1" autocomplete="off"><button id="lobbySend">שלח</button></div>
-    <b>הגדרות משחק</b>
+    <div id="compModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>💻 מחשב החללית</h2>
+      <p class="sub" id="compNote" style="margin-top:0"></p>
+    <b>⚙️ הגדרות משחק</b>
     <div id="settingsGrid">
       <label>מתחזים <select data-s="impostors"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
       <label>בוטים <select data-s="bots"></select></label>
@@ -559,6 +602,11 @@
     <div id="hostSettings" class="row hidden" style="margin:12px 0">
       <button id="startBtn" class="primary">התחל משחק ▶</button>
     </div>
+    </div></div>
+    <div id="boardModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>📋 לוח תפקידים</h2>
+      <p class="sub" style="margin-top:0">מה כל תפקיד עושה, וכמה אחוז הוא יופיע לפי ההגדרות. המארח משנה את זה במחשב.</p>
+      <div id="roleBoard"></div>
+    </div></div>
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול) · מגן אישי (יודע איפה מת מי שהוא שומר עליו) · שומר הזמן (מחזיר את כולם אחורה פעם אחת)<br>
@@ -692,7 +740,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261121-161759'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261121-183841'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1173,6 +1221,7 @@ function onState(s) {
   }
   s.toast.forEach(toast);
   show('#lobby', s.phase === 'lobby');
+  if (s.phase !== 'lobby' && lobOpen) closeStation();
   show('#hud', s.phase === 'play');
   show('#meeting', s.phase === 'meeting');
   show('#alert', s.phase === 'alert');
@@ -1210,6 +1259,7 @@ function toast(t) {
 let lobbySig = '';
 let lookApplied = false;
 function renderLobby(s) {
+  renderShip(s);
   if (!lookApplied) { // מחזירים את הצבע והכובע שבחרתי בפעם הקודמת
     lookApplied = true;
     try {
@@ -1258,6 +1308,126 @@ const sendSettings = () => {
 document.querySelectorAll('#settingsGrid select, #roleSet select, #roleToggles input, #modToggles input').forEach(el => el.onchange = sendSettings);
 $('#secretCode').onchange = sendSettings;
 $('#startBtn').onclick = () => api({ type: 'start' });
+// ---------- חללית הלובי: הולכים בה, ארון בגדים, מחשב מארח ולוח תפקידים ----------
+const LOB = { W: 1000, H: 560, st: [
+  { id: 'wardrobe', x: 170, y: 112, ic: '👕', n: 'ארון בגדים', hint: 'שנה צבע, כובע וחיית מחמד' },
+  { id: 'comp', x: 500, y: 112, ic: '💻', n: 'מחשב המארח', hint: 'הגדרות המשחק' },
+  { id: 'board', x: 830, y: 112, ic: '📋', n: 'לוח תפקידים', hint: 'מה כל תפקיד עושה ובאיזה אחוז' },
+] };
+const lobbyModals = { wardrobe: '#wardrobeModal', comp: '#compModal', board: '#boardModal' };
+['#wardrobeModal', '#compModal', '#boardModal'].forEach(sel => document.body.appendChild($(sel))); // מחוץ לכרטיס, כדי שיכסו את כל המסך
+let LI = null, lobOpen = null, lobRaf = 0;
+const lobDisp = {};
+function openStation(id) {
+  if (!S || S.phase !== 'lobby') return;
+  closeStation();
+  lobOpen = id; show(lobbyModals[id], true);
+  keys.clear(); sendInput();
+  if (id === 'comp') $('#compNote').textContent = S.me.host ? '👑 אתה המארח – שינויים נשמרים מיד ונשלחים לכולם.' : 'רק המארח 👑 יכול לשנות. אתה יכול לראות את ההגדרות.';
+  renderOdds();
+}
+function closeStation() { if (lobOpen) { show(lobbyModals[lobOpen], false); lobOpen = null; } }
+document.querySelectorAll('.lmClose').forEach(b => b.onclick = closeStation);
+document.querySelectorAll('.lmodal').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) closeStation(); }));
+document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => openStation(b.dataset.st));
+$('#startBtn2').onclick = () => api({ type: 'start' });
+function nearStation() {
+  const me = S && S.players.find(p => p.id === S.me.id); if (!me) return null;
+  return LOB.st.find(st => Math.hypot(me.x - st.x, me.y - (st.y + 70)) < 110) || null;
+}
+addEventListener('keydown', e => {
+  if (!S || S.phase !== 'lobby') return;
+  if (e.code === 'Escape' && lobOpen) { closeStation(); e.stopImmediatePropagation(); return; }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || capturing) return;
+  if (lobOpen) { e.stopImmediatePropagation(); return; }
+  if (e.code === KEYS.use && !e.repeat) { const st = nearStation(); if (st) { openStation(st.id); e.stopImmediatePropagation(); e.preventDefault(); } }
+}, true);
+$('#shipCv').addEventListener('click', e => {
+  const r = e.target.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * LOB.W, y = (e.clientY - r.top) / r.height * LOB.H;
+  const st = LOB.st.find(q => Math.abs(x - q.x) < 80 && Math.abs(y - q.y) < 70);
+  if (st) openStation(st.id);
+});
+function renderOdds() {
+  if (!LI) return;
+  $('#oddsN').textContent = LI.classic ? '(' + LI.n + ' שחקנים)' : '';
+  const teamOrder = [['crew', '🧑‍🚀 ' + 'צוות (הטובים)'], ['imp', '🔪 ' + 'מתחזים (הרעים)'], ['jester', '🟠 ' + 'לבד (ניטרלי)']];
+  const show1 = LI.roles.filter(r => r.k !== 'crew' || true);
+  if (!LI.classic) {
+    const msg = '<p class="sub">במצב הזה אין תפקידים מיוחדים (' + (LI.mode === 2 ? 'כולם מבצעים משימות' : LI.mode === 3 ? 'מחפש אחד והשאר מתחבאים' : 'מצב מיוחד') + ').</p>';
+    $('#oddsMini').innerHTML = msg; $('#roleBoard').innerHTML = msg; return;
+  }
+  const pct = r => r.on ? r.per + '%' : '—';
+  $('#oddsMini').innerHTML = LI.roles.filter(r => r.on && r.per > 0).sort((a, b) => b.per - a.per).map(r =>
+    `<div class="orow ${esc(r.team)}" title="${esc(r.desc)}"><span>${esc(r.ic)}</span><span class="nm">${esc(r.name)}</span><span class="pc">${r.per}%</span></div>`).join('') || '<p class="sub">אין תפקידים פעילים</p>';
+  $('#roleBoard').innerHTML = teamOrder.map(([t, title]) => {
+    const rs = LI.roles.filter(r => r.team === t);
+    if (!rs.length) return '';
+    return `<div class="rg">${title}</div>` + rs.map(r =>
+      `<div class="rrow ${esc(r.team)} ${r.on ? '' : 'off'}"><span class="ic">${esc(r.ic)}</span><div><b>${esc(r.name)}</b> <span class="pc">${r.on ? 'בכל משחק: ' + r.game + '% · סיכוי אישי: ' + r.per + '%' : 'כבוי בהגדרות'}</span><p>${esc(r.desc)}</p></div></div>`).join('');
+  }).join('');
+}
+function drawShip(t) {
+  const c = $('#shipCv'), g = c.getContext('2d'), W = LOB.W, H = LOB.H;
+  const saved = ctx; ctx = g;
+  g.clearRect(0, 0, W, H);
+  // רצפה וקירות
+  const bgd = g.createLinearGradient(0, 0, 0, H); bgd.addColorStop(0, '#161c30'); bgd.addColorStop(1, '#0d1220');
+  g.fillStyle = bgd; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1b2238'; g.fillRect(0, 0, W, 130);
+  g.fillStyle = '#2a3453'; g.fillRect(0, 126, W, 6);
+  for (let i = 0; i < 6; i++) { const x = 90 + i * 164; g.fillStyle = '#0a0f1e'; g.beginPath(); g.arc(x, 40, 22, 0, 7); g.fill(); g.strokeStyle = '#3a4668'; g.lineWidth = 4; g.stroke(); g.fillStyle = '#fff'; for (let k = 0; k < 4; k++) g.fillRect(x - 14 + ((i * 7 + k * 11 + Math.floor(t / 900)) % 26), 28 + (k * 5 + i * 3) % 22, 1.6, 1.6); }
+  g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
+  for (let x = 50; x <= 950; x += 50) { g.beginPath(); g.moveTo(x, 140); g.lineTo(x, 510); g.stroke(); }
+  for (let y = 140; y <= 510; y += 50) { g.beginPath(); g.moveTo(50, y); g.lineTo(950, y); g.stroke(); }
+  g.strokeStyle = '#3a4668'; g.lineWidth = 8; g.strokeRect(46, 136, 908, 378);
+  // שולחן מרכזי
+  g.fillStyle = '#243052'; g.beginPath(); g.ellipse(500, 327, 85, 46, 0, 0, 7); g.fill(); g.strokeStyle = '#4a5a86'; g.lineWidth = 4; g.stroke();
+  g.font = '28px serif'; g.textAlign = 'center'; g.fillText('🗺️', 500, 337);
+  // תחנות
+  const near = nearStation();
+  for (const st of LOB.st) {
+    const on = near && near.id === st.id;
+    g.fillStyle = on ? '#2d4a86' : '#26304e'; g.strokeStyle = on ? '#ffb547' : '#4a5a86'; g.lineWidth = on ? 4 : 3;
+    g.beginPath(); g.roundRect ? g.roundRect(st.x - 80, st.y - 62, 160, 110, 14) : g.rect(st.x - 80, st.y - 62, 160, 110); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(120,200,255,' + (0.1 + 0.08 * Math.sin(t / 400 + st.x)) + ')'; g.fillRect(st.x - 64, st.y - 48, 128, 50);
+    g.font = '40px serif'; g.fillStyle = '#fff'; g.fillText(st.ic, st.x, st.y - 4);
+    g.font = 'bold 18px sans-serif'; g.fillStyle = on ? '#ffb547' : '#cfd8ee'; g.fillText(st.n, st.x, st.y + 32);
+    if (st.id === 'comp' && S && S.me.host) { g.font = '16px serif'; g.fillText('👑', st.x + 62, st.y - 44); }
+  }
+  // שחקנים
+  const me = S && S.players.find(p => p.id === S.me.id);
+  const ps = S ? S.players.slice().sort((a, b) => a.y - b.y) : [];
+  for (const p of ps) {
+    const d = lobDisp[p.id] || (lobDisp[p.id] = { x: p.x, y: p.y });
+    d.x += (p.x - d.x) * 0.35; d.y += (p.y - d.y) * 0.35;
+    drawDrone(d.x, d.y, p.color, p.dir || 1, { hat: p.hat, pet: p.pet });
+    g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.8)'; g.fillStyle = '#fff';
+    const label = (p.id === S.hostId ? '👑 ' : '') + p.name;
+    g.strokeText(label, d.x, d.y + 40); g.fillText(label, d.x, d.y + 40);
+    if (me && p.id === me.id) { g.fillStyle = '#ffb547'; g.font = '16px sans-serif'; g.fillText('▼', d.x, d.y - 48); }
+  }
+  if (near && !lobOpen) {
+    g.font = 'bold 20px sans-serif'; g.textAlign = 'center'; g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,.85)'; g.fillStyle = '#ffb547';
+    const txt = (isTouch ? 'לחץ על התחנה' : 'לחץ ' + (KEYS.use || 'E').replace('Key', '')) + ' – ' + near.hint;
+    g.strokeText(txt, 500, 490); g.fillText(txt, 500, 490);
+  }
+  ctx = saved;
+}
+function shipLoop(t) {
+  lobRaf = 0;
+  if (!S || S.phase !== 'lobby') return;
+  try { drawShip(t); } catch (e) { ctx = $('#cv').getContext('2d'); }
+  lobRaf = requestAnimationFrame(shipLoop);
+}
+function renderShip(s) {
+  if (s.lobbyInfo) { LI = s.lobbyInfo; renderOdds(); }
+  else if (!LI && !renderShip.asked) { renderShip.asked = true; api({ type: 'lobbyinfo' }); }
+  show('#startBtn2', s.me.host);
+  $('#useKey').textContent = (KEYS.use || 'KeyE').replace('Key', '');
+  $('#walkKeys').textContent = [KEYS.up, KEYS.left, KEYS.down, KEYS.right].map(k => (k || '').replace('Key', '')).join('');
+  if (!lobRaf) lobRaf = requestAnimationFrame(shipLoop);
+}
+
 
 // ---------- HUD ----------
 const ACTIONS = [
@@ -3236,7 +3406,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys.delete(e.code); sendInput(); });
 addEventListener('blur', () => { keys.clear(); sendInput(); });
-setInterval(() => { if (S && S.phase === 'play') { lastIn = ''; sendInput(); } }, 1000);
+setInterval(() => { if (S && (S.phase === 'play' || S.phase === 'lobby')) { lastIn = ''; sendInput(); } }, 1000);
 
 const isTouch = matchMedia('(pointer: coarse)').matches;
 if (isTouch) document.body.classList.add('touch');
@@ -3256,9 +3426,9 @@ const joy = { active: false, dx: 0, dy: 0 };
   };
   const end = () => { id = null; joy.active = false; joy.dx = joy.dy = 0; knob.style.transform = ''; el.classList.add('hidden'); sendInput(); };
   document.addEventListener('touchstart', e => {
-    if (!S || S.phase !== 'play' || id !== null || S.me.cam || miniOpen !== null || sabOpen || tmOpen) return;
+    if (!S || (S.phase !== 'play' && S.phase !== 'lobby') || (S.phase === 'lobby' && lobOpen) || id !== null || S.me.cam || miniOpen !== null || sabOpen || tmOpen) return;
     for (const t of e.changedTouches) {
-      if (t.target !== cv || t.clientX > innerWidth * 0.55) continue;
+      if (S.phase === 'lobby' ? t.target !== $('#shipCv') : (t.target !== cv || t.clientX > innerWidth * 0.55)) continue;
       id = t.identifier; cx = t.clientX; cy = t.clientY; joy.active = true;
       el.style.left = (cx - 65) + 'px'; el.style.top = (cy - 65) + 'px'; el.classList.remove('hidden');
       move(t); e.preventDefault(); break;

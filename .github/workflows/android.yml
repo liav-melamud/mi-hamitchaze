@@ -5,6 +5,11 @@ on:
   push:
     paths:
       - 'android/**'
+      - 'index.html'
+      - 'engine.js'
+      - 'map.js'
+      - 'i18n.js'
+      - 'config.js'
       - '.github/workflows/android.yml'
 
 permissions:
