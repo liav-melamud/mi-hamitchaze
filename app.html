@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>מי המתחזה? – הורדה לאנדרואיד</title>
+<meta property="og:title" content="מי המתחזה? – הורד את האפליקציה">
+<meta property="og:description" content="משחק הונאה חברתי – גם אונליין וגם אופליין מול בוטים. לחץ להורדה לאנדרואיד.">
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0e16;color:#e9eef7;font-family:system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}
+  .c{max-width:420px}
+  h1{margin:0 0 8px}
+  p{color:#9aa6bd;line-height:1.5}
+  a.b{display:inline-block;margin:10px 4px;padding:16px 30px;background:#ffb547;color:#1a1205;border-radius:14px;font-weight:bold;font-size:18px;text-decoration:none}
+  a.s{background:#222a3b;color:#e9eef7;font-size:15px;padding:12px 22px}
+</style>
+</head>
+<body>
+<div class="c">
+  <h1>🕵️ מי המתחזה?</h1>
+  <p id="msg">מוריד את האפליקציה…</p>
+  <a class="b" id="dl" href="https://github.com/liav-melamud/mi-hamitchaze/releases/download/app/mi-hamitchaze.apk">⬇️ הורד לאנדרואיד (APK)</a><br>
+  <a class="b s" href="./">🎮 שחק בדפדפן</a>
+  <p style="font-size:13px">אחרי ההורדה פתח את הקובץ. אם אנדרואיד שואל, אשר "התקנה ממקור לא מוכר" עבור הדפדפן.</p>
+</div>
+<script>
+  var apk = document.getElementById('dl').href;
+  if (/Android/i.test(navigator.userAgent)) {
+    setTimeout(function () { location.href = apk; }, 300); // הורדה אוטומטית
+  } else {
+    document.getElementById('msg').textContent = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      ? 'האפליקציה היא לאנדרואיד בלבד. באייפון אפשר לשחק ישר מהדפדפן:'
+      : 'האפליקציה היא לאנדרואיד. במחשב ובאייפון אפשר לשחק ישר מהדפדפן:';
+  }
+</script>
+</body>
+</html>
