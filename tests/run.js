@@ -998,6 +998,31 @@ test('הליצן מופיע רק עם הקוד 54321', () => {
   for (let i = 0; i < 60 && !seen; i++) { const { g, a } = newGame({ bots: 6, cfg: { jester: true } }); seen = JSON.parse(g.snapshot()).players && Object.values(JSON.parse(g.snapshot()).players).some(p => p.role === 'jester'); }
   ok(seen, 'עם הקוד הליצן לא הופיע');
 });
+test('הוצאת שחקן: רק המארח, בלובי השחקן נמחק ולא חוזר עם אותה דמות', () => {
+  const g = createGame(MAP); const h = g.join('מארח'); const x = g.join('זר'); const y = g.join('חבר');
+  const kx = g.keyOf(x);
+  g.act(y, { type: 'kick', id: x }); ok(g.hasPlayer(x), 'שחקן שאינו מארח הצליח להוציא');
+  g.act(h, { type: 'kick', id: h }); ok(g.hasPlayer(h), 'המארח הוציא את עצמו');
+  g.act(h, { type: 'kick', id: x }); ok(!g.hasPlayer(x), 'השחקן לא הוצא מהלובי');
+  ok(g.checkKey(x, kx) === false, 'המפתח הישן עדיין תקף');
+});
+test('הוצאת שחקן באמצע משחק: הופך לצופה ולא יכול להתחבר מחדש', () => {
+  const { g, a, ids } = newGame({ bots: 3, humans: 3 });
+  const x = ids[2];
+  g.act(a, { type: 'kick', id: x });
+  ok(g.isKicked(x), 'לא סומן כמוצא');
+  ok(g.join('זר', x) === null, 'שחקן שהוצא חזר עם אותה דמות');
+  const v = g.view(a); const px = v.players.find(p => p.id === x);
+  ok(!px || !px.alive, 'שחקן שהוצא עדיין חי במשחק');
+});
+test('נעילת חדר: חדשים לא נכנסים, מי שבפנים חוזר, ורק המארח נועל', () => {
+  const g = createGame(MAP); const h = g.join('מארח'); const y = g.join('חבר');
+  g.act(y, { type: 'lock', on: true }); ok(!g.isLocked(), 'שחקן רגיל נעל את החדר');
+  g.act(h, { type: 'lock', on: true }); ok(g.isLocked(), 'החדר לא ננעל');
+  ok(g.join('זר') === null, 'שחקן חדש נכנס לחדר נעול');
+  ok(g.join('חבר', y) === y, 'שחקן קיים לא הצליח להתחבר מחדש');
+  g.act(h, { type: 'lock', on: false }); ok(g.join('זר') !== null, 'אחרי פתיחה עדיין אי אפשר להיכנס');
+});
 
 test('חנוכה: מצב שמונה נרות – 8 נרות כבויים, היעד 8, ורק עם אירוע', () => {
   const g = createGame(MAP); const a = g.join('מארח');
