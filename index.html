@@ -170,6 +170,20 @@
 
   #lobby .card { width: min(1100px, 100%); }
   #ship { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0 12px; }
+
+  #shipMain { position: relative; }
+  #codeChip { position: absolute; top: 8px; right: 8px; z-index: 3; display: flex; align-items: center; gap: 6px; background: rgba(10,13,24,.85); border: 1px solid var(--line); border-radius: 12px; padding: 4px 8px; font-size: 14px; }
+  #codeChip.hidden { display: none; }
+  #chipCode { letter-spacing: 3px; color: var(--accent); direction: ltr; font-size: 18px; }
+  #codeChip button { padding: 4px 8px; }
+  body.phone #lobby.screen { padding: 0; }
+  body.phone #lobby .card { padding: 4px 6px; border-radius: 0; border: 0; width: 100%; max-height: 100dvh; overflow: auto; }
+  body.phone #lobby .card > h1, body.phone #lobby .card > .sub, body.phone #lobby .help, body.phone #shipSide, body.phone #walkHelp { display: none; }
+  body.phone #ship { margin: 0; display: block; }
+  body.phone #shipCv { height: calc(100dvh - 58px); width: auto; max-width: 100%; margin: 0 auto; }
+  body.phone #shipMain .row button { padding: 8px 10px; font-size: 14px; }
+  body.phone #shipMain > .row { padding-left: 150px; margin-top: 4px; }
+  body.phone .lmBox { padding: 12px; max-height: 100dvh; }
   #shipMain { flex: 1; min-width: 0; }
   #shipSide { width: 250px; flex: none; display: flex; flex-direction: column; gap: 10px; }
   #shipSide .urls { margin: 0; }
@@ -509,14 +523,16 @@
         <div class="oddsBox"><b>📊 סיכוי תפקידים</b> <span class="sub" style="margin:0;font-size:12px" id="oddsN"></span><div id="oddsMini"></div></div>
       </aside>
       <div id="shipMain">
+        <div id="codeChip" class="hidden"><span class="sub" style="margin:0">קוד:</span> <b id="chipCode"></b> <button id="chipWa" style="background:#1f8a4c">📲</button> <button id="chipCopy">📋</button></div>
         <canvas id="shipCv" width="1000" height="560"></canvas>
         <div class="row" style="justify-content:center;margin-top:8px">
           <button data-st="wardrobe">👕 ארון בגדים</button>
           <button data-st="comp">💻 מחשב</button>
           <button data-st="board">📋 לוח תפקידים</button>
+          <button data-st="crew" id="crewBtn" class="hidden">👥 שחקנים וצ'אט</button>
           <button id="startBtn2" class="primary hidden">התחל משחק ▶</button>
         </div>
-        <p class="sub" style="text-align:center;margin:6px 0 0">🚶 הולכים בחללית (<span id="walkKeys">WASD</span> או גרירה במגע) · ליד תחנה לוחצים <b id="useKey">E</b> או נוגעים בה</p>
+        <p id="walkHelp" class="sub" style="text-align:center;margin:6px 0 0">🚶 הולכים בחללית (<span id="walkKeys">WASD</span> או גרירה במגע) · ליד תחנה לוחצים <b id="useKey">E</b> או נוגעים בה</p>
       </div>
     </div>
     <div id="wardrobeModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>👕 ארון בגדים</h2>
@@ -528,12 +544,15 @@
     <div id="pets"></div>
     <button class="statsBtn" style="margin-top:8px">📊 הסטטיסטיקה והתגים שלי</button>
     </div></div>
+    <div id="crewBox">
     <b>שחקנים (<span id="pcount">0</span>)</b>
     <div id="plist"></div>
     <b>צ'אט</b>
     <div id="micHeardL" class="micHeard hidden"></div>
     <div id="lobbyChat" class="lchat"></div>
     <div class="row" style="margin:6px 0 12px"><input id="lobbyIn" maxlength="140" placeholder="כתוב הודעה… (או דבר אם המיקרופון דלוק)" style="flex:1" autocomplete="off"><button id="lobbySend">שלח</button></div>
+    </div>
+    <div id="crewModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>👥 שחקנים וצ'אט</h2><div id="crewModalBody"></div></div></div>
     <div id="compModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>💻 מחשב החללית</h2>
       <p class="sub" id="compNote" style="margin-top:0"></p>
     <b>⚙️ הגדרות משחק</b>
@@ -740,7 +759,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261121-183841'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-092000'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1235,7 +1254,7 @@ function onState(s) {
   if (s.phase === 'meeting') renderMeeting(s);
   if (s.phase === 'eject') renderEject(s);
   if (s.phase === 'end') renderEnd(s); else { jesterVideo(false); stopVictoryMusic(); }
-  if (s.phase !== 'play' && joy.active) window.__joyEnd && window.__joyEnd();
+  if (s.phase !== 'play' && s.phase !== 'lobby' && joy.active) window.__joyEnd && window.__joyEnd();
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
   miniSync(s);
@@ -1314,15 +1333,15 @@ const LOB = { W: 1000, H: 560, st: [
   { id: 'comp', x: 500, y: 112, ic: '💻', n: 'מחשב המארח', hint: 'הגדרות המשחק' },
   { id: 'board', x: 830, y: 112, ic: '📋', n: 'לוח תפקידים', hint: 'מה כל תפקיד עושה ובאיזה אחוז' },
 ] };
-const lobbyModals = { wardrobe: '#wardrobeModal', comp: '#compModal', board: '#boardModal' };
-['#wardrobeModal', '#compModal', '#boardModal'].forEach(sel => document.body.appendChild($(sel))); // מחוץ לכרטיס, כדי שיכסו את כל המסך
+const lobbyModals = { wardrobe: '#wardrobeModal', comp: '#compModal', board: '#boardModal', crew: '#crewModal' };
+['#wardrobeModal', '#compModal', '#boardModal', '#crewModal'].forEach(sel => document.body.appendChild($(sel))); // מחוץ לכרטיס, כדי שיכסו את כל המסך
 let LI = null, lobOpen = null, lobRaf = 0;
 const lobDisp = {};
 function openStation(id) {
   if (!S || S.phase !== 'lobby') return;
   closeStation();
   lobOpen = id; show(lobbyModals[id], true);
-  keys.clear(); sendInput();
+  keys.clear(); window.__joyEnd && window.__joyEnd(); sendInput();
   if (id === 'comp') $('#compNote').textContent = S.me.host ? '👑 אתה המארח – שינויים נשמרים מיד ונשלחים לכולם.' : 'רק המארח 👑 יכול לשנות. אתה יכול לראות את ההגדרות.';
   renderOdds();
 }
@@ -1331,6 +1350,19 @@ document.querySelectorAll('.lmClose').forEach(b => b.onclick = closeStation);
 document.querySelectorAll('.lmodal').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) closeStation(); }));
 document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => openStation(b.dataset.st));
 $('#startBtn2').onclick = () => api({ type: 'start' });
+
+// טלפון (מגע או מסך נמוך): החללית ממלאת את המסך, והשחקנים/צ'אט עוברים לחלון
+const phoneMQ = matchMedia('(pointer: coarse), (max-height: 560px)');
+function adaptLobby() {
+  const ph = phoneMQ.matches;
+  document.body.classList.toggle('phone', ph);
+  show('#crewBtn', ph); show('#codeChip', ph);
+  if (ph) $('#crewModalBody').appendChild($('#crewBox'));
+  else $('#ship').after($('#crewBox'));
+}
+adaptLobby(); phoneMQ.addEventListener && phoneMQ.addEventListener('change', adaptLobby);
+$('#chipWa').onclick = () => $('#waBtn').click();
+$('#chipCopy').onclick = () => $('#copyBtn').click();
 function nearStation() {
   const me = S && S.players.find(p => p.id === S.me.id); if (!me) return null;
   return LOB.st.find(st => Math.hypot(me.x - st.x, me.y - (st.y + 70)) < 110) || null;
@@ -1342,11 +1374,11 @@ addEventListener('keydown', e => {
   if (lobOpen) { e.stopImmediatePropagation(); return; }
   if (e.code === KEYS.use && !e.repeat) { const st = nearStation(); if (st) { openStation(st.id); e.stopImmediatePropagation(); e.preventDefault(); } }
 }, true);
-$('#shipCv').addEventListener('click', e => {
-  const r = e.target.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * LOB.W, y = (e.clientY - r.top) / r.height * LOB.H;
-  const st = LOB.st.find(q => Math.abs(x - q.x) < 80 && Math.abs(y - q.y) < 70);
-  if (st) openStation(st.id);
-});
+function stationAtPoint(cx, cy) {
+  const r = $('#shipCv').getBoundingClientRect(), x = (cx - r.left) / r.width * LOB.W, y = (cy - r.top) / r.height * LOB.H;
+  return LOB.st.find(q => Math.abs(x - q.x) < 85 && Math.abs(y - q.y) < 75) || null;
+}
+$('#shipCv').addEventListener('click', e => { const st = stationAtPoint(e.clientX, e.clientY); if (st) openStation(st.id); });
 function renderOdds() {
   if (!LI) return;
   $('#oddsN').textContent = LI.classic ? '(' + LI.n + ' שחקנים)' : '';
@@ -1423,6 +1455,7 @@ function renderShip(s) {
   if (s.lobbyInfo) { LI = s.lobbyInfo; renderOdds(); }
   else if (!LI && !renderShip.asked) { renderShip.asked = true; api({ type: 'lobbyinfo' }); }
   show('#startBtn2', s.me.host);
+  $('#chipCode').textContent = $('#roomCode').textContent;
   $('#useKey').textContent = (KEYS.use || 'KeyE').replace('Key', '');
   $('#walkKeys').textContent = [KEYS.up, KEYS.left, KEYS.down, KEYS.right].map(k => (k || '').replace('Key', '')).join('');
   if (!lobRaf) lobRaf = requestAnimationFrame(shipLoop);
@@ -3428,7 +3461,7 @@ const joy = { active: false, dx: 0, dy: 0 };
   document.addEventListener('touchstart', e => {
     if (!S || (S.phase !== 'play' && S.phase !== 'lobby') || (S.phase === 'lobby' && lobOpen) || id !== null || S.me.cam || miniOpen !== null || sabOpen || tmOpen) return;
     for (const t of e.changedTouches) {
-      if (S.phase === 'lobby' ? t.target !== $('#shipCv') : (t.target !== cv || t.clientX > innerWidth * 0.55)) continue;
+      if (S.phase === 'lobby' ? (t.target !== $('#shipCv') || stationAtPoint(t.clientX, t.clientY)) : (t.target !== cv || t.clientX > innerWidth * 0.55)) continue;
       id = t.identifier; cx = t.clientX; cy = t.clientY; joy.active = true;
       el.style.left = (cx - 65) + 'px'; el.style.top = (cy - 65) + 'px'; el.classList.remove('hidden');
       move(t); e.preventDefault(); break;
