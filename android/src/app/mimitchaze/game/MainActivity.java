@@ -103,7 +103,10 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri u = request.getUrl();
-                if (HOST.equals(u.getHost())) return false;
+                if (HOST.equals(u.getHost())) {
+                    if ("offline".equals(u.getQueryParameter("play"))) offlineAssets = true; // "שחק אופליין": מגישים את העותק שבתוך האפליקציה
+                    return false;
+                }
                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { /* אין אפליקציה מתאימה */ }
                 return true;
             }
@@ -158,6 +161,7 @@ public class MainActivity extends Activity {
         String html = "<html dir='rtl'><body style='background:#0b0e16;color:#e9eef7;font-family:sans-serif;text-align:center;padding:40px'>"
                 + "<h2>אין חיבור לאינטרנט</h2><p>לא הצלחתי לפתוח את המשחק. בדוק את החיבור ונסה שוב.</p>"
                 + "<p><a href='" + HOME + "' style='display:inline-block;padding:14px 28px;background:#ffb547;color:#1a1205;border-radius:12px;font-weight:bold;text-decoration:none'>נסה שוב</a></p>"
+                + "<p><a href='" + HOME + "?play=offline' style='display:inline-block;padding:14px 28px;background:#2a3350;color:#e9eef7;border-radius:12px;font-weight:bold;text-decoration:none'>📴 בינתיים שחק אופליין</a></p>"
                 + "</body></html>";
         web.loadDataWithBaseURL(HOME, html, "text/html", "utf-8", null);
     }
