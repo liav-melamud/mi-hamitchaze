@@ -57,7 +57,7 @@ const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', '�
 
 const SPEED = 220, KILL_RANGE = 90, REPORT_RANGE = 110, USE_RANGE = 60;
 const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15, TASK_TIME = 2.5;
-const MEETING_TIME = 60, EJECT_TIME = 6, HAT_COUNT = 12, PET_COUNT = 9;
+const MEETING_TIME = 60, EJECT_TIME = 6, HAT_BASE = 12, HAT_COUNT = 14, PET_BASE = 9, PET_COUNT = 11; // כובעים וחיות מחמד: הבסיס, ועם פריטי חנוכה
 // הגדרות תפקידים (כמו במשחק האמיתי): [ברירת מחדל, מינימום, מקסימום]
 const ROLE_SET = {
   engVent: [15, 0, 60], engVentCd: [15, 0, 60],       // מהנדס: כמה זמן אפשר להיות בפתח (0 = בלי הגבלה), והמתנה בין זחילות
@@ -76,6 +76,7 @@ const roleOn = k => !(settings.roleOff || []).includes(k);
 // ---- מודים: 20 תפקידים נוספים, נפתחים רק עם הקוד 54321 בלובי ----
 const hasCode = c => String(settings.code || '').split(/[\s,]+/).includes(c);
 const modsOn = () => hasCode('54321');
+const hanukOn = () => !!(typeof opts !== 'undefined' && opts && (typeof opts.hanuk === 'function' ? opts.hanuk() : opts.hanuk)) || hasCode('8888'); // אירוע חנוכה: בתאריכים, או תמיד עם הקוד 8888
 const jesterOn = () => modsOn() && settings.jester; // הליצן נפתח רק עם הקוד 54321
 const MOD = { // [שם, קבוצה, אייקון, כפתור, קירור, מספר שימושים (0 = ללא הגבלה), תיאור]
   sprinter: ['רץ', 'crew', '🏃', 'ספרינט', 30, 0, 'לחץ O כדי לרוץ מהר פי 1.7 למשך 5 שניות (אחרי זה 30 שניות המתנה). מעולה לברוח – או להגיע לגופה לפני כולם.'],
@@ -97,10 +98,12 @@ const MOD = { // [שם, קבוצה, אייקון, כפתור, קירור, מספ
   martyr: ['קורבן', 'jester', '🕊️', '', 0, 0, 'אתה לא צוות ולא מתחזה: אתה מנצח לבד אם חיסלו אותך (על ידי מתחזה)! הצטרף לחשד, תסתובב ליד מתחזים… אבל אל תיתן להדיח אותך.'],
   vulture: ['נשר', 'jester', '🦅', 'אכול גופה', 5, 0, 'אתה לא צוות ולא מתחזה: אכול (O) 3 גופות ותנצח לבד! הגופה נעלמת, ואי אפשר לדווח עליה.'],
   survivor: ['ניצול', 'jester', '🛟', '', 0, 0, 'אתה לא צוות ולא מתחזה: אם אתה בחיים בסוף המשחק – אתה מנצח גם, בלי קשר למי שניצח! תישאר חי.'],
+  shamash: ['השמש', 'crew', '🕎', 'נס פח השמן', 0, 1, 'תפקיד חנוכה: פעם אחת במשחק, לחץ O כדי להדליק אור קסום במקום שבו אתה עומד. ל-15 שניות אף אחד בתוך האור לא יכול להיחסל – גם לא אתה. תדליק אותו כשהמתחזה קרוב!'],
   instigator: ['מסית', 'jester', '🗣️', '', 0, 0, 'אתה לא צוות ולא מתחזה: אם תצליח לגרום להדחה של 2 אנשי צוות חפים מפשע – ואתה עדיין בחיים – אתה מנצח לבד!'],
 };
-const MOD_CREW = Object.keys(MOD).filter(k => MOD[k][1] === 'crew'), MOD_IMP = Object.keys(MOD).filter(k => MOD[k][1] === 'imp'), MOD_NEU = Object.keys(MOD).filter(k => MOD[k][1] === 'jester');
+const MOD_CREW = Object.keys(MOD).filter(k => MOD[k][1] === 'crew' && k !== 'shamash'), MOD_IMP = Object.keys(MOD).filter(k => MOD[k][1] === 'imp'), MOD_NEU = Object.keys(MOD).filter(k => MOD[k][1] === 'jester');
 for (const k in MOD) { ROLES[k] = { name: MOD[k][0], team: MOD[k][1], desc: MOD[k][6], mod: true }; TOGGLE_ROLES.push(k); }
+let miracles = [], candleLit = {}; // נס פח השמן של השמש, ונרות החנוכה במצב שמונה נרות
 let traps = [], bombs = [], wrongEjects = 0, lastRoles = {};
   // רמת אורך משימות (1 קל, 2 רגיל, 3 ארוך): מאריכה משימות עם פס התקדמות, ומשימות של בוטים
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
@@ -225,7 +228,7 @@ function newPlayer(name, color, isBot) {
     id, key: isBot ? null : secretKey(), name: String(name || 'שחקן').replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, '').slice(0, 14) || 'שחקן', color, isBot,
     x: MAP.BUTTON.x, y: MAP.BUTTON.y, dir: 1, alive: true, role: null, tasks: [],
     input: { dx: 0, dy: 0 }, work: null, killCd: 0, shiftCd: 0, shapeAs: null, shapeUntil: 0,
-    shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * (HAT_COUNT - 1)) : 0, pet: isBot && Math.random() < 0.3 ? 1 + Math.floor(Math.random() * (PET_COUNT - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
+    shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * ((hanukOn() ? HAT_COUNT : HAT_BASE) - 1)) : 0, pet: isBot && Math.random() < 0.3 ? 1 + Math.floor(Math.random() * ((hanukOn() ? PET_COUNT : PET_BASE) - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
     bot: isBot ? { plan: [], wait: 0, goal: null, voteAt: 0, chatAt: 0, persona: pick(['suspicious', 'quiet', 'chatty', 'aggressive', 'helpful', 'normal', 'normal']) } : null,
   };
   players[id] = p;
@@ -258,12 +261,13 @@ function simRoles(n, mods) {
   const crew = [];
   for (let i = 0; i < nCrew; i++) crew.push(i < Math.min(specials.length, nSpecial) && nCrew > 1 ? specials[i] : 'crew');
   if (jesterOn() && nCrew >= 3 && n >= 5) crew[Math.floor(Math.random() * nCrew)] = 'jester';
+  if (hanukOn() && roleOn('shamash') && nCrew >= 3 && n >= 4) { const ix = shuffle(crew.map((r, i) => r === 'crew' ? i : -1).filter(i => i >= 0))[0]; if (ix !== undefined) crew[ix] = 'shamash'; }
   if (mods && nCrew >= 4 && n >= 5) { const idx = shuffle(crew.map((r, i) => r === 'crew' ? i : -1).filter(i => i >= 0)), nn = shuffle(MOD_NEU.filter(roleOn)); for (let i = 0; i < (nCrew >= 8 ? 2 : 1) && idx[i] !== undefined && nn[i]; i++) crew[idx[i]] = nn[i]; }
   if (settings.newRoles && roleOn('mole') && nImp > 0 && n >= 6 && nCrew >= 4) { const c = shuffle(crew.map((r, i) => r !== 'jester' ? i : -1).filter(i => i >= 0))[0]; if (c !== undefined) crew[c] = 'mole'; }
   return out.concat(crew);
 }
 function lobbyInfo() {
-  const n = Math.max(3, humans().filter(q => !q.spectator).length + settings.bots), mods = modsOn(), classic = settings.mode === 1 || settings.mode === 4;
+  const n = Math.max(3, humans().filter(q => !q.spectator).length + settings.bots), mods = modsOn(), classic = settings.mode === 1 || settings.mode === 4 || settings.mode === 5;
   const cnt = {}, pres = {}, T = 400;
   if (classic) for (let t = 0; t < T; t++) { const seen = {}; for (const r of simRoles(n, mods)) { cnt[r] = (cnt[r] || 0) + 1; seen[r] = 1; } for (const r in seen) pres[r] = (pres[r] || 0) + 1; }
   const roles = [];
@@ -273,7 +277,7 @@ function lobbyInfo() {
     const r = ROLES[k];
     add(k, r.name, r.team === 'jester' ? 'jester' : r.team, ROLE_IC[k] || '⭐', roleDesc(k));
   }
-  if (mods) for (const k of Object.keys(MOD)) { const m = MOD[k]; add(k, m[0], m[1], m[2], m[6] + (m[3] ? ` [כפתור: ${m[3]}${m[4] ? ' · המתנה ' + m[4] + ' שניות' : ''}${m[5] ? ' · ' + m[5] + (m[5] > 1 ? ' שימושים' : ' שימוש') : ''}]` : '')); }
+  if (mods || hanukOn()) for (const k of Object.keys(MOD)) { if (!mods && k !== 'shamash') continue; const m = MOD[k]; add(k, m[0], m[1], m[2], m[6] + (m[3] ? ` [כפתור: ${m[3]}${m[4] ? ' · המתנה ' + m[4] + ' שניות' : ''}${m[5] ? ' · ' + m[5] + (m[5] > 1 ? ' שימושים' : ' שימוש') : ''}]` : '')); }
   // תפקיד הליצן בהגדרות הוא מתג נפרד
   const j = roles.find(r => r.k === 'jester'); if (j) j.on = jesterOn();
   return { n, classic, mode: settings.mode, roles };
@@ -318,6 +322,8 @@ function startGame(by) {
   crew.forEach((p, i) => { p.role = !race && !hide && i < Math.min(specials.length, nSpecial) && crew.length > 1 ? specials[i] : 'crew'; });
   // הליצן (אפשר לכבות בהגדרות): אחד מהצוות הופך לליצן, רק כשיש מספיק שחקנים
   if (jesterOn() && !race && !hide && crew.length >= 3 && all.length >= 5) crew[Math.floor(Math.random() * crew.length)].role = 'jester';
+  // השמש: תפקיד חנוכה – אחד מהצוות
+  if (hanukOn() && roleOn('shamash') && !race && !hide && crew.length >= 3 && all.length >= 4) { const c = shuffle(crew.filter(q => q.role === 'crew'))[0]; if (c) c.role = 'shamash'; }
   // מודים: תפקידים ניטרליים (עם מטרה משלהם)
   if (mods && crew.length >= 4 && all.length >= 5) { const cand = shuffle(crew.filter(q => q.role === 'crew')), nn = shuffle(MOD_NEU.filter(roleOn)); for (let i = 0; i < (crew.length >= 8 ? 2 : 1) && cand[i] && nn[i]; i++) cand[i].role = nn[i]; }
   // השתול: אחד מהצוות שבעצם עובד בשביל המתחזים (רק כשיש מספיק שחקנים)
@@ -339,22 +345,25 @@ function startGame(by) {
     }
   }
   events = []; gameStartT = now(); ev('start', '🚀 המשחק התחיל');
-  taskTotal = 0; taskDone = 0;
+  taskTotal = 0; taskDone = 0; candleLit = {}; miracles = [];
   // בקבוצה קטנה כל איש צוות מקבל יותר משימות, כדי שהצוות לא יסיים מהר מדי (לפחות 20 משימות בסך הכל)
   const tasksEach = Math.min(8, Math.max(settings.tasks, Math.ceil(20 / Math.max(1, crew.length))));
   hideEndAt = hide ? now() + settings.hideTime + 10 : 0;
   if (hide) ev('start', '🙈 מחבואים: ' + nm(imps[0]) + ' הוא המחפש');
+  if (settings.mode === 5) { crew.forEach(p => toast(p, '🕎 שמונה נרות! הדליקו את כל 8 הנרות שבמפה (E ליד נר). מתחזים יכבו אותם – תחזרו להדליק!')); imps.forEach(p => toast(p, '💨 שמונה נרות: עמוד ליד נר דולק ולחץ E כדי לכבות אותו (אחת ל-12 שניות)')); ev('start', '🕎 שמונה נרות: הצוות מדליק, המתחזים מכבים'); }
   if (race) { raceEndAt = now() + 8 * 60; ev('start', '🏁 מרוץ משימות: ראשון שמגיע ל-' + settings.raceGoal + ' משימות מנצח'); }
   all.forEach(p => {
     p.alive = true; p.ejected = false; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
     p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.hiding = null; p.hideSince = 0; p.hideCd = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15; p.modCd = 0; p.modUsed = 0; p.sprintUntil = 0; p.radarUntil = 0; p.luckUsed = false; p.poisonAt = 0; p.poisonBy = null; p.eaten = 0;
     if (team(p) === 'crew') {
-      p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false }));
+      if (settings.mode === 5) { p.tasks = candleIdx().map(i => ({ i, done: false })); }
+      else { p.tasks = shuffle(taskPool()).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false })); addDreidel(p); }
       taskTotal += p.tasks.length;
-    } else if (p.role === 'mole') p.tasks = shuffle(MAP.TASKS.map((_, i) => i)).slice(0, tasksEach).map(i => ({ i, done: false })); // משימות מזויפות
+    } else if (p.role === 'mole') p.tasks = shuffle(settings.mode === 5 ? candleIdx() : taskPool()).slice(0, tasksEach).map(i => ({ i, done: false })); // משימות מזויפות
     else p.tasks = [];
   });
+  if (settings.mode === 5) taskTotal = candleIdx().length; // שמונה נרות: היעד הוא שמונה, לא סכום המשימות של כולם
   // המגן האישי מקבל שחקן לשמור עליו
   all.filter(p => p.role === 'guardian').forEach(p => { const w = pick(all.filter(o => o.id !== p.id)); if (w) { p.ward = w.id; toast(p, '🫂 אתה שומר על ' + nm(w) + '. אם יקרה לו משהו – תדע מיד'); } });
   traps = []; bombs = []; wrongEjects = 0; pings = []; hideFinalSaid = false; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
@@ -376,7 +385,7 @@ function backToLobby(by) {
   list().forEach(p => { p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
   lobbySpawn(list());
   phase = 'lobby'; bodies = []; bananas = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
-  sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {};
+  sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {}; miracles = []; candleLit = {};
 }
 
 function raceRanking() {
@@ -421,7 +430,7 @@ function checkWin() {
   let w = null;
   if (noImpGame) { if (taskTotal > 0 && taskDone >= taskTotal) w = { team: 'crew', reason: '😄 לא היה מתחזה בכלל! השלמתם את המשימות בלי להדיח אף אחד – כולם ניצחו', surprise: true }; }
   else if (imps === 0) w = { team: 'crew', reason: 'כל המתחזים הודחו!' };
-  else if (taskTotal > 0 && taskDone >= taskTotal) w = { team: 'crew', reason: 'הצוות השלים את כל המשימות!' };
+  else if (taskTotal > 0 && taskDone >= taskTotal) w = { team: 'crew', reason: settings.mode === 5 ? '🕎 כל שמונת הנרות דולקים – חג אורים שמח!' : 'הצוות השלים את כל המשימות!' };
   else if (imps >= crew) w = { team: 'imp', reason: 'המתחזים השתלטו על התחנה!' };
   if (w) {
     const sv = list().filter(q => q.role === 'survivor' && q.alive && !q.spectator);
@@ -431,7 +440,36 @@ function checkWin() {
   return false;
 }
 
+const candleIdx = () => MAP.TASKS.map((T, i) => T.ev === 'candle' ? i : -1).filter(i => i >= 0);
+// מאגר המשימות: משימות הסביבון רק באירוע חנוכה, והנרות רק במצב שמונה נרות
+const taskPool = () => MAP.TASKS.map((_, i) => i).filter(i => { const k = MAP.TASKS[i].ev; return !k || (k === 'dreidel' && hanukOn() && settings.mode !== 5); });
+function addDreidel(p) {
+  if (!hanukOn() || settings.mode === 2 || p.tasks.some(x => MAP.TASKS[x.i].ev === 'dreidel') || Math.random() > 0.6) return;
+  const d = taskPool().filter(i => MAP.TASKS[i].ev === 'dreidel' && !p.tasks.some(x => x.i === i))[0];
+  if (d !== undefined && p.tasks.length) p.tasks[p.tasks.length - 1] = { i: d, done: false };
+}
+const roomOf = i => (MAP.ROOMS[MAP.TASKS[i].room] || {}).name || 'המסדרון';
+function candleCount() { return candleIdx().filter(i => candleLit[i]).length; }
+function lightCandle(p, i) {
+  if (candleLit[i]) return;
+  candleLit[i] = true;
+  list().forEach(q => q.tasks.forEach(x => { if (x.i === i) x.done = true; }));
+  taskDone = candleCount(); p.stats.tasks++;
+  toast(p, '🕯️ הדלקת נר ב' + roomOf(i));
+  ev('candle', `🕯️ ${nm(p)} הדליק נר (${taskDone}/${taskTotal})`);
+  checkWin();
+}
+function blowCandle(p, i) {
+  candleLit[i] = false;
+  list().forEach(q => q.tasks.forEach(x => { if (x.i === i) x.done = false; }));
+  taskDone = candleCount(); p.blowAt = now() + 12;
+  const rn = roomOf(i);
+  list().forEach(q => { if (q.alive && !q.spectator && team(q) !== 'imp') toast(q, '💨 נר כבה ב' + rn + '!'); });
+  ev('candle', `💨 ${nm(p)} כיבה נר ב${rn}`);
+}
 function completeTask(p, t) {
+  if (MAP.TASKS[t.i].ev === 'dreidel') { p.sprintUntil = now() + 6; toast(p, '🪀 גימל! נס גדול היה שם – תוספת מהירות ל-6 שניות'); }
+  if (settings.mode === 5 && MAP.TASKS[t.i].ev === 'candle') { t.done = true; lightCandle(p, t.i); return; }
   t.done = true;
   if (team(p) === 'crew') taskDone++;
   p.stats.tasks++;
@@ -439,7 +477,7 @@ function completeTask(p, t) {
   toast(p, '✔ ' + MAP.TASKS[t.i].name + ' הושלמה');
   if (settings.mode === 2) { // מרוץ: מקבלים מיד משימה חדשה שלא עשיתי עוד
     const have = new Set(p.tasks.map(x => x.i).concat(p.doneIdx));
-    const fresh = shuffle(MAP.TASKS.map((_, i) => i).filter(i => !have.has(i)))[0];
+    const fresh = shuffle(taskPool().filter(i => !have.has(i)))[0];
     p.tasks = p.tasks.filter(x => !x.done);
     if (fresh !== undefined) p.tasks.push({ i: fresh, done: false });
   }
@@ -718,6 +756,11 @@ function act(p, a) {
       const t0 = p.tasks.filter(x => !x.done).map(x => ({ ...MAP.TASKS[x.i], ref: x }));
       const task = nearest(p, t0, USE_RANGE);
       if (p.inVent !== null) return;
+      if (settings.mode === 5 && team(p) === 'imp' && p.alive) { // מתחזה מכבה נרות
+        const lit = candleIdx().filter(i => candleLit[i]).map(i => ({ ...MAP.TASKS[i], ci: i }));
+        const c = nearest(p, lit, USE_RANGE);
+        if (c) { if ((p.blowAt || 0) > now()) return toast(p, '💨 אפשר לכבות שוב בעוד ' + Math.ceil(p.blowAt - now()) + ' שניות'); blowCandle(p, c.ci); return; }
+      }
       // נקודת תיקון של חבלה פעילה
       if (sab && p.alive) {
         const pts = MAP.SAB_POINTS[sab.type];
@@ -745,7 +788,7 @@ function act(p, a) {
       if (p.frozenUntil > t) return toast(p, 'עוד רגע… סופר עד 10');
       const tgt = nearest(p, list().filter(o => o.alive && !o.spectator && team(o) !== 'imp' && o.inVent === null && (o.hiding == null || dist(o, p) < 60)), p.role === 'sniper' ? 190 : KILL_RANGE);
       if (!tgt) return;
-      if (tgt.shieldUntil > t) {
+      if (tgt.shieldUntil > t || miracleAt(tgt)) {
         p.killCd = 10; toast(p, '🛡 המטרה מוגנת!');
         if (tgt.guardedBy && players[tgt.guardedBy] && players[tgt.guardedBy].alive) { toast(players[tgt.guardedBy], '🛡 הצלת את ' + nm(tgt) + ' מחיסול!'); ev('guard', `🛡 שומר הראש הציל את ${nm(tgt)} מחיסול`); }
         return;
@@ -907,10 +950,10 @@ function act(p, a) {
       settings.jester = !!a.jester;
       settings.botLevel = Math.round(cl(a.botLevel, 1, 3, 2));
       settings.map = ['small', 'ice'].includes(a.map) ? a.map : 'big';
-      settings.mode = [1, 2, 3, 4].includes(a.mode) ? a.mode : 1;
       settings.rounds = [1, 3, 5].includes(Number(a.rounds)) ? Number(a.rounds) : 1;
       settings.hideTime = Math.round(cl(a.hideTime, 60, 600, 180));
       if (a.code !== undefined) settings.code = String(a.code).trim().slice(0, 12);
+      settings.mode = [1, 2, 3, 4].concat(hanukOn() ? [5] : []).includes(a.mode) ? a.mode : 1;
       settings.raceGoal = Math.round(cl(a.raceGoal, 4, 25, 10));
       for (const k in ROLE_SET) settings[k] = Math.round(cl(a[k] === undefined ? settings[k] : a[k], ROLE_SET[k][1], ROLE_SET[k][2], ROLE_SET[k][0]));
       break;
@@ -967,6 +1010,7 @@ function slay(tgt, killer) {
   if (tgt.role === 'martyr' && martyrWin(tgt)) return;
   checkWin();
 }
+const miracleAt = q => miracles.some(m => m.until > now() && dist(m, q) < 230);
 // יכולת מיוחדת של תפקידי המודים (כפתור O)
 function modUse(p) {
   const def = MOD[p.role], t = now();
@@ -977,6 +1021,7 @@ function modUse(p) {
   const body = nearest(p, bodies.filter(b => !b.fake), 110);
   let ok = false;
   switch (p.role) {
+    case 'shamash': miracles.push({ x: p.x, y: p.y, until: t + 15, by: p.id }); toast(p, '🕎 נס! אור קסום ל-15 שניות – אף אחד בתוכו לא ייפגע'); ev('miracle', `🕎 ${nm(p)} הדליק את נס פח השמן ב${room ? room.name : 'מסדרון'}`); ok = true; break;
     case 'sprinter': p.sprintUntil = t + 5; toast(p, '🏃 רץ!'); ok = true; break;
     case 'medic': {
       const q = body && players[body.id];
@@ -1084,6 +1129,7 @@ function botGoal(p) {
     const v = pick(MAP.VENTS), vr = MAP.roomAt(v.x, v.y);
     if (vr) target = { x: v.x, y: v.y, room: vr.id, fake: true };
   }
+  if (!target && settings.mode === 5 && team(p) === 'imp' && p.alive) { const lit = candleIdx().filter(i => candleLit[i]); if (lit.length && Math.random() < 0.7) { const tk = MAP.TASKS[pick(lit)]; target = { x: tk.x, y: tk.y, room: tk.room, fake: true }; } }
   if (target) { /* כבר נבחר יעד */ } else if (team(p) !== 'crew' && p.alive && MAP.TASKS.length && Math.random() < 0.6) {
     const tk = MAP.TASKS[Math.floor(Math.random() * MAP.TASKS.length)];
     target = { x: tk.x, y: tk.y, room: tk.room, fake: true };
@@ -1111,6 +1157,7 @@ function botChatter(p, dt) {
   const room = (MAP.roomAt(p.x, p.y) || {}).name || 'המסדרון';
   let lines;
   if (sab) lines = ['צריך לתקן את התקלה, מהר!', 'מישהו בא איתי לתקן?', 'אני רץ לתקן, תכסו אותי', 'אם לא נתקן את זה נפסיד!'];
+  else if (hanukOn() && Math.random() < 0.18) lines = ['חג אורים שמח, {n}! 🕎', 'מי רוצה סופגנייה? 🍩', '{n}, סביבון סביבון סוב סוב סוב 🎶', 'איזה יפה כל האורות האלה', 'נס גדול היה פה… בואו נשמור על כולם']
   else if (bodies.length && Math.random() < 0.3) lines = ['משהו פה מריח לא טוב…', 'יש לי הרגשה רעה', 'אני נשאר ליד אנשים, לא מסתובב לבד'];
   else lines = [
     'היי {n}, מה אתה עושה ב{r}?', '{n}, בוא נעשה משימות ביחד', 'אני הולך לעשות משימה', 'נשארו לי עוד כמה משימות',
@@ -1128,6 +1175,10 @@ function botTick(p, dt) {
 
   if (p.alive) {
     botChatter(p, dt);
+    if (settings.mode === 5 && team(p) === 'imp' && (p.blowAt || 0) <= now() && Math.random() < 0.15) { // בוט מתחזה מכבה נר שקרוב אליו
+      const c = candleIdx().find(i => candleLit[i] && dist(p, MAP.TASKS[i]) < USE_RANGE - 8);
+      if (c !== undefined) blowCandle(p, c);
+    }
     // זיכרון: איפה ראיתי את מי
     b.seeT = (b.seeT || 0) - dt;
     if (b.seeT <= 0) {
@@ -1262,7 +1313,7 @@ function botTick(p, dt) {
     if (MOD[p.role] && MOD[p.role][3] && !(p.modCd > 0) && !(MOD[p.role][5] && (p.modUsed || 0) >= MOD[p.role][5])) {
       const bd = bodies.find(x => !x.fake && dist(x, p) < 100), near = n => list().filter(o => o.id !== p.id && o.alive && !o.spectator && o.inVent === null && dist(o, p) < n);
       const R = p.role, rr = Math.random();
-      if ((R === 'sprinter' && (b.flee || rr < 0.002)) || (R === 'medic' && bd && rr < 0.2) || (R === 'trapper' && rr < 0.004) || (R === 'radar' && rr < 0.003) || (R === 'jailer' && rr < 0.002 && near(300).length)
+      if ((R === 'shamash' && (rr < 0.001 || (near(300).some(o => team(o) === 'imp') && rr < 0.1))) || (R === 'sprinter' && (b.flee || rr < 0.002)) || (R === 'medic' && bd && rr < 0.2) || (R === 'trapper' && rr < 0.004) || (R === 'radar' && rr < 0.003) || (R === 'jailer' && rr < 0.002 && near(300).length)
         || (R === 'empath' && rr < 0.004) || (R === 'blinker' && (b.escape ? rr < 0.1 : rr < 0.0015)) || (R === 'cleaner' && bd && !near(260).filter(o => team(o) !== 'imp').length && rr < 0.3)
         || (R === 'zapper' && p.killCd < 4 && near(160).filter(o => team(o) !== 'imp').length && rr < 0.03) || (R === 'bomber' && near(100).filter(o => team(o) !== 'imp').length >= 2 && rr < 0.03)
         || (R === 'vulture' && bd && !near(260).length && rr < 0.2)) act(p, { type: 'mod' });
@@ -1899,6 +1950,8 @@ function viewFor(v) {
     traps: v.role === 'trapper' ? traps.filter(tr => tr.by === v.id).map(tr => ({ x: tr.x, y: tr.y })) : [],
     radar: v.radarUntil > t && v.alive ? list().filter(o => o.id !== v.id && o.alive && !o.spectator).map(o => ({ x: Math.round(o.x), y: Math.round(o.y) })) : [],
     bodies: bodies.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), color: COLORS[b.color].c, rot: b.decayAt ? 1 : 0 })),
+    hanuk: hanukOn(), candles: settings.mode === 5 && phase !== 'lobby' ? candleIdx().map(i => ({ i, lit: !!candleLit[i] })) : null,
+    miracles: miracles.filter(m => m.until > t).map(m => ({ x: m.x, y: m.y, left: Math.round(m.until - t) })),
     tasks: settings.mode === 2 ? { done: v.stats ? v.stats.tasks : 0, total: settings.raceGoal } : { done: taskDone, total: taskTotal },
     map: settings.map,
     hide: settings.mode === 3 && phase === 'play' ? { final: finalPhase(), near: (() => { const sk = list().filter(q => q.alive && !q.spectator && team(q) === 'imp'); if (!sk.length || team(v) === 'imp') return 0; const d = Math.min(...sk.map(q => dist(q, v))); return d < 170 ? 5 : d < 270 ? 4 : d < 390 ? 3 : d < 540 ? 2 : d < 750 ? 1 : 0; })(), left: Math.max(0, Math.round(hideEndAt - t)), wait: Math.max(0, Math.ceil(Math.max(...list().map(q => (q.frozenUntil || 0) - t)))), hiders: list().filter(q => q.alive && !q.spectator && team(q) !== 'imp').length } : null,

@@ -130,7 +130,7 @@
     { room: 'SE', x: 700, y: 720, name: 'גיבוי הקלטות מצלמה', kind: 'download', theme: 'radar' },
   ];
   if (small) for (let i = TASKS.length - 1; i >= 0; i--) if (!ROOMS[TASKS[i].room]) TASKS.splice(i, 1);
-  const TASK_TIME = { hold: 2.5, scan: 6, pair: 3.5 };
+  const TASK_TIME = { hold: 2.5, scan: 6, pair: 3.5, candle: 2.5 };
 
   // רשת פתחי אוורור: שלוש רשתות נפרדות (מערב, מרכז, מזרח)
   const VENTS = ice ? [
@@ -337,6 +337,27 @@
         if (best) SPOTS.push(best);
       }
     }
+  })();
+  // משימות חנוכה (ev): שמונה נרות ושני סביבונים. הן לא נכנסות למשחק רגיל, רק באירוע חנוכה (המנוע מסנן לפי ev)
+  (function addHanukTasks() {
+    const ids = Object.keys(ROOMS);
+    let seed = 20261204;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const fixed = [...TASKS, ...SPOTS, ...VENTS, BUTTON, CAM_CONSOLE, ...SAB_POINTS.lights, ...SAB_POINTS.oxygen, ...SAB_POINTS.reactor, ...SAB_POINTS.freeze];
+    const put = (room, name, kind, ev) => {
+      const r = ROOMS[room]; let best = null, bs = -1;
+      for (let i = 0; i < 400; i++) {
+        const x = Math.round(r.x + 45 + rnd() * (r.w - 90)), y = Math.round(r.y + 65 + rnd() * (r.h - 105));
+        if (!walkable(x, y)) continue;
+        let d = 1e9; for (const q of fixed) d = Math.min(d, Math.hypot(q.x - x, q.y - y));
+        if (d > bs) { bs = d; best = { x, y }; }
+      }
+      if (!best) best = { x: Math.round(r.cx), y: Math.round(r.cy) };
+      const T = { room, x: best.x, y: best.y, name, kind, ev }; TASKS.push(T); fixed.push(T);
+    };
+    for (let i = 0; i < 8; i++) put(ids[i % ids.length], '🕯️ הדלקת נר ' + (i + 1), 'candle', 'candle');
+    put(ids[2 % ids.length], '🌀 סביבון', 'dreidel', 'dreidel');
+    put(ids[(ids.length >> 1) % ids.length], '🌀 סביבון גדול', 'dreidel', 'dreidel');
   })();
   return { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, SPOTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant, theme: ice ? 'ice' : 'space' };
   }

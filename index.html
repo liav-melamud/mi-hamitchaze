@@ -43,6 +43,16 @@
     background: linear-gradient(90deg, #ff9f1c, #ffd23f, #ff6bcb, #ff9f1c); background-size: 300% 100%; animation: clownbg 6s linear infinite; }
   #clownWeek small { display: block; font-weight: 600; font-size: 13px; margin-top: 2px; }
   @keyframes clownbg { to { background-position: 300% 0; } }
+  #hanukBanner { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; text-align: center; color: #0b1a4a; background: linear-gradient(90deg, #5ec8ff, #ffffff, #ffd54a, #ffffff, #5ec8ff); background-size: 300% 100%; animation: clownbg 7s linear infinite; box-shadow: 0 0 18px rgba(110,190,255,.45); }
+  #hanukBanner .hbT { font-weight: 900; font-size: 18px; }
+  #hanukBanner small { display: block; font-weight: 700; font-size: 12.5px; margin-top: 3px; }
+  #menBody canvas { width: 100%; height: auto; display: block; background: radial-gradient(ellipse at 50% 80%, rgba(80,120,255,.25), rgba(10,14,30,0)); border-radius: 14px; }
+  .mdots { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; text-align: center; }
+  .mdot { padding: 6px 0; border-radius: 10px; background: rgba(255,255,255,.05); border: 1px solid var(--line); font-size: 18px; opacity: .6; }
+  .mdot small { display: block; font-size: 10px; opacity: .8; } .mdot.on { opacity: 1; background: rgba(255,200,70,.16); border-color: #ffd54a; } .mdot.today { outline: 2px solid #5ec8ff; }
+  #emojiRain { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }
+  #emojiRain span { position: absolute; top: -40px; animation: erain linear forwards; }
+  @keyframes erain { to { transform: translateY(110vh) rotate(360deg); } }
   #jesterVideo { margin: 10px auto; width: 100%; max-width: 480px; }
   #jesterVideo iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; display: block; }
 
@@ -479,6 +489,7 @@
   <div class="card" style="max-width:420px">
     <h1>מי <span>המתחזה</span>?</h1>
     <p class="sub">משחק חשיפה חברתי עם חברים – תחנת החלל נוגה</p>
+    <div id="hanukBanner" class="hidden"><div class="hbT">🕎 חג אורים במי המתחזה! 🕎</div><small id="hanukSub"></small></div>
     <div id="clownWeek" class="hidden">🤡 עונת הליצן – לשבוע בלבד! 🤡<small>תפקיד חדש: הליצן. לא צוות ולא מתחזה – אם מדיחים אותו, הוא מנצח!</small></div>
     <div id="netPick" class="row" style="gap:8px;margin-bottom:6px">
       <button id="netOnline" class="netBtn" style="flex:1">🌐 אונליין</button>
@@ -566,7 +577,7 @@
       <label>משימות לשחקן <select data-s="tasks"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       <label>זמן ישיבה <select data-s="meetingTime"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option><option value="120">120ש׳</option></select></label>
       <label>חשיפת תפקיד המודח <select data-s="confirm"><option value="1">כן</option><option value="0">לא</option></select></label>
-      <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option><option value="3">🙈 מחבואים (ראייה קצרה, חיסול כל שנייה, 5 פתחים)</option><option value="4">🎲 הפתעה (אולי אין מתחזה בכלל!)</option></select></label>
+      <label>מצב משחק <select data-s="mode"><option value="1">קלאסי (מתחזים)</option><option value="2">🏁 מרוץ משימות</option><option value="3">🙈 מחבואים (ראייה קצרה, חיסול כל שנייה, 5 פתחים)</option><option value="5" id="mode5opt" hidden disabled>🕎 שמונה נרות (חנוכה)</option><option value="4">🎲 הפתעה (אולי אין מתחזה בכלל!)</option></select></label>
       <label>🔑 קוד מיוחד <input id="secretCode" type="text" inputmode="numeric" maxlength="12" autocomplete="off" style="width:90px"></label>
       <label>זמן מחבואים <select data-s="hideTime"><option value="120">2 דק׳</option><option value="180">3 דק׳</option><option value="240">4 דק׳</option><option value="300">5 דק׳</option></select></label>
       <label>🏆 טורניר <select data-s="rounds"><option value="1">בלי (משחק בודד)</option><option value="3">3 סיבובים</option><option value="5">5 סיבובים</option></select></label>
@@ -626,6 +637,7 @@
       <p class="sub" style="margin-top:0">מה כל תפקיד עושה, וכמה אחוז הוא יופיע לפי ההגדרות. המארח משנה את זה במחשב.</p>
       <div id="roleBoard"></div>
     </div></div>
+    <div id="menorahModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>🕎 חנוכייה</h2><div id="menBody"></div></div></div>
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
       <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול) · מגן אישי (יודע איפה מת מי שהוא שומר עליו) · שומר הזמן (מחזיר את כולם אחורה פעם אחת)<br>
@@ -759,7 +771,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-114903'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-122354'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -854,10 +866,103 @@ function getName() {
   return n;
 }
 
+// ---------- אירוע חנוכה (22.11–12.12.2026; אחרי זה רק עם הקוד 8888) ----------
+// לפני 4 בדצמבר דולק רק הנר התשיעי (השמש). מ-4 בדצמבר נדלק עוד נר בכל יום, עד שמונה.
+const HAN_FROM = new Date(2026, 10, 22), HAN_TO = new Date(2026, 11, 12, 23, 59, 59), HAN_D1 = new Date(2026, 11, 4);
+function hanukActive() { const d = new Date(); return d >= HAN_FROM && d <= HAN_TO; }
+function hanukCandles() { // כמה נרות (0–8) אמורים להיות דלוקים היום
+  if (!hanukActive()) return 0;
+  const d = new Date(), n = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - HAN_D1) / 864e5) + 1;
+  return Math.max(0, Math.min(8, n));
+}
+const hanukOn = () => { try { return hanukActive() || !!(S && S.hanuk); } catch (e) { return hanukActive(); } };
+const HAN_COL = ['#4fc3ff', '#ffffff', '#ffd54a', '#7aa7ff', '#ffe9a8', '#ff9ad5'];
+function hanukStar(c, x, y, r) { // מגן דוד (קווי מתאר)
+  for (let k = 0; k < 2; k++) {
+    c.beginPath();
+    for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 3 + (k ? Math.PI : 0), px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; i ? c.lineTo(px, py) : c.moveTo(px, py); }
+    c.closePath(); c.stroke();
+  }
+}
+// זר נורות צבעוניות (קו נופל עם נורות מהבהבות)
+function hanukGarland(c, x0, y0, x1, y1, sag, t, seed) {
+  const len = Math.hypot(x1 - x0, y1 - y0), n = Math.max(2, Math.round(len / 36));
+  const P = u => [x0 + (x1 - x0) * u, y0 + (y1 - y0) * u + Math.sin(u * Math.PI) * sag];
+  c.strokeStyle = 'rgba(190,205,255,.38)'; c.lineWidth = 2; c.beginPath();
+  for (let i = 0; i <= 20; i++) { const [x, y] = P(i / 20); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+  c.stroke();
+  for (let i = 1; i < n; i++) {
+    const [x, y] = P(i / n), on = 0.55 + 0.45 * Math.sin(t / 260 + i * 1.7 + seed), col = HAN_COL[(i + seed) % HAN_COL.length];
+    c.globalAlpha = 0.22 * on; c.fillStyle = col; c.beginPath(); c.arc(x, y + 6, 10, 0, 7); c.fill();
+    c.globalAlpha = 0.5 + 0.5 * on; c.beginPath(); c.arc(x, y + 6, 3.6, 0, 7); c.fill();
+  }
+  c.globalAlpha = 1;
+}
+// סביבון (משמש כחיית מחמד, כקישוט וכצעצוע בלובי). ang = זווית הסיבוב, letter = האות על הפנים הקדמיות (ברירת מחדל לפי הזווית)
+function drawDreidel(c, x, y, s, ang, letter) {
+  const q = Math.PI / 2, ph = ((ang % q) + q) % q, w = Math.abs(Math.cos(ph - q / 2)) * 1.4;
+  const L = letter || ['נ', 'ג', 'ה', 'ש'][Math.floor((((ang / q) % 4) + 4) % 4)];
+  c.save(); c.translate(x, y); c.scale(s, s); c.lineJoin = 'round'; c.lineWidth = 1.8; c.strokeStyle = 'rgba(20,20,40,.7)';
+  c.fillStyle = '#d9a441'; c.fillRect(-2, -26, 4, 10); c.strokeRect(-2, -26, 4, 10);
+  const bw = 15 * Math.min(1, 0.55 + 0.45 * w);
+  c.fillStyle = '#2f6fe0'; c.beginPath(); c.moveTo(-bw, -16); c.lineTo(bw, -16); c.lineTo(bw, 2); c.lineTo(0, 18); c.lineTo(-bw, 2); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.moveTo(-bw, -16); c.lineTo(-bw * 0.2, -16); c.lineTo(-bw * 0.2, 4); c.lineTo(-bw, 2); c.closePath(); c.fill();
+  c.fillStyle = '#ffd54a'; c.fillRect(-bw, -16, bw * 2, 3);
+  c.fillStyle = '#fff'; c.font = 'bold 15px Arial'; c.textAlign = 'center'; c.save(); c.translate(0, -2); c.scale(Math.max(0.35, w * 0.8), 1); c.fillText(L, 0, 0); c.restore();
+  c.restore();
+}
+const _dreidelIcon = {};
+function petHtml(i) { // אייקון של חיית מחמד (סביבון מצויר, השאר אמוג'י)
+  if (PETS[i] !== '@dreidel') return PETS[i] || '✖️';
+  if (!_dreidelIcon.u) { const cv = document.createElement('canvas'); cv.width = cv.height = 48; const g = cv.getContext('2d'); drawDreidel(g, 24, 26, 1.05, Math.PI / 4, 'ג'); _dreidelIcon.u = cv.toDataURL(); }
+  return `<img src="${_dreidelIcon.u}" width="26" height="26" alt="">`;
+}
+// חנוכייה: lit = מערך של 9 ערכים (נר 1 עד 8, ואז השמש). מצוירת במרכז (x,y) בסקאלה s
+function drawMenorah(g, x, y, s, lit, t, glow) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  const step = 15, gold = '#e8b030';
+  // סדר העמדות משמאל לימין: נר 8 … נר 5, השמש, נר 4 … נר 1 (הנר הראשון מימין)
+  const order = [7, 6, 5, 4, 8, 3, 2, 1, 0];
+  if (glow) { const gr = g.createRadialGradient(0, -34, 5, 0, -34, 120); gr.addColorStop(0, 'rgba(255,200,80,.28)'); gr.addColorStop(1, 'rgba(255,200,80,0)'); g.fillStyle = gr; g.fillRect(-130, -150, 260, 200); }
+  g.strokeStyle = gold; g.lineWidth = 5; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-4 * step, -18); g.bezierCurveTo(-4 * step, 6, 4 * step, 6, 4 * step, -18); g.stroke();
+  g.beginPath(); g.moveTo(0, 2); g.lineTo(0, -22); g.stroke();
+  g.fillStyle = gold; g.beginPath(); g.moveTo(-18, 22); g.lineTo(18, 22); g.lineTo(9, 8); g.lineTo(-9, 8); g.closePath(); g.fill();
+  g.fillRect(-4, 4, 8, 6);
+  order.forEach((k, idx) => {
+    const cx = (idx - 4) * step, shamash = k === 8, h = shamash ? 34 : 24, base = shamash ? -22 : -18;
+    g.fillStyle = gold; g.fillRect(cx - 5, base - 2, 10, 4);
+    g.fillStyle = k % 2 ? '#9ad4ff' : '#f4f8ff'; g.fillRect(cx - 3.2, base - h, 6.4, h - 2);
+    g.fillStyle = 'rgba(0,0,40,.18)'; g.fillRect(cx + 0.6, base - h, 2.6, h - 2);
+    if (lit[k]) {
+      const fl = 1 + 0.22 * Math.sin(t / 95 + k * 2.1) + 0.1 * Math.sin(t / 53 + k);
+      const gr = g.createRadialGradient(cx, base - h - 7, 1, cx, base - h - 7, 26); gr.addColorStop(0, 'rgba(255,214,90,.5)'); gr.addColorStop(1, 'rgba(255,170,40,0)');
+      g.fillStyle = gr; g.fillRect(cx - 28, base - h - 36, 56, 60);
+      g.fillStyle = '#ff9d1c'; g.beginPath(); g.ellipse(cx, base - h - 7, 3.6 * fl, 8.2 * fl, 0, 0, 7); g.fill();
+      g.fillStyle = '#fff3a0'; g.beginPath(); g.ellipse(cx, base - h - 5.6, 1.7, 4.3 * fl, 0, 0, 7); g.fill();
+    } else { g.fillStyle = '#222'; g.fillRect(cx - 0.6, base - h - 4, 1.2, 4); }
+  });
+  g.restore();
+}
+function hanukLitFlags() { // איזה נרות דולקים בחנוכייה שלי: ימים שעברו תמיד, הנר של היום רק אם שיחקתי היום, והשמש תמיד
+  const n = hanukCandles(), st = loadStats(), flags = Array(9).fill(false);
+  for (let k = 1; k <= 8; k++) flags[k - 1] = k < n || (k === n && !!st['hanuk' + k]);
+  flags[8] = true; return flags;
+}
+// גשם אמוג'ים חגיגי (מסך הניצחון)
+function emojiRain(list, count, ms) {
+  let box = $('#emojiRain'); if (!box) { box = document.createElement('div'); box.id = 'emojiRain'; document.body.appendChild(box); }
+  for (let i = 0; i < count; i++) {
+    const s = document.createElement('span'); s.textContent = list[i % list.length];
+    s.style.cssText = `left:${Math.random() * 100}%;font-size:${18 + Math.random() * 22}px;animation-duration:${3 + Math.random() * 3}s;animation-delay:${Math.random() * 1.8}s`;
+    box.appendChild(s); setTimeout(() => s.remove(), ms || 7000);
+  }
+}
+
 // מריץ את מנוע המשחק בדפדפן הזה (מארח או דמו)
 function runEngine(name, demo, resume, offline) {
   isHost = true;
-  engine = createGame(MAP, { demo, jester: true });
+  engine = createGame(MAP, { demo, jester: true, hanuk: hanukActive });
   if (resume && resume.snapshot) { try { engine.restore(resume.snapshot); } catch (e) { console.warn('restore failed', e); } }
   ID = engine.join(name, resume && resume.pid);
   if (resume && resume.snapshot) engine.setHost(ID);
@@ -1253,7 +1358,7 @@ function onState(s) {
   if (s.phase === 'play') renderHud(s);
   if (s.phase === 'meeting') renderMeeting(s);
   if (s.phase === 'eject') renderEject(s);
-  if (s.phase === 'end') renderEnd(s); else { jesterVideo(false); stopVictoryMusic(); }
+  if (s.phase === 'end') renderEnd(s); else { jesterVideo(false); stopVictoryMusic(); renderEnd.rained = false; }
   if (s.phase !== 'play' && s.phase !== 'lobby' && joy.active) window.__joyEnd && window.__joyEnd();
   document.body.classList.toggle('meeting-on', s.phase !== 'play');
   tutCheck(s);
@@ -1290,6 +1395,7 @@ function renderLobby(s) {
   }
   const sig = JSON.stringify([s.roster, s.hostId, s.settings, s.me.color]);
   renderHats(s); renderPets(s);
+  $('#mode5opt').hidden = !s.hanuk; $('#mode5opt').disabled = !s.hanuk;
   if (sig === lobbySig) return;
   lobbySig = sig;
   $('#pcount').textContent = s.roster.length;
@@ -1333,9 +1439,11 @@ const LOB = { W: 1000, H: 560, st: [
   { id: 'wardrobe', x: 170, y: 112, ic: '👕', n: 'ארון בגדים', hint: 'שנה צבע, כובע וחיית מחמד' },
   { id: 'comp', x: 500, y: 112, ic: '💻', n: 'מחשב המארח', hint: 'הגדרות המשחק' },
   { id: 'board', x: 830, y: 112, ic: '📋', n: 'לוח תפקידים', hint: 'מה כל תפקיד עושה ובאיזה אחוז' },
+  { id: 'menorah', x: 500, y: 327, ic: '🕎', n: 'חנוכייה', hint: 'הנרות, התגים והפרסים של חנוכה', evt: true },
 ] };
-const lobbyModals = { wardrobe: '#wardrobeModal', comp: '#compModal', board: '#boardModal', crew: '#crewModal' };
-['#wardrobeModal', '#compModal', '#boardModal', '#crewModal'].forEach(sel => document.body.appendChild($(sel))); // מחוץ לכרטיס, כדי שיכסו את כל המסך
+const lobStations = () => LOB.st.filter(q => !q.evt || hanukOn());
+const lobbyModals = { wardrobe: '#wardrobeModal', comp: '#compModal', board: '#boardModal', crew: '#crewModal', menorah: '#menorahModal' };
+['#wardrobeModal', '#compModal', '#boardModal', '#crewModal', '#menorahModal'].forEach(sel => document.body.appendChild($(sel))); // מחוץ לכרטיס, כדי שיכסו את כל המסך
 let LI = null, lobOpen = null, lobRaf = 0;
 const lobDisp = {};
 function openStation(id) {
@@ -1344,9 +1452,10 @@ function openStation(id) {
   lobOpen = id; show(lobbyModals[id], true);
   keys.clear(); window.__joyEnd && window.__joyEnd(); sendInput();
   if (id === 'comp') $('#compNote').textContent = S.me.host ? '👑 אתה המארח – שינויים נשמרים מיד ונשלחים לכולם.' : 'רק המארח 👑 יכול לשנות. אתה יכול לראות את ההגדרות.';
+  if (id === 'menorah') renderMenorah();
   renderOdds();
 }
-function closeStation() { if (lobOpen) { show(lobbyModals[lobOpen], false); lobOpen = null; } }
+function closeStation() { clearInterval(menTimer); if (lobOpen) { show(lobbyModals[lobOpen], false); lobOpen = null; } }
 document.querySelectorAll('.lmClose').forEach(b => b.onclick = closeStation);
 document.querySelectorAll('.lmodal').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) closeStation(); }));
 document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => openStation(b.dataset.st));
@@ -1366,7 +1475,7 @@ $('#chipWa').onclick = () => $('#waBtn').click();
 $('#chipCopy').onclick = () => $('#copyBtn').click();
 function nearStation() {
   const me = S && S.players.find(p => p.id === S.me.id); if (!me) return null;
-  return LOB.st.find(st => Math.hypot(me.x - st.x, me.y - (st.y + 70)) < 110) || null;
+  return lobStations().find(st => Math.hypot(me.x - st.x, me.y - (st.y + 70)) < 110) || null;
 }
 addEventListener('keydown', e => {
   if (!S || S.phase !== 'lobby') return;
@@ -1377,7 +1486,7 @@ addEventListener('keydown', e => {
 }, true);
 function stationAtPoint(cx, cy) {
   const r = $('#shipCv').getBoundingClientRect(), x = (cx - r.left) / r.width * LOB.W, y = (cy - r.top) / r.height * LOB.H;
-  return LOB.st.find(q => Math.abs(x - q.x) < 85 && Math.abs(y - q.y) < 75) || null;
+  return lobStations().find(q => Math.abs(x - q.x) < 85 && Math.abs(y - q.y) < 75) || null;
 }
 $('#shipCv').addEventListener('click', e => { const st = stationAtPoint(e.clientX, e.clientY); if (st) openStation(st.id); });
 function renderOdds() {
@@ -1415,10 +1524,13 @@ function drawShip(t) {
   g.strokeStyle = '#3a4668'; g.lineWidth = 8; g.strokeRect(46, 136, 908, 378);
   // שולחן מרכזי
   g.fillStyle = '#243052'; g.beginPath(); g.ellipse(500, 327, 85, 46, 0, 0, 7); g.fill(); g.strokeStyle = '#4a5a86'; g.lineWidth = 4; g.stroke();
-  g.font = '28px serif'; g.textAlign = 'center'; g.fillText('🗺️', 500, 337);
+  g.font = '28px serif'; g.textAlign = 'center';
+  const hk = hanukOn(), meP0 = S && S.players.find(p => p.id === S.me.id);
+  if (hk) { drawShipHanuk(g, t, meP0); drawMenorah(g, 500, 336, 0.95, hanukLitFlags(), t, true); g.font = 'bold 14px sans-serif'; g.fillStyle = '#ffe27a'; g.fillText('🕎 חנוכייה', 500, 392); } else g.fillText('🗺️', 500, 337);
   // תחנות
   const near = nearStation();
-  for (const st of LOB.st) {
+  for (const st of lobStations()) {
+    if (st.evt) continue;
     const on = near && near.id === st.id;
     g.fillStyle = on ? '#2d4a86' : '#26304e'; g.strokeStyle = on ? '#ffb547' : '#4a5a86'; g.lineWidth = on ? 4 : 3;
     g.beginPath(); g.roundRect ? g.roundRect(st.x - 80, st.y - 62, 160, 110, 14) : g.rect(st.x - 80, st.y - 62, 160, 110); g.fill(); g.stroke();
@@ -1508,7 +1620,8 @@ function actionState(s) {
   const nearCam = alive && D(pos, MAP.CAM_CONSOLE) < 80;
   // נקודת תיקון של חבלה (אותו מרחק כמו במנוע: 70)
   const nearSab = alive && !!s.sab && MAP.SAB_POINTS[s.sab.type].some((q, i) => !s.sab.fixed[i] && D(pos, q) < 68);
-  st.use = { show: !me.spec, on: !inVent && (nearSab || nearTask || nearBtn || nearCam), label: me.cam ? 'סגור מצלמות' : (nearSab ? '🔧 תקן' : nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
+  const nearCandle = alive && me.team === 'imp' && s.settings.mode === 5 && (s.candles || []).some(cd => cd.lit && D(pos, MAP.TASKS[cd.i]) <= 60);
+  st.use = { show: !me.spec, on: !inVent && (nearSab || nearTask || nearBtn || nearCam || nearCandle), label: me.cam ? 'סגור מצלמות' : (nearSab ? '🔧 תקן' : nearCandle ? '💨 כבה נר' : nearTask ? 'שימוש' : nearBtn ? 'חירום' : nearCam ? '🎥 מצלמות' : 'שימוש') };
   st.report = { show: alive && s.settings.mode !== 3, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
@@ -1831,6 +1944,8 @@ function renderAlert(s) {
 const CLOWN_FROM = new Date(2026, 10, 14), CLOWN_TO = new Date(2026, 10, 21, 23, 59, 59);
 function clownWeek() { const d = new Date(); return d >= CLOWN_FROM && d <= CLOWN_TO; }
 show('#clownWeek', clownWeek());
+show('#hanukBanner', hanukActive());
+if (hanukActive()) $('#hanukSub').textContent = hanukCandles() ? 'בכל יום נדלק עוד נר · מצב שמונה נרות · התפקיד "השמש" · סביבון' : 'הנר התשיעי כבר דולק! ב-4 בדצמבר נתחיל להדליק עוד נר בכל יום · מצב שמונה נרות · התפקיד "השמש" · סביבון';
 // כשהליצן מנצח: מתנגן השיר עם הווידאו (יוטיוב, בלי עוגיות מעקב). יוצאים מהמסך – המוזיקה נעצרת
 const JESTER_VIDEO = 'DyJpRcLsVAY';
 function jesterVideo(on) {
@@ -1979,6 +2094,7 @@ function renderEnd(s) {
   if (w.team === 'race') $('#endTitle').innerHTML = '<span style="color:var(--accent)">🏁 המרוץ הסתיים!</span>'; else
   $('#endTitle').innerHTML = w.team === 'nobody' ? '<span style="color:#ffd166">🤯 לא היה מתחזה בכלל!</span>' : w.surprise ? '<span style="color:var(--crew)">😄 לא היה מתחזה בכלל – ניצחתם!</span>' : s.settings.mode === 3 && w.team === 'imp' ? '<span style="color:var(--imp)">👀 המחפש תפס את כולם!</span>' : s.settings.mode === 3 ? '<span style="color:var(--crew)">🙈 המתחבאים ניצחו!</span>' : w.team === 'jester' ? '<span style="color:#ff9f1c">' + ({ martyr: '🕊️ הקורבן ניצח!', vulture: '🦅 הנשר ניצח!', instigator: '🗣️ המסית ניצח!' }[w.role] || '🤡 הליצן ניצח! 🤡') + '</span>' : w.team === 'crew' ? '<span style="color:var(--crew)">🎉 הצוות ניצח!</span>' : '<span style="color:var(--imp)">😈 המתחזים ניצחו!</span>';
   jesterVideo(w.team === 'jester');
+  if (hanukOn() && !renderEnd.rained) { renderEnd.rained = true; emojiRain(['🍩', '🕎', '✨', '🪙', '⭐'], 34); }
   $('#endReason').textContent = w.reason;
   const roles = {};
   s.players.forEach(p => roles[p.id] = p);
@@ -2172,6 +2288,85 @@ function buildRound() {
   show('#mini', true);
   (MINI_BUILD[miniCur.kind] || buildCode)($('#miniBody'), tk);
 }
+
+// ---------- מיני-משחק הסביבון ----------
+function buildDreidel(b, tk) {
+  let spins = 0, busy = false, ang = Math.random() * 6;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p><canvas id="drCv" width="240" height="200" style="display:block;margin:0 auto"></canvas><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
+  const g = $('#drCv').getContext('2d');
+  const draw = () => { g.clearRect(0, 0, 240, 200); g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.ellipse(120, 176, 46, 9, 0, 0, 7); g.fill(); drawDreidel(g, 120, 104, 3.5, ang, null); };
+  draw();
+  $('#drBtn').onclick = () => {
+    if (busy) return; busy = true; spins++;
+    const q = Math.PI / 2;
+    const target = spins >= 3 || Math.random() < 0.34 ? 1 : [0, 2, 3][Math.floor(Math.random() * 3)];
+    const start = ang, end = (Math.ceil(start / (2 * Math.PI)) + 3) * 2 * Math.PI + (target + 0.5) * q, t0 = performance.now(), dur = 2100;
+    $('#drRes').textContent = '';
+    const step = now => {
+      if (!alive(tk)) return;
+      const u = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - u, 3);
+      ang = start + (end - start) * e; draw();
+      if (u < 1) return requestAnimationFrame(step);
+      if (target === 1) { $('#drRes').innerHTML = '<span style="color:var(--ok)">🎉 ג׳! נס גדול!</span>'; setTimeout(() => { if (alive(tk)) miniDone(); }, 650); }
+      else { $('#drRes').textContent = '😅 לא יצא ג׳ – עוד פעם'; busy = false; }
+    };
+    requestAnimationFrame(step);
+  };
+}
+// ---------- חנוכייה בלובי ----------
+let menTimer = 0;
+function renderMenorah() {
+  const st = loadStats(), n = hanukCandles(), dayLbl = k => (k + 3) + '.12';
+  const dots = Array.from({ length: 8 }, (_, i) => { const k = i + 1; return `<div class="mdot ${st['hanuk' + k] ? 'on' : ''} ${k === n ? 'today' : ''}"><span>${st['hanuk' + k] ? '🕯️' : '▫️'}</span><small>${dayLbl(k)}</small></div>`; }).join('');
+  const have = (r) => unlocked(r, st) ? '✅' : '🔒';
+  $('#menBody').innerHTML = `<canvas id="menCv" width="560" height="230"></canvas>
+    <p class="sub" style="margin:6px 0 10px">${n === 0 ? 'הנר התשיעי – השמש – כבר דולק! ב-4 בדצמבר מתחילים להדליק נר חדש בכל יום. שחק משחק אחד ביום כדי להדליק את הנר שלך.' : n >= 8 ? 'כל שמונת הנרות דולקים! 🎉 שחק משחק היום כדי לסגור את התג של היום.' : 'בכל יום נדלק עוד נר. שחק משחק אחד היום כדי להדליק את הנר שלך ולקבל את התג.'}</p>
+    <div class="mdots">${dots}</div>
+    <h3 style="margin:12px 0 6px">🎁 מה מקבלים</h3>
+    <div class="badge ${unlocked(HAT_REQ[12], st) ? '' : 'off'}"><span class="bi">🕎</span><span style="flex:1"><b>כובע חנוכייה</b><small>משחק אחד באירוע</small></span>${have(HAT_REQ[12])}</div>
+    <div class="badge ${unlocked(PET_REQ[9], st) ? '' : 'off'}"><span class="bi">🍩</span><span style="flex:1"><b>חיית מחמד סופגנייה</b><small>משחק אחד באירוע</small></span>${have(PET_REQ[9])}</div>
+    <div class="badge ${unlocked(PET_REQ[10], st) ? '' : 'off'}"><span class="bi">${petHtml(10)}</span><span style="flex:1"><b>חיית מחמד סביבון</b><small>שלושה ימים שונים של משחק (${Math.min(st.hanukDays || 0, 3)}/3)</small></span>${have(PET_REQ[10])}</div>
+    <div class="badge ${unlocked(HAT_REQ[13], st) ? '' : 'off'}"><span class="bi">👑</span><span style="flex:1"><b>כובע מכבי זהב + תג "מכבי מלא"</b><small>הדלקת כל 8 הנרות (${Math.min(st.hanukCount || 0, 8)}/8)</small></span>${have(HAT_REQ[13])}</div>
+    <p class="sub" style="margin-top:10px">🕎 באירוע: מצב משחק "שמונה נרות", תפקיד "השמש", ומשימת סביבון.</p>`;
+  const draw = t => { const cv = $('#menCv'); if (!cv) return; const g = cv.getContext('2d'); g.clearRect(0, 0, 560, 230); drawMenorah(g, 280, 168, 2.15, hanukLitFlags(), t, true); };
+  clearInterval(menTimer); menTimer = setInterval(() => draw(performance.now()), 90); draw(performance.now());
+}
+function drawShipHanuk(g, t, mePos) { // קישוט הלובי: אורות, זרים, כוכב על הרצפה, סביבון לשחק איתו וכרזה
+  for (let i = 0; i < 8; i++) { const x = 100 + i * 114, y = 470 + (i % 2) * 14, pu = 0.5 + 0.5 * Math.sin(t / 500 + i); g.fillStyle = HAN_COL[i % HAN_COL.length]; g.globalAlpha = 0.07 + 0.07 * pu; g.beginPath(); g.arc(x, y, 62, 0, 7); g.fill(); }
+  g.globalAlpha = 1; g.strokeStyle = 'rgba(255,224,130,.14)'; g.lineWidth = 5; hanukStar(g, 500, 327, 175);
+  hanukGarland(g, 0, 128, 1000, 128, 16, t, 1);
+  hanukGarland(g, 46, 520, 954, 520, 10, t, 4);
+  hanukGarland(g, 46, 140, 46, 512, 0, t, 2);
+  hanukGarland(g, 954, 140, 954, 512, 0, t, 3);
+  g.textAlign = 'center';
+  g.font = 'bold 24px Rubik, sans-serif'; g.lineWidth = 5; g.strokeStyle = 'rgba(20,30,90,.85)'; g.fillStyle = '#ffe27a';
+  g.strokeText('🕎 חג אורים שמח 🕎', 500, 548); g.fillText('🕎 חג אורים שמח 🕎', 500, 548);
+  g.font = '30px serif'; g.fillText('🍩', 84, 500); g.fillText('🍩', 916, 500);
+  const dx = 150, dy = 470, near = mePos && Math.hypot(mePos.x - dx, mePos.y - dy) < 95;
+  drawDreidel(g, dx, dy, 1.5, t / (near ? 55 : 600), null);
+  if (near) { g.font = 'bold 14px sans-serif'; g.fillStyle = '#fff'; g.fillText('🌀', dx, dy - 46 + Math.sin(t / 120) * 4); }
+}
+// ---------- קישוטי כובעים ----------
+function drawHanukHat(c, h) {
+  const tt = performance.now();
+  if (h === 12) { // כובע חנוכייה
+    for (let i = -4; i <= 4; i++) {
+      const x = i * 4, ht = i === 0 ? 13 : 8, y0 = -18;
+      c.fillStyle = (i + 4) % 2 ? '#8fd0ff' : '#fff'; c.fillRect(x - 1.2, y0 - ht, 2.4, ht);
+      const fl = 1 + 0.25 * Math.sin(tt / 110 + i * 2);
+      c.fillStyle = '#ffb300'; c.beginPath(); c.ellipse(x, y0 - ht - 3, 1.8 * fl, 3.3 * fl, 0, 0, 7); c.fill();
+      c.fillStyle = '#fff6a0'; c.beginPath(); c.ellipse(x, y0 - ht - 2.4, 0.8, 1.8, 0, 0, 7); c.fill();
+    }
+    c.strokeStyle = '#e0a82e'; c.lineWidth = 2.6; c.beginPath(); c.moveTo(-17, -18); c.quadraticCurveTo(0, -9, 17, -18); c.stroke();
+    c.beginPath(); c.moveTo(0, -13.5); c.lineTo(0, -18); c.stroke();
+  } else { // קסדת מכבי זהב
+    c.fillStyle = '#ffc93c'; c.beginPath(); c.arc(0, -13, 13, Math.PI, 0); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#fff3b0'; c.fillRect(-13, -15, 26, 3);
+    c.fillStyle = '#2f6fe0'; c.beginPath(); c.moveTo(-3.5, -26); c.lineTo(0, -37); c.lineTo(3.5, -26); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = '#1d5fd6'; c.lineWidth = 1.6; hanukStar(c, 0, -20, 5);
+  }
+}
+
 const SAB_TITLES = { switches: '💡 החזרת החשמל', code: '💨 תיקון מערכת החמצן', sliders: '☢️ קירור הכור', tapfill: '🔥 הפעלת המחמם' };
 function openSabMini(m) {
   miniOpen = -1; miniSabIdx = m.i; miniKind = m.kind;
@@ -2814,7 +3009,7 @@ function buildDownload(b, tk) {
   }, 60);
   btn.onclick = () => { st.className = 'dlSt'; st.textContent = '🔌 מתחבר…'; btn.classList.add('hidden'); setTimeout(() => { stall = false; }, 700); };
 }
-const MINI_BUILD = { scrub: buildScrub, combo: buildCombo, pipes: buildPipes, download: buildDownload,  maze: buildMaze, valve: buildValve, balance: buildBalance, bins: buildBins, quiz: buildQuiz, track: buildTrack, charge: buildCharge, swipe: buildSwipe, slide: buildSlide, lights: buildLights, wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern };
+const MINI_BUILD = { scrub: buildScrub, combo: buildCombo, pipes: buildPipes, download: buildDownload,  maze: buildMaze, valve: buildValve, balance: buildBalance, bins: buildBins, quiz: buildQuiz, track: buildTrack, charge: buildCharge, swipe: buildSwipe, slide: buildSlide, lights: buildLights, wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern, dreidel: buildDreidel };
 
 function miniKey(e) {
   if (e.code === 'Escape') { closeMini(); return; }
@@ -2831,14 +3026,14 @@ $('#ventBtns').onclick = e => {
 };
 
 // ---------- כובעים ----------
-const HATS = ['ללא', 'מסיבה', 'כתר', 'מצחייה', 'ארנב', 'הילה', 'פרח', 'קש', 'משקפיים', 'שף', 'קרניים', 'אוזניות'];
+const HATS = ['ללא', 'מסיבה', 'כתר', 'מצחייה', 'ארנב', 'הילה', 'פרח', 'קש', 'משקפיים', 'שף', 'קרניים', 'אוזניות', 'חנוכייה', 'מכבי זהב'];
 // ---------- סטטיסטיקה אישית, תגים ופריטים שנפתחים (נשמר בדפדפן) ----------
-const PETS = ['', '🐶', '🐱', '🐧', '🐹', '🦊', '🐸', '🐙', '🦄'];
-const PET_NAMES = ['ללא', 'כלב', 'חתול', 'פינגווין', 'אוגר', 'שועל', 'צפרדע', 'תמנון', 'חד-קרן'];
-const loadStats = () => { try { return Object.assign({ games: 0, wins: 0, impGames: 0, impWins: 0, crewWins: 0, jesterWins: 0, moleWins: 0, kills: 0, tasks: 0, goodVotes: 0, badVotes: 0, ejected: 0, survived: 0, reports: 0, hideWins: 0, streak: 0, best: 0, last: 0, badges: [] }, JSON.parse(localStorage.getItem('mm_stats') || '{}')); } catch (e) { return { games: 0, wins: 0, badges: [] }; } };
+const PETS = ['', '🐶', '🐱', '🐧', '🐹', '🦊', '🐸', '🐙', '🦄', '🍩', '@dreidel'];
+const PET_NAMES = ['ללא', 'כלב', 'חתול', 'פינגווין', 'אוגר', 'שועל', 'צפרדע', 'תמנון', 'חד-קרן', 'סופגנייה', 'סביבון'];
+const loadStats = () => { try { return Object.assign({ games: 0, wins: 0, impGames: 0, impWins: 0, crewWins: 0, jesterWins: 0, moleWins: 0, kills: 0, tasks: 0, goodVotes: 0, badVotes: 0, ejected: 0, survived: 0, reports: 0, hideWins: 0, streak: 0, best: 0, last: 0, badges: [], hanukDays: 0, hanukSeen: [], hanukCount: 0 }, JSON.parse(localStorage.getItem('mm_stats') || '{}')); } catch (e) { return { games: 0, wins: 0, badges: [] }; } };
 // דרישה לפתיחה: [שם השדה, כמה]
-const HAT_REQ = { 8: ['wins', 2, 'ניצחונות'], 9: ['tasks', 60, 'משימות'], 10: ['impWins', 3, 'ניצחונות כמתחזה'], 11: ['games', 15, 'משחקים'] };
-const PET_REQ = { 1: null, 2: ['games', 1, 'משחקים'], 3: ['games', 3, 'משחקים'], 4: ['wins', 1, 'ניצחונות'], 5: ['impWins', 1, 'ניצחונות כמתחזה'], 6: ['tasks', 50, 'משימות'], 7: ['kills', 10, 'חיסולים'], 8: ['wins', 10, 'ניצחונות'] };
+const HAT_REQ = { 8: ['wins', 2, 'ניצחונות'], 9: ['tasks', 60, 'משימות'], 10: ['impWins', 3, 'ניצחונות כמתחזה'], 11: ['games', 15, 'משחקים'], 12: ['hanukDays', 1, 'ימי חנוכה שבהם שיחקת'], 13: ['hanukCount', 8, 'נרות חנוכה (מכבי מלא)'] };
+const PET_REQ = { 1: null, 2: ['games', 1, 'משחקים'], 3: ['games', 3, 'משחקים'], 4: ['wins', 1, 'ניצחונות'], 5: ['impWins', 1, 'ניצחונות כמתחזה'], 6: ['tasks', 50, 'משימות'], 7: ['kills', 10, 'חיסולים'], 8: ['wins', 10, 'ניצחונות'], 9: ['hanukDays', 1, 'ימי חנוכה שבהם שיחקת'], 10: ['hanukDays', 3, 'ימי חנוכה שבהם שיחקת'] };
 const unlocked = (req, st) => !req || (st[req[0]] || 0) >= req[1];
 const BADGES = [
   { id: 'detective', ic: '🕵️', name: 'הבלש הטוב', d: 'הצבעת נכון נגד מתחזים', k: 'goodVotes', n: 10 },
@@ -2853,6 +3048,8 @@ const BADGES = [
   { id: 'reporter', ic: '📢', name: 'עיתונאי', d: 'דיווחים על גופות', k: 'reports', n: 10 },
   { id: 'vet', ic: '🎮', name: 'ותיק', d: 'משחקים', k: 'games', n: 25 },
   { id: 'wrong', ic: '🤦', name: 'יד קלה על ההדק', d: 'הצבעות נגד חפים מפשע', k: 'badVotes', n: 10 },
+  ...Array.from({ length: 8 }, (_, i) => ({ id: 'han' + (i + 1), han: 1, ic: '🕯️', name: 'נר חנוכה ' + (i + 1), d: 'שיחקת משחק ביום החנוכה ' + (i + 1), k: 'hanuk' + (i + 1), n: 1 })),
+  { id: 'macabi', han: 1, ic: '🕎', name: 'מכבי מלא', d: 'הדלקת כל שמונת הנרות', k: 'hanukCount', n: 8 },
 ];
 // סוף משחק: מעדכנים את הסטטיסטיקה פעם אחת לכל משחק, ומחזירים תגים חדשים שהושגו
 function recordGame(m) {
@@ -2868,6 +3065,12 @@ function recordGame(m) {
   for (const k of ['kills', 'tasks', 'goodVotes', 'badVotes', 'reports']) st[k] += m[k] || 0;
   if (m.ejected) st.ejected++;
   if (m.alive) st.survived++;
+  if (hanukActive()) { // אירוע חנוכה: יום משחק חדש, והנר של היום
+    const d = new Date(), key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    if (!st.hanukSeen.includes(key)) { st.hanukSeen.push(key); st.hanukDays++; }
+    const n = hanukCandles();
+    if (n >= 1 && !st['hanuk' + n]) { st['hanuk' + n] = 1; st.hanukCount = (st.hanukCount || 0) + 1; }
+  }
   const fresh = BADGES.filter(b => !st.badges.includes(b.id) && (st[b.k] || 0) >= b.n);
   fresh.forEach(b => st.badges.push(b.id));
   try { localStorage.setItem('mm_stats', JSON.stringify(st)); } catch (e) {}
@@ -2878,21 +3081,22 @@ function openStats() {
   const cell = (n, l) => `<div><b>${n}</b>${l}</div>`;
   let h = '<div class="stGrid">' + cell(st.games, 'משחקים') + cell(st.wins, 'ניצחונות') + cell(pct(st.wins, st.games), 'אחוז ניצחון') + cell(st.impWins + '/' + st.impGames, 'ניצחונות כמתחזה') +
     cell(st.kills, 'חיסולים') + cell(st.tasks, 'משימות') + cell(st.goodVotes, 'הדחות נכונות') + cell(st.badVotes, 'הצבעות שגויות') + cell(st.ejected, 'פעמים שהודחת') + cell(st.best, 'רצף ניצחונות שיא') + '</div>';
-  h += '<h3 style="margin:6px 0">🏅 תגים</h3>' + BADGES.map(b => { const v = Math.min(st[b.k] || 0, b.n), on = st.badges.includes(b.id) || v >= b.n;
+  h += '<h3 style="margin:6px 0">🏅 תגים</h3>' + BADGES.filter(b => !b.han || hanukActive() || st.hanukDays).map(b => { const v = Math.min(st[b.k] || 0, b.n), on = st.badges.includes(b.id) || v >= b.n;
     return `<div class="badge ${on ? '' : 'off'}"><span class="bi">${b.ic}</span><span style="flex:1"><b>${b.name}</b><small>${b.d}: ${v}/${b.n}</small>${on ? '' : `<div class="bar"><i style="width:${100 * v / b.n}%"></i></div>`}</span>${on ? '✅' : ''}</div>`; }).join('');
-  h += '<h3 style="margin:10px 0 6px">🎁 פריטים שנפתחים</h3>' + [...Object.entries(HAT_REQ).map(([i, r]) => ['🎩 כובע ' + HATS[i], r]), ...Object.entries(PET_REQ).filter(([, r]) => r).map(([i, r]) => [PETS[i] + ' ' + PET_NAMES[i], r])]
+  h += '<h3 style="margin:10px 0 6px">🎁 פריטים שנפתחים</h3>' + [...Object.entries(HAT_REQ).map(([i, r]) => ['🎩 כובע ' + HATS[i], r]), ...Object.entries(PET_REQ).filter(([, r]) => r).map(([i, r]) => [petHtml(i) + ' ' + PET_NAMES[i], r])]
     .map(([n, r]) => `<div class="badge ${unlocked(r, st) ? '' : 'off'}"><span style="flex:1">${n}</span><small>${unlocked(r, st) ? '✅ פתוח' : `${Math.min(st[r[0]] || 0, r[1])}/${r[1]} ${r[2]}`}</small></div>`).join('');
   $('#statsBody').innerHTML = h; show('#statsModal', true);
 }
 document.querySelectorAll('.statsBtn').forEach(b => b.onclick = openStats);
 $('#statsClose').onclick = () => show('#statsModal', false);
 $('#statsModal').onclick = e => { if (e.target.id === 'statsModal') show('#statsModal', false); };
+const PET_BASE = 9, HAT_BASE = 12;
 let petSig = '';
 function renderPets(s) {
-  const st = loadStats(), sig = s.me.pet + '|' + st.games + st.wins;
+  const st = loadStats(), sig = s.me.pet + '|' + st.games + st.wins + '|' + st.hanukDays + '|' + hanukActive();
   if (sig === petSig) return; petSig = sig;
   const myPet = (s.roster.find(p => p.id === s.me.id) || {}).pet || 0;
-  $('#pets').innerHTML = PETS.map((e, i) => `<button data-p="${i}" title="${PET_NAMES[i]}${PET_REQ[i] && !unlocked(PET_REQ[i], st) ? ' – נפתח אחרי ' + PET_REQ[i][1] + ' ' + PET_REQ[i][2] : ''}" class="${i === myPet ? 'sel' : ''} ${unlocked(PET_REQ[i], st) ? '' : 'locked'}">${e || '✖️'}</button>`).join('');
+  $('#pets').innerHTML = PETS.map((e, i) => (i >= PET_BASE && !hanukActive() && !unlocked(PET_REQ[i], st)) ? '' : `<button data-p="${i}" title="${PET_NAMES[i]}${PET_REQ[i] && !unlocked(PET_REQ[i], st) ? ' – נפתח אחרי ' + PET_REQ[i][1] + ' ' + PET_REQ[i][2] : ''}" class="${i === myPet ? 'sel' : ''} ${unlocked(PET_REQ[i], st) ? '' : 'locked'}">${petHtml(i)}</button>`).join('');
 }
 $('#pets').onclick = e => {
   const b = e.target.closest('button'); if (!b) return; const i = +b.dataset.p, r = PET_REQ[i];
@@ -2939,6 +3143,7 @@ function drawHat(h, dir) {
     case 10:
       c.fillStyle = '#d62828';
       for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 3, -16); c.quadraticCurveTo(s * 10, -24, s * 14, -33); c.lineTo(s * 12, -15); c.closePath(); c.fill(); c.stroke(); } break;
+    case 12: case 13: drawHanukHat(c, h); break;
     case 11:
       c.strokeStyle = '#333'; c.lineWidth = 4; c.beginPath(); c.arc(0, -2, 21, Math.PI * 1.08, Math.PI * 1.92); c.stroke();
       c.fillStyle = '#ff4d6d'; c.fillRect(-24, -9, 7, 13); c.fillRect(17, -9, 7, 13); break;
@@ -2948,12 +3153,13 @@ function drawHat(h, dir) {
 
 let hatSig = '';
 function renderHats(s) {
-  const col = s.colors[s.me.color].c, sig = col + s.me.hat;
+  const col = s.colors[s.me.color].c, sig = col + s.me.hat + '|' + loadStats().hanukDays + hanukActive();
   if (sig === hatSig) return;
   hatSig = sig;
   const box = $('#hats');
   box.innerHTML = '';
   HATS.forEach((name, i) => {
+    if (i >= HAT_BASE && !hanukActive() && !unlocked(HAT_REQ[i], loadStats())) return;
     const btn = document.createElement('button');
     btn.className = (i === s.me.hat ? 'sel' : '') + (unlocked(HAT_REQ[i], loadStats()) ? '' : ' locked');
     btn.dataset.h = i;
@@ -3517,7 +3723,8 @@ function drawDrone(x, y, color, dir, opts = {}) {
   if (opts.vent) ctx.globalAlpha = 0.35;
   if (opts.pet && PETS[opts.pet] && !opts.ghost && !opts.vent) { // חיית מחמד מקפצת מאחורי הרחפן
     const hop = Math.abs(Math.sin(performance.now() / 160)) * 6;
-    ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.fillText(PETS[opts.pet], -dir * 32, 18 - hop);
+    if (PETS[opts.pet] === '@dreidel') drawDreidel(ctx, -dir * 32, 8 - hop, 0.85, performance.now() / 110, null);
+    else { ctx.font = '22px serif'; ctx.textAlign = 'center'; ctx.fillText(PETS[opts.pet], -dir * 32, 18 - hop); }
   }
   const bob = opts.ghost ? Math.sin(performance.now() / 300) * 3 : 0;
   ctx.translate(0, bob);
@@ -3843,6 +4050,77 @@ function drawAO(r) {
 }
 let VIEW = null;
 const inV = (x, y, w, h) => !VIEW || (x < VIEW.x1 && x + w > VIEW.x0 && y < VIEW.y1 && y + h > VIEW.y0);
+// ---------- חנוכה על המפה: אווירה (המפה עצמה לא משתנה), נרות ונס פח השמן ----------
+function drawHanukMap(t) {
+  const c = ctx;
+  c.save();
+  for (const id in MAP.ROOMS) {
+    const r = MAP.ROOMS[id]; if (!inV(r.x, r.y, r.w, r.h)) continue;
+    const g = c.createRadialGradient(r.cx, r.cy, 10, r.cx, r.cy, Math.max(r.w, r.h) * 0.62);
+    g.addColorStop(0, 'rgba(255,213,74,.11)'); g.addColorStop(1, 'rgba(60,110,255,.09)');
+    c.fillStyle = g; c.fillRect(r.x, r.y, r.w, r.h);
+    c.strokeStyle = 'rgba(255,224,130,.17)'; c.lineWidth = 4; hanukStar(c, r.cx, r.cy, Math.min(r.w, r.h) * 0.27);
+    hanukGarland(c, r.x + 12, r.y + 16, r.x + r.w - 12, r.y + 16, 14, t, (r.x / 7) | 0);
+    c.textAlign = 'center'; c.font = '24px serif';
+    c.fillText('🕎', r.x + 28, r.y + r.h - 20);
+    if (((r.x / 10) | 0) % 2) c.fillText('🍩', r.x + r.w - 28, r.y + r.h - 20); else drawDreidel(c, r.x + r.w - 28, r.y + r.h - 28, 0.75, t / 700 + r.x, null);
+  }
+  for (const k of MAP.CORRIDORS) { // אורות לאורך המסדרונות
+    if (!inV(k.x - 10, k.y - 10, k.w + 20, k.h + 20)) continue;
+    if (k.o === 'v') hanukGarland(c, k.x + 9, k.y, k.x + 9, k.y + k.h, 0, t, (k.y / 5) | 0);
+    else hanukGarland(c, k.x, k.y + 12, k.x + k.w, k.y + 12, 7, t, (k.x / 5) | 0);
+  }
+  if (VIEW) { // נצנוצים יורדים
+    const w = VIEW.x1 - VIEW.x0, h = VIEW.y1 - VIEW.y0;
+    for (let i = 0; i < 46; i++) {
+      const x = VIEW.x0 + (i * 173 + t * 0.012 * (1 + i % 3)) % w, y = VIEW.y0 + (i * 97 + t * 0.03 * (0.5 + (i % 4) * 0.3)) % h, tw = 0.5 + 0.5 * Math.sin(t / 300 + i);
+      c.globalAlpha = 0.25 + 0.5 * tw; c.fillStyle = HAN_COL[i % HAN_COL.length];
+      const r = 2 + (i % 3); c.beginPath(); c.moveTo(x, y - r * 1.6); c.lineTo(x + r * 0.5, y); c.lineTo(x, y + r * 1.6); c.lineTo(x - r * 0.5, y); c.closePath(); c.fill();
+    }
+  }
+  c.restore();
+}
+function drawCandles(t) { // שמונה נרות (מצב חנוכה): נר דולק או כבוי בכל אחד משמונה חדרים
+  const c = ctx, pulse = 0.5 + 0.5 * Math.sin(t / 300);
+  for (const cd of S.candles || []) {
+    const T = MAP.TASKS[cd.i]; if (!inV(T.x - 60, T.y - 90, 120, 120)) continue;
+    const x = T.x, y = T.y + 10;
+    c.save();
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x, y + 4, 17, 6, 0, 0, 7); c.fill();
+    c.fillStyle = '#e8b030'; c.beginPath(); c.moveTo(x - 15, y + 4); c.lineTo(x + 15, y + 4); c.lineTo(x + 9, y - 6); c.lineTo(x - 9, y - 6); c.closePath(); c.fill();
+    c.fillStyle = cd.i % 2 ? '#9ad4ff' : '#f4f8ff'; c.fillRect(x - 5.5, y - 40, 11, 36);
+    c.fillStyle = 'rgba(0,0,40,.18)'; c.fillRect(x + 1, y - 40, 4.5, 36);
+    if (cd.lit) {
+      const fl = 1 + 0.2 * Math.sin(t / 90 + cd.i) + 0.1 * Math.sin(t / 47 + cd.i * 3);
+      const gr = c.createRadialGradient(x, y - 50, 2, x, y - 50, 90); gr.addColorStop(0, 'rgba(255,214,90,.5)'); gr.addColorStop(1, 'rgba(255,170,40,0)');
+      c.fillStyle = gr; c.fillRect(x - 90, y - 140, 180, 180);
+      c.fillStyle = '#ff9d1c'; c.beginPath(); c.ellipse(x, y - 49, 6 * fl, 13 * fl, 0, 0, 7); c.fill();
+      c.fillStyle = '#fff3a0'; c.beginPath(); c.ellipse(x, y - 47, 2.8, 7 * fl, 0, 0, 7); c.fill();
+    } else {
+      c.fillStyle = '#222'; c.fillRect(x - 1, y - 46, 2, 6);
+      c.strokeStyle = `rgba(255,214,70,${0.35 + pulse * 0.5})`; c.lineWidth = 3; c.beginPath(); c.arc(x, y - 26, 30 + pulse * 5, 0, 7); c.stroke();
+      c.fillStyle = 'rgba(255,230,150,.9)'; c.font = 'bold 12px Rubik, Arial'; c.textAlign = 'center'; c.fillText('E', x, y - 52);
+    }
+    c.restore();
+  }
+}
+function drawMiracles(t) { // נס פח השמן: אור קסום מסביב לשמש
+  const c = ctx;
+  for (const m of S.miracles || []) {
+    if (!inV(m.x - 240, m.y - 240, 480, 480)) continue;
+    c.save(); c.translate(m.x, m.y);
+    const gr = c.createRadialGradient(0, 0, 20, 0, 0, 230); gr.addColorStop(0, 'rgba(255,225,120,.38)'); gr.addColorStop(0.7, 'rgba(255,190,60,.16)'); gr.addColorStop(1, 'rgba(255,170,40,0)');
+    c.fillStyle = gr; c.beginPath(); c.arc(0, 0, 230, 0, 7); c.fill();
+    c.rotate(t / 4000); c.fillStyle = 'rgba(255,230,140,.1)';
+    for (let i = 0; i < 12; i++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(0, 0); c.lineTo(-14, -225); c.lineTo(14, -225); c.closePath(); c.fill(); }
+    c.rotate(-t / 4000 - Math.PI * 2);
+    c.strokeStyle = 'rgba(255,224,130,.6)'; c.lineWidth = 3; c.setLineDash([10, 10]); c.beginPath(); c.arc(0, 0, 228, 0, 7); c.stroke(); c.setLineDash([]);
+    c.font = '34px serif'; c.textAlign = 'center'; c.fillText('🕎', 0, -8 + Math.sin(t / 300) * 4);
+    c.font = 'bold 15px Rubik, Arial'; c.fillStyle = '#fff3b0'; c.fillText(m.left + '', 0, 22);
+    c.restore();
+  }
+}
+
 function drawMap(t) {
   const ICE = MAP.theme === 'ice';
   if (ICE) { // תחנת קרח: שדה שלג בחוץ, דיונות ושלג שיורד
@@ -3990,11 +4268,14 @@ function drawMap(t) {
   ctx.fillStyle = '#6b6f7c'; ctx.beginPath(); ctx.arc(MAP.BUTTON.x, MAP.BUTTON.y, 30, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = `rgba(230,40,40,${0.75 + pulse * 0.25})`; ctx.beginPath(); ctx.arc(MAP.BUTTON.x, MAP.BUTTON.y, 21, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Rubik, Arial'; ctx.fillText('חירום', MAP.BUTTON.x, MAP.BUTTON.y + 48);
+  if (S.hanuk) { drawHanukMap(t); drawMiracles(t); }
+  if (S.candles) drawCandles(t);
   // משימות שלי
   if (S.me.team !== 'imp') {
     for (const tk of S.me.tasks) {
       if (tk.done) continue;
       const T = MAP.TASKS[tk.i];
+      if (T.ev === 'candle') continue;
       ctx.fillStyle = `rgba(255,214,70,${0.55 + pulse * 0.45})`;
       ctx.beginPath(); ctx.arc(T.x, T.y, 14, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#1b1405'; ctx.font = 'bold 18px Arial'; ctx.fillText('!', T.x, T.y + 6);

@@ -999,5 +999,41 @@ test('הליצן מופיע רק עם הקוד 54321', () => {
   ok(seen, 'עם הקוד הליצן לא הופיע');
 });
 
+test('חנוכה: מצב שמונה נרות – 8 נרות כבויים, היעד 8, ורק עם אירוע', () => {
+  const g = createGame(MAP); const a = g.join('מארח');
+  g.act(a, { type: 'settings', impostors: 1, bots: 4, mode: 5, code: '8888' });
+  ok(g.view(a).settings.mode === 5, 'מצב 5 לא נשמר עם הקוד 8888');
+  g.act(a, { type: 'start' });
+  const v = g.view(a);
+  ok(v.candles && v.candles.length === 8 && v.candles.every(c => !c.lit), 'צריכים להיות 8 נרות כבויים');
+  ok(v.tasks.total === 8, 'היעד צריך להיות 8 נרות: ' + v.tasks.total);
+  sec(g, 400); // הבוטים מדליקים (ומתחזה בוט עשוי לכבות)
+  const v2 = g.view(a);
+  ok(v2.phase === 'end' || (v2.tasks.done >= 0 && v2.tasks.done <= 8), 'ספירת נרות לא תקינה');
+  const g2 = createGame(MAP); const b = g2.join('מארח'); g2.act(b, { type: 'settings', mode: 5 });
+  ok(g2.view(b).settings.mode !== 5, 'מצב נרות נפתח בלי חנוכה');
+});
+
+test('חנוכה: השמש מגן ל-15 שניות, ובלי אירוע אין שמש וסביבון', () => {
+  let found = null;
+  for (let i = 0; i < 80 && !found; i++) {
+    const g = createGame(MAP, { hanuk: true }); const a = g.join('מארח');
+    g.act(a, { type: 'settings', impostors: 1, bots: 5, newRoles: true });
+    g.act(a, { type: 'start' });
+    if (g.view(a).me.roleKey === 'shamash') found = { g, a };
+  }
+  ok(found, 'השמש לא הופיע באירוע');
+  const { g, a } = found; const v = g.view(a);
+  ok(v.me.mod && v.me.mod.label === 'נס פח השמן', 'אין כפתור נס');
+  g.act(a, { type: 'mod' });
+  ok(g.view(a).miracles.length === 1, 'הנס לא נדלק');
+  sec(g, 16); ok(g.view(a).miracles.length === 0, 'הנס לא נגמר אחרי 15 שניות');
+  for (let i = 0; i < 25; i++) {
+    const g2 = createGame(MAP); const b = g2.join('מארח'); g2.act(b, { type: 'settings', impostors: 1, bots: 5 }); g2.act(b, { type: 'start' });
+    const sn = JSON.parse(g2.snapshot());
+    ok(Object.values(sn.players).every(p => p.role !== 'shamash' && p.tasks.every(x => !MAP.TASKS[x.i].ev)), 'פריט חנוכה הופיע בלי אירוע');
+  }
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
