@@ -43,6 +43,10 @@
     background: linear-gradient(90deg, #ff9f1c, #ffd23f, #ff6bcb, #ff9f1c); background-size: 300% 100%; animation: clownbg 6s linear infinite; }
   #clownWeek small { display: block; font-weight: 600; font-size: 13px; margin-top: 2px; }
   @keyframes clownbg { to { background-position: 300% 0; } }
+  .dreidelBox { display: flex; justify-content: center; align-items: center; padding: 20px; perspective: 700px; }
+  .spinning-dreidel { width: 130px; height: 156px; }
+  .spinning-dreidel.spin { animation: spin-dreidel 1.2s linear infinite; }
+  @keyframes spin-dreidel { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
   #hanukBanner { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; text-align: center; color: #0b1a4a; background: linear-gradient(90deg, #5ec8ff, #ffffff, #ffd54a, #ffffff, #5ec8ff); background-size: 300% 100%; animation: clownbg 7s linear infinite; box-shadow: 0 0 18px rgba(110,190,255,.45); }
   #hanukBanner .hbT { font-weight: 900; font-size: 18px; }
   #hanukBanner small { display: block; font-weight: 700; font-size: 12.5px; margin-top: 3px; }
@@ -203,9 +207,9 @@
   .orow { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
   .orow .nm { flex: 1; } .orow .pc { direction: ltr; font-weight: bold; color: var(--accent); } .orow.off { opacity: .4; }
   .orow.imp .pc { color: var(--imp); } .orow.jester .pc { color: #ff9f1c; }
-  .lmodal { position: fixed; inset: 0; z-index: 40; background: rgba(5,8,16,.78); display: flex; align-items: center; justify-content: center; padding: 14px; }
+  .lmodal { position: fixed; inset: 0; z-index: 40; background: var(--bg, #0b0f1c); display: flex; align-items: stretch; justify-content: center; padding: 0; }
   .lmodal.hidden { display: none; }
-  .lmBox { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; width: min(760px, 100%); max-height: 100%; overflow: auto; }
+  .lmBox { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 0; border: 0; padding: 22px max(16px, 6vw); width: 100%; max-height: none; height: 100%; overflow: auto; }
   .lmBox h2 { margin: 0 0 10px; }
   .lmClose { position: sticky; float: left; top: 0; }
   #roleBoard .rg { margin: 12px 0 4px; font-weight: bold; }
@@ -531,15 +535,11 @@
       </div>
       <div id="shareLink" style="direction:ltr;text-align:left;font-family:ui-monospace,monospace;font-size:13px;color:var(--muted);margin-top:6px;word-break:break-all"></div>
     </div>
-        <div class="oddsBox"><b>📊 סיכוי תפקידים</b> <span class="sub" style="margin:0;font-size:12px" id="oddsN"></span><div id="oddsMini"></div></div>
       </aside>
       <div id="shipMain">
         <div id="codeChip" class="hidden"><span class="sub" style="margin:0">קוד:</span> <b id="chipCode"></b> <button id="chipWa" style="background:#1f8a4c">📲</button> <button id="chipCopy">📋</button></div>
         <canvas id="shipCv" width="1000" height="560"></canvas>
         <div class="row" style="justify-content:center;margin-top:8px">
-          <button data-st="wardrobe">👕 ארון בגדים</button>
-          <button data-st="comp">💻 מחשב</button>
-          <button data-st="board">📋 לוח תפקידים</button>
           <button data-st="crew" id="crewBtn" class="hidden">👥 שחקנים וצ'אט</button>
           <button id="startBtn2" class="primary hidden">התחל משחק ▶</button>
         </div>
@@ -640,10 +640,6 @@
     <div id="menorahModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>🕎 חנוכייה</h2><div id="menBody"></div></div></div>
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
-      <b>צוות:</b> איש צוות · מהנדס (פתחי אוורור) · מדען (סימנים חיוניים) · מלאך שומר · הצלם (מצלם ראיות) · בלש (חוקר) · שופט (קול כפול) · מגן אישי (יודע איפה מת מי שהוא שומר עליו) · שומר הזמן (מחזיר את כולם אחורה פעם אחת)<br>
-      <b>🤡 לבד:</b> הליצן – לא צוות ולא מתחזה. מנצח אם מדיחים אותו בישיבה. פתחי אוורור, קליפת בננה וגופה מזויפת (אפשר לכבות בהגדרות)<br>
-      <b>מתחזים:</b> מתחזה · משנה צורה · נעלם (בלתי נראה) · מרקיב (גופות מתפרקות) · מחבל · רדוף (נועל דלת, מכבה אור בחדר, גורר גופות) · רעשן (רעש מזויף בחדר אחר)<br>
-      <b>🕵️ שתול:</b> נראה כמו איש צוות, יודע מי המתחזים ומנצח איתם – בלי חיסול<br>
       <span class="sub" style="font-size:12px">גרסה: <span id="verTxt"></span> · קול: <span id="linkInfo">לא פעיל</span></span><br>
       <b>🎙️ צ'אט קולי:</b> לחץ על כפתור המיקרופון ליד ⚙️ ואשר גישה בדפדפן. הקול פועל בכל שלבי המשחק: בלובי, במהלך המשחק ובישיבות. חיים לא שומעים רוחות. הבוטים מדברים בקול (אפשר להשתיק ב-🤖).<br>
       <b>מקשים:</b> <span id="keysHelp"></span> · אפשר לשנות בכפתור ⚙️ למעלה
@@ -771,7 +767,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-122354'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-123006'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1491,16 +1487,13 @@ function stationAtPoint(cx, cy) {
 $('#shipCv').addEventListener('click', e => { const st = stationAtPoint(e.clientX, e.clientY); if (st) openStation(st.id); });
 function renderOdds() {
   if (!LI) return;
-  $('#oddsN').textContent = LI.classic ? '(' + LI.n + ' שחקנים)' : '';
   const teamOrder = [['crew', '🧑‍🚀 ' + 'צוות (הטובים)'], ['imp', '🔪 ' + 'מתחזים (הרעים)'], ['jester', '🟠 ' + 'לבד (ניטרלי)']];
   const show1 = LI.roles.filter(r => r.k !== 'crew' || true);
   if (!LI.classic) {
     const msg = '<p class="sub">במצב הזה אין תפקידים מיוחדים (' + (LI.mode === 2 ? 'כולם מבצעים משימות' : LI.mode === 3 ? 'מחפש אחד והשאר מתחבאים' : 'מצב מיוחד') + ').</p>';
-    $('#oddsMini').innerHTML = msg; $('#roleBoard').innerHTML = msg; return;
+    $('#roleBoard').innerHTML = msg; return;
   }
   const pct = r => r.on ? r.per + '%' : '—';
-  $('#oddsMini').innerHTML = LI.roles.filter(r => r.on && r.per > 0).sort((a, b) => b.per - a.per).map(r =>
-    `<div class="orow ${esc(r.team)}" title="${esc(r.desc)}"><span>${esc(r.ic)}</span><span class="nm">${esc(r.name)}</span><span class="pc">${r.per}%</span></div>`).join('') || '<p class="sub">אין תפקידים פעילים</p>';
   $('#roleBoard').innerHTML = teamOrder.map(([t, title]) => {
     const rs = LI.roles.filter(r => r.team === t);
     if (!rs.length) return '';
@@ -2291,26 +2284,20 @@ function buildRound() {
 
 // ---------- מיני-משחק הסביבון ----------
 function buildDreidel(b, tk) {
-  let spins = 0, busy = false, ang = Math.random() * 6;
-  b.innerHTML = '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p><canvas id="drCv" width="240" height="200" style="display:block;margin:0 auto"></canvas><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
-  const g = $('#drCv').getContext('2d');
-  const draw = () => { g.clearRect(0, 0, 240, 200); g.fillStyle = 'rgba(255,255,255,.1)'; g.beginPath(); g.ellipse(120, 176, 46, 9, 0, 0, 7); g.fill(); drawDreidel(g, 120, 104, 3.5, ang, null); };
-  draw();
+  let spins = 0, busy = false;
+  b.innerHTML = '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p><div class="dreidelBox"><svg id="drSvg" class="spinning-dreidel" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg"><rect x="44" y="5" width="12" height="20" rx="3" fill="#d97706"/><rect x="25" y="25" width="50" height="50" rx="6" fill="#2563eb"/><polygon points="25,75 75,75 50,110" fill="#1d4ed8"/><circle cx="50" cy="50" r="15" fill="#facc15"/><text id="drLetter" x="50" y="57" text-anchor="middle" font-size="20" font-weight="bold" font-family="Arial" fill="#1b1405">ש</text></svg></div><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
+  const svg = $('#drSvg'), L = $('#drLetter'), faces = ['נ', 'ג', 'ה', 'ש'];
   $('#drBtn').onclick = () => {
     if (busy) return; busy = true; spins++;
-    const q = Math.PI / 2;
     const target = spins >= 3 || Math.random() < 0.34 ? 1 : [0, 2, 3][Math.floor(Math.random() * 3)];
-    const start = ang, end = (Math.ceil(start / (2 * Math.PI)) + 3) * 2 * Math.PI + (target + 0.5) * q, t0 = performance.now(), dur = 2100;
-    $('#drRes').textContent = '';
-    const step = now => {
-      if (!alive(tk)) return;
-      const u = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - u, 3);
-      ang = start + (end - start) * e; draw();
-      if (u < 1) return requestAnimationFrame(step);
+    $('#drRes').textContent = ''; svg.classList.add('spin');
+    const flick = setInterval(() => { if (!alive(tk)) return clearInterval(flick); L.textContent = faces[Math.floor(Math.random() * 4)]; }, 140);
+    setTimeout(() => {
+      clearInterval(flick); if (!alive(tk)) return;
+      svg.classList.remove('spin'); L.textContent = faces[target];
       if (target === 1) { $('#drRes').innerHTML = '<span style="color:var(--ok)">🎉 ג׳! נס גדול!</span>'; setTimeout(() => { if (alive(tk)) miniDone(); }, 650); }
       else { $('#drRes').textContent = '😅 לא יצא ג׳ – עוד פעם'; busy = false; }
-    };
-    requestAnimationFrame(step);
+    }, 2100);
   };
 }
 // ---------- חנוכייה בלובי ----------
