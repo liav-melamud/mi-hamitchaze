@@ -1122,5 +1122,38 @@ test('בוטים חכמים: שחקן שחזר לחיים אומר "X הרג א�
   ok(crewBots.length && voted >= Math.ceil(crewBots.length * 0.6), 'הבוטים לא הצביעו על מי שהואשם ע"י מי שחזר: ' + voted + '/' + crewBots.length);
 });
 
+test('מודים: תפקיד מותאם מתבנית (ספרינט) מופיע, נושא שם ויכולת משלו, ומשתמש בהתנהגות התבנית', () => {
+  const g = createGame(MAP); const a = g.join('מארח');
+  const keys = g.setCustomRoles([{ id: 't1', name: 'מהיר ברק', tpl: 'sprinter', icon: '⚡', cd: 7, uses: 0, dur: 3, desc: 'רץ מהר' }, { id: 'bad', tpl: 'nosuch' }, { id: 'x', name: '<b>x</b>', tpl: 'medic' }]);
+  ok(keys.length === 2 && keys[0] === 'x_t1', 'רישום תפקידים מותאמים נכשל: ' + keys);
+  let found = null;
+  for (let i = 0; i < 120 && !found; i++) {
+    const h = createGame(MAP); h.setCustomRoles([{ id: 't1', name: 'מהיר ברק', tpl: 'sprinter', icon: '⚡', cd: 7, uses: 0, dur: 3 }]);
+    const b = h.join('מארח'); h.act(b, { type: 'settings', impostors: 1, bots: 6, newRoles: true }); h.act(b, { type: 'start' });
+    if (h.view(b).me.roleKey === 'x_t1') found = { h, b };
+  }
+  ok(found, 'התפקיד המותאם לא הופיע במשחק');
+  const { h, b } = found, v = h.view(b);
+  ok(v.me.role === 'מהיר ברק' && v.me.tpl === 'sprinter' && v.me.mod && v.me.mod.cd === 0, 'תכונות התפקיד המותאם שגויות');
+  h.act(b, { type: 'mod' }); sec(h, 0.1);
+  ok(h.view(b).me.mod.cd > 0 || JSON.parse(h.snapshot()).players[b].sprintUntil > 0, 'היכולת לא הופעלה');
+  g.setCustomRoles([]);
+});
+
+test('מודים: מפה מותאמת נרשמת, נבחרת בלובי, והמשחק רץ עליה (גם עם בוטים) – וחדר לא מוכר חוזר לגדולה', () => {
+  const d = { theme: 'space', rooms: { A: { name: 'א', x: 100, y: 100, w: 300, h: 240, c: '#335' }, B: { name: 'ב', x: 600, y: 100, w: 300, h: 240, c: '#353' }, C: { name: 'ג', x: 100, y: 500, w: 300, h: 240, c: '#533' }, D: { name: 'ד', x: 600, y: 500, w: 300, h: 240, c: '#553' } }, corr: [['A', 'B', 'h', 220], ['C', 'D', 'h', 620], ['A', 'C', 'v', 250], ['B', 'D', 'v', 750]], tasks: [], perRoom: 4, vents: [{ x: 200, y: 200, net: 0 }, { x: 700, y: 200, net: 0 }, { x: 200, y: 600, net: 0 }], button: { x: 250, y: 220 }, world: { w: 1100, h: 900 } };
+  const g = createGame(MAP); const a = g.join('מארח');
+  g.setCustomMaps({ mod_t1: d });
+  g.act(a, { type: 'settings', bots: 4, map: 'mod_t1' });
+  const v0 = g.view(a); ok(v0.settings.map === 'mod_t1', 'המפה המותאמת לא נבחרה');
+  ok(v0.modMap && v0.modMap.id === 'mod_t1' && v0.modMap.def.rooms.A, 'המפה לא נשלחה לשחקנים');
+  ok(!g.view(a).modMap, 'המפה נשלחה שוב בלי צורך');
+  g.act(a, { type: 'start' }); sec(g, 20);
+  const v = g.view(a); ok(v.phase === 'play' && v.tasks.total > 0, 'המשחק לא התחיל במפה המותאמת');
+  const m = MAP.byId.mod_t1; ok(m && m.walkable(v.players.find(p => p.id === a).x, v.players.find(p => p.id === a).y), 'השחקן מחוץ למפה');
+  g.act(a, { type: 'lobby' }); g.act(a, { type: 'settings', map: 'mod_nope' });
+  ok(g.view(a).settings.map === 'big', 'מפה לא קיימת צריכה לחזור לגדולה');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);

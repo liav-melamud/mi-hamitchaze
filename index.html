@@ -60,6 +60,10 @@
   .spinning-dreidel { width: 130px; height: 156px; }
   .spinning-dreidel.spin { animation: spin-dreidel 1.2s linear infinite; }
   @keyframes spin-dreidel { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+  #modsTabs button.sel, #meTools button.sel { background: var(--accent, #ffb547); color: #1b1405; }
+  .mcard { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: 6px 0; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.04); }
+  .mcard small { display: block; color: var(--muted); font-size: 12px; } .mcard .mic { font-size: 26px; } .mtog { font-size: 13px; white-space: nowrap; }
+  .mform label { display: block; margin: 8px 0; font-size: 14px; } .mform input, .mform select, .mform textarea { width: 100%; box-sizing: border-box; margin-top: 3px; }
   #gavel { text-align: center; padding: 26px 0 10px; }
   #gavel .hm { font-size: 96px; display: inline-block; transform-origin: 80% 90%; animation: hammer 1.2s ease-in forwards; }
   #gavel .gtxt { font-size: 22px; opacity: 0; animation: gfade .4s 0.95s forwards; margin-top: 8px; }
@@ -553,6 +557,7 @@
         <button id="langBtn" class="link">🌐 English / עברית</button>
         <button class="statsBtn link">📊 הסטטיסטיקה והתגים שלי</button>
         <button id="funDreidelBtn" class="link">🌀 סביבון לכיף</button>
+        <button id="modsBtn" class="link">🧩 מודים</button>
       </div>
     </div>
     <button id="moreOpts" class="link hidden" style="width:100%;margin-top:10px">אפשרויות נוספות</button>
@@ -560,6 +565,13 @@
     <div id="appBox" class="hidden"></div>
   </div>
 </div>
+
+<div id="modsScreen" class="lmodal hidden"><div class="lmBox">
+  <button class="lmClose" id="modsClose">✖</button>
+  <h2>🧩 מודים</h2>
+  <div id="modsTabs" class="row" style="gap:6px;margin-bottom:10px"><button data-mt="roles" class="sel">🎭 תפקידים</button><button data-mt="maps">🗺️ מפות</button><button data-mt="share">📦 ייצוא / ייבוא</button></div>
+  <div id="modsBody"></div>
+</div></div>
 
 <!-- לובי -->
 <div id="lobby" class="screen hidden">
@@ -811,7 +823,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-131053'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-155355'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1005,6 +1017,7 @@ function emojiRain(list, count, ms) {
 function runEngine(name, demo, resume, offline) {
   isHost = true;
   engine = createGame(MAP, { demo, jester: true, hanuk: hanukActive });
+  applyMods(engine);
   if (resume && resume.snapshot) { try { engine.restore(resume.snapshot); } catch (e) { console.warn('restore failed', e); } }
   ID = engine.join(name, resume && resume.pid);
   if (resume && resume.snapshot) engine.setHost(ID);
@@ -1393,6 +1406,8 @@ function switchMap(id) {
   if (tmOpen) closeTaskMap();
 }
 function onState(s) {
+  if (s.modMap && MAPREG) MAPREG(s.modMap.id, s.modMap.def);
+  if (s.map && s.map.startsWith('mod_') && !(window.MAPS && window.MAPS[s.map]) && Date.now() - (window._mapAsk || 0) > 1500) { window._mapAsk = Date.now(); api({ type: 'lobbyinfo' }); }
   if (s.map) switchMap(s.map);
   if (s.noises && s.noises.length) { const last = window._lastNoise || 0; let mx = last; for (const n of s.noises) if (n.id > last) { mx = Math.max(mx, n.id); const dx = n.x - s.me.x, dy = n.y - s.me.y, d = Math.hypot(dx, dy); if (s.me.team === 'imp' || d <= 1300) stepsSound(Math.max(0.05, 1 - d / 1300), Math.max(-1, Math.min(1, dx / 500))); } window._lastNoise = mx; }
   if (s.pings && s.pings.length) { const last = window._lastPing || 0; let mx = last; for (const n of s.pings) if (n.id > last) { mx = Math.max(mx, n.id); const dx = n.x - s.me.x, dy = n.y - s.me.y, d = Math.hypot(dx, dy), rng = s.me.team === 'imp' ? 1000 : 380; pingSound(Math.max(0.03, 1 - d / rng), Math.max(-1, Math.min(1, dx / 500))); } window._lastPing = mx; }
@@ -1458,7 +1473,7 @@ function renderLobby(s) {
     } catch (e) {}
   }
   const sig = JSON.stringify([s.roster, s.hostId, s.settings, s.me.color]);
-  renderHats(s); renderPets(s);
+  renderHats(s); renderPets(s); syncMapOptions(s);
   $('#mode5opt').hidden = !s.hanuk; $('#mode5opt').disabled = !s.hanuk;
   if (sig === lobbySig) return;
   lobbySig = sig;
@@ -1691,7 +1706,7 @@ function actionState(s) {
   st.report = { show: alive && s.settings.mode !== 3, on: s.bodies.some(b => D(pos, b) <= 110) };
   const killable = s.players.filter(p => p.id !== me.id && p.alive && !p.spec && p.team !== 'imp' && D(pos, p) <= 90);
   st.kill = { show: alive && me.team === 'imp' && me.roleKey !== 'saboteur' && me.roleKey !== 'poltergeist', on: !inVent && !me.vanished && me.killCd === 0 && killable.length > 0, label: me.killCd ? 'חסל ' + me.killCd : 'חסל' };
-  st.vent = { show: alive && (me.hideVentsLeft != null || MOD_IMP.includes(me.roleKey) || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey)), on: inVent || (!me.engVentCd && me.hideVentsLeft !== 0 && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : me.hideVentsLeft != null ? 'פתח (' + me.hideVentsLeft + ')' : 'פתח') };
+  st.vent = { show: alive && (me.hideVentsLeft != null || MOD_IMP.includes(me.tpl || me.roleKey) || ['impostor', 'shifter', 'engineer', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'jester'].includes(me.roleKey)), on: inVent || (!me.engVentCd && me.hideVentsLeft !== 0 && MAP.VENTS.some(v => D(pos, v) <= 60)), label: inVent ? (me.ventLeft != null ? 'צא (' + me.ventLeft + ')' : 'צא מהפתח') : (me.engVentCd ? 'פתח ' + me.engVentCd : me.hideVentsLeft != null ? 'פתח (' + me.hideVentsLeft + ')' : 'פתח') };
   st.shift = { show: alive && me.roleKey === 'shifter', on: me.shifted || me.shiftCd === 0, label: me.shifted ? 'חזור לצורה' : (me.shiftCd ? 'שנה צורה ' + me.shiftCd : 'שנה צורה') };
   st.shield = { show: !me.alive && me.roleKey === 'angel', on: me.gaCd === 0 && s.players.some(p => p.alive && !p.spec && D(pos, p) <= 150), label: me.gaCd ? 'הגן ' + me.gaCd : 'הגן' };
   st.vitals = { show: me.roleKey === 'scientist', on: true };
@@ -1757,7 +1772,7 @@ function doAction(k) {
 }
 
 function jestLike(me) { // יעד שונה לכל תפקיד "לבד" (קורבן, נשר, ניצול, מסית) – לא טקסט הליצן
-  const r = me.roleKey;
+  const r = me.tpl || me.roleKey;
   if (r === 'martyr') return '<li>🕊️ המטרה שלך: שיחסלו אותך (מתחזה) – אז אתה מנצח לבד!</li><li>הסתובב ליד מתחזים, תעורר חשד… אבל אל תיתן להדיח אותך בישיבה.</li>';
   if (r === 'vulture') return '<li>🦅 אכול 3 גופות (O) ותנצח לבד – אכלת ' + (me.eaten || 0) + '/3</li><li>הגופה נעלמת ואי אפשר לדווח עליה. אל תיתפס.</li>';
   if (r === 'survivor') return '<li>🛟 תישאר בחיים עד סוף המשחק – ואתה מנצח גם, בלי קשר למי שניצח!</li><li>הימנע ממתחזים ומהצבעות נגדך.</li>';
@@ -4683,6 +4698,294 @@ applyPref();
 refreshKeyLabels();
 $('#verTxt').textContent = VERSION;
 if (isTouch) document.body.classList.add('touch');
+
+// =====================================================================
+// ---------- סטודיו מודים: תפקידים ומפות משלכם (נשמר בדפדפן, ומשותף לחדר שאתה מארח) ----------
+const MAPREG = window.MAP && window.MAP.register, MAP_FROM = window.MAP && window.MAP.fromDef, BUILTIN_MAPS = { big: 'הגדולה', small: 'הקטנה', ice: 'תחנת הקרח' };
+const modLoad = () => { try { const o = JSON.parse(localStorage.getItem('mm_mods') || '{}'); return { roles: Array.isArray(o.roles) ? o.roles : [], maps: Array.isArray(o.maps) ? o.maps : [] }; } catch (e) { return { roles: [], maps: [] }; } };
+const modSave = m => { try { localStorage.setItem('mm_mods', JSON.stringify(m)); } catch (e) { toast('⚠️ לא הצלחתי לשמור (אחסון הדפדפן חסום)'); } };
+const modId = () => Math.random().toString(36).slice(2, 8);
+// מחברים את המודים הפעילים למנוע (נקרא כשהמארח יוצר חדר)
+function applyMods(eng) {
+  const m = modLoad(), maps = {};
+  m.maps.filter(x => x.on !== false && x.def).forEach(x => { maps['mod_' + x.id] = x.def; });
+  try { eng.setCustomRoles(m.roles.filter(r => r.on !== false)); eng.setCustomMaps(maps); } catch (e) { console.warn('mods failed', e); }
+}
+// ----- תבניות יכולת: כל תפקיד חדש נבנה מאחת מהן, עם שם, אייקון, זמנים ותיאור משלכם -----
+// [מפתח, אייקון, שם, קבוצה (c/imp/n), יש כפתור, ברירות מחדל {cd,uses,dur}, תיאור]
+const TPLS = [
+  ['sprinter', '🏃', 'ספרינט', 'c', 1, { cd: 30, uses: 0, dur: 5 }, 'ריצה מהירה פי 1.7 לכמה שניות'],
+  ['medic', '🩺', 'החייאה', 'c', 1, { cd: 0, uses: 1, dur: 0 }, 'מחיה שחקן שחוסל (עומד ליד הגופה)'],
+  ['scout', '🔭', 'סייר', 'c', 0, { cd: 0, uses: 0, dur: 0 }, 'טווח ראייה גדול ב-40% (פסיבי)'],
+  ['lucky', '🍀', 'בר מזל', 'c', 0, { cd: 0, uses: 0, dur: 0 }, 'שורד ניסיון חיסול ראשון (פסיבי)'],
+  ['trapper', '🪤', 'מלכודות', 'c', 1, { cd: 8, uses: 2, dur: 0 }, 'מניח מלכודות שמקפיאות מי שדורך'],
+  ['radar', '📡', 'מכ"ם', 'c', 1, { cd: 45, uses: 3, dur: 5 }, 'רואה את כל השחקנים על המפה לכמה שניות'],
+  ['taskmaster', '⚡', 'אשף משימות', 'c', 0, { cd: 0, uses: 0, dur: 0 }, 'משימות בחצי מהזמן (פסיבי)'],
+  ['jailer', '🔒', 'נעילת חדר', 'c', 1, { cd: 45, uses: 0, dur: 0 }, 'נועל את דלתות החדר שבו הוא נמצא'],
+  ['empath', '😨', 'חוש', 'c', 1, { cd: 25, uses: 0, dur: 0 }, 'מרגיש אם יש מתחזה קרוב'],
+  ['shamash', '🕎', 'נס פח השמן', 'c', 1, { cd: 0, uses: 1, dur: 15 }, 'אור קסום שמגן מחיסול לכמה שניות'],
+  ['sniper', '🎯', 'צלף', 'imp', 0, { cd: 0, uses: 0, dur: 0 }, 'חיסול מטווח כפול, המתנה ארוכה יותר (פסיבי)'],
+  ['poisoner', '☠️', 'הרעלה', 'imp', 0, { cd: 0, uses: 0, dur: 0 }, 'חיסול מושהה: הקורבן מת אחרי 12 שניות (פסיבי)'],
+  ['blinker', '🌀', 'שיגור', 'imp', 1, { cd: 40, uses: 0, dur: 0 }, 'משתגר לחדר אקראי'],
+  ['cleaner', '🧹', 'ניקוי גופה', 'imp', 1, { cd: 30, uses: 0, dur: 0 }, 'מעלים גופה קרובה'],
+  ['zapper', '⚡', 'שוק חשמלי', 'imp', 1, { cd: 40, uses: 0, dur: 0 }, 'מקפיא את הצוות שבסביבה'],
+  ['vampire', '🧛', 'ערפד', 'imp', 0, { cd: 0, uses: 0, dur: 0 }, 'המתנה קצרה יותר בין חיסולים (פסיבי)'],
+  ['bomber', '💣', 'פצצה', 'imp', 1, { cd: 0, uses: 1, dur: 0 }, 'מניח פצצה שמתפוצצת אחרי 6 שניות'],
+  ['martyr', '🕊️', 'קורבן', 'n', 0, { cd: 0, uses: 0, dur: 0 }, 'מנצח לבד אם מתחזה מחסל אותו'],
+  ['vulture', '🦅', 'אוכל גופות', 'n', 1, { cd: 5, uses: 0, dur: 0 }, 'אוכל 3 גופות ומנצח לבד'],
+  ['survivor', '🛟', 'ניצול', 'n', 0, { cd: 0, uses: 0, dur: 0 }, 'מנצח אם הוא חי בסוף (פסיבי)'],
+  ['instigator', '🗣️', 'מסית', 'n', 0, { cd: 0, uses: 0, dur: 0 }, 'מנצח לבד אם גרם להדחת 2 חפים מפשע'],
+];
+const TPL = Object.fromEntries(TPLS.map(t => [t[0], t]));
+const TEAM_NAME = { c: 'צוות', imp: 'מתחזים', n: 'לבד (כתום)' };
+let modsTab = 'roles', modEdit = null;
+const modsBox = () => $('#modsBody');
+function openMods(tab) { modsTab = tab || modsTab; modEdit = null; show('#modsScreen', true); renderMods(); }
+function closeMods() { show('#modsScreen', false); mapEd = null; }
+function renderMods() {
+  document.querySelectorAll('#modsTabs button').forEach(b => b.classList.toggle('sel', b.dataset.mt === modsTab));
+  if (mapEd) return renderMapEditor();
+  ({ roles: renderModRoles, maps: renderModMaps, share: renderModShare })[modsTab]();
+}
+// ---------- תפקידים ----------
+function renderModRoles() {
+  const m = modLoad(), b = modsBox();
+  if (modEdit) return renderRoleEditor();
+  b.innerHTML = '<p class="sub" style="margin:0 0 10px">צור תפקידים משלך: בחר תבנית יכולת, תן שם ואייקון וכוונן זמנים. התפקידים הפעילים מופיעים בחדרים שאתה מארח (גם מול בוטים).</p>' +
+    (m.roles.map(r => { const t = TPL[r.tpl] || TPLS[0]; return `<div class="mcard"><span class="mic">${esc(r.icon || t[1])}</span><span style="flex:1"><b>${esc(r.name)}</b><small>${esc(T(TEAM_NAME[t[3]]))} · ${esc(T(t[2]))}${t[4] ? ' · המתנה ' + (+r.cd || 0) + ' שנ׳' : ''}</small></span>
+      <label class="mtog"><input type="checkbox" data-mon="${esc(r.id)}" ${r.on !== false ? 'checked' : ''}> <span>פעיל</span></label><button data-med="${esc(r.id)}">✏️</button><button data-mdel="${esc(r.id)}">🗑️</button></div>`; }).join('') || '<p class="sub">עוד אין תפקידים. לחץ על "תפקיד חדש".</p>') +
+    '<button id="mrNew" class="primary" style="margin-top:10px">➕ תפקיד חדש</button>';
+  $('#mrNew').onclick = () => { modEdit = { id: modId(), name: '', tpl: 'sprinter', icon: '', btn: '', cd: 30, uses: 0, dur: 5, desc: '', on: true, isNew: true }; renderMods(); };
+  b.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const mm = modLoad(); const r = mm.roles.find(x => x.id === c.dataset.mon); if (r) { r.on = c.checked; modSave(mm); } });
+  b.querySelectorAll('[data-med]').forEach(c => c.onclick = () => { modEdit = JSON.parse(JSON.stringify(modLoad().roles.find(x => x.id === c.dataset.med))); renderMods(); });
+  b.querySelectorAll('[data-mdel]').forEach(c => c.onclick = () => { if (!confirm('למחוק את התפקיד?')) return; const mm = modLoad(); mm.roles = mm.roles.filter(x => x.id !== c.dataset.mdel); modSave(mm); renderMods(); });
+}
+function renderRoleEditor() {
+  const r = modEdit, b = modsBox(), t = TPL[r.tpl];
+  const groups = ['c', 'imp', 'n'].map(g => `<optgroup label="${esc(T(TEAM_NAME[g]))}">` + TPLS.filter(x => x[3] === g).map(x => `<option value="${x[0]}" ${x[0] === r.tpl ? 'selected' : ''}>${x[1]} ${esc(T(x[2]))} – ${esc(T(x[6]))}</option>`).join('') + '</optgroup>').join('');
+  b.innerHTML = `<div class="mform"><h3 style="margin:0 0 8px">${r.isNew ? 'תפקיד חדש' : 'עריכת תפקיד'}</h3>
+    <label><span>שם התפקיד</span> <input id="reName" maxlength="14" value="${esc(r.name)}" placeholder="${esc(T('למשל: מהיר ברק'))}"></label>
+    <label><span>תבנית יכולת</span> <select id="reTpl">${groups}</select></label>
+    <label><span>אייקון</span> <input id="reIcon" maxlength="4" value="${esc(r.icon || t[1])}" style="width:80px;text-align:center;font-size:20px"></label>
+    ${t[4] ? `<label><span>שם הכפתור</span> <input id="reBtn" maxlength="14" value="${esc(r.btn || '')}" placeholder="${esc(T(t[2]))}"></label>
+    <label><span>המתנה בין שימושים (שניות)</span> <input id="reCd" type="number" min="0" max="120" value="${+r.cd || 0}" style="width:90px"></label>
+    <label><span>מספר שימושים במשחק (0 = בלי הגבלה)</span> <input id="reUses" type="number" min="0" max="9" value="${+r.uses || 0}" style="width:90px"></label>` : '<p class="sub" style="margin:4px 0">לתבנית הזו אין כפתור – היא פועלת אוטומטית.</p>'}
+    ${t[5].dur ? `<label><span>משך היכולת (שניות)</span> <input id="reDur" type="number" min="1" max="60" value="${+r.dur || t[5].dur}" style="width:90px"></label>` : ''}
+    <label><span>תיאור (מה השחקן רואה)</span> <textarea id="reDesc" rows="3" maxlength="260" placeholder="${esc(T(t[6]))}">${esc(r.desc)}</textarea></label>
+    <div class="row" style="gap:8px;margin-top:10px"><button id="reSave" class="primary">💾 שמור</button><button id="reCancel">ביטול</button></div></div>`;
+  $('#reTpl').onchange = () => { const nt = TPL[$('#reTpl').value]; modEdit = collectRole(); modEdit.tpl = nt[0]; modEdit.icon = nt[1]; modEdit.cd = nt[5].cd; modEdit.uses = nt[5].uses; modEdit.dur = nt[5].dur; modEdit.btn = ''; renderMods(); };
+  $('#reCancel').onclick = () => { modEdit = null; renderMods(); };
+  $('#reSave').onclick = () => {
+    const x = collectRole(); if (!x.name.trim()) return toast('תן שם לתפקיד');
+    const mm = modLoad(), i = mm.roles.findIndex(q => q.id === x.id); delete x.isNew; if (i >= 0) mm.roles[i] = x; else mm.roles.push(x);
+    modSave(mm); modEdit = null; renderMods(); toast('✅ התפקיד נשמר – הוא יופיע בחדרים שתפתח');
+  };
+}
+function collectRole() {
+  const g = id => { const el = $('#' + id); return el ? el.value : undefined; };
+  return Object.assign({}, modEdit, { name: (g('reName') || '').trim().slice(0, 14), tpl: g('reTpl') || modEdit.tpl, icon: (g('reIcon') || '').trim().slice(0, 4), btn: (g('reBtn') || '').trim().slice(0, 14), cd: Math.max(0, Math.min(120, +g('reCd') || 0)), uses: Math.max(0, Math.min(9, +g('reUses') || 0)), dur: Math.max(0, Math.min(60, +g('reDur') || modEdit.dur || 0)), desc: (g('reDesc') || '').trim().slice(0, 260) });
+}
+// ---------- מפות ----------
+function renderModMaps() {
+  const m = modLoad(), b = modsBox();
+  b.innerHTML = '<p class="sub" style="margin:0 0 10px">צור מפה חדשה, או התחל מעותק של אחת הקיימות ושנה אותה. המפות הפעילות מופיעות בבחירת המפה בלובי של חדר שאתה מארח.</p>' +
+    (m.maps.map(x => `<div class="mcard"><span class="mic">🗺️</span><span style="flex:1"><b>${esc(x.name)}</b><small>${Object.keys(x.def.rooms).length} חדרים</small></span>
+      <label class="mtog"><input type="checkbox" data-mon="${esc(x.id)}" ${x.on !== false ? 'checked' : ''}> <span>פעילה</span></label><button data-med="${esc(x.id)}">✏️</button><button data-mdel="${esc(x.id)}">🗑️</button></div>`).join('') || '<p class="sub">עוד אין מפות משלך.</p>') +
+    '<h3 style="margin:14px 0 6px">➕ מפה חדשה</h3><div class="row" style="gap:6px"><button id="mmBlank" class="primary">מפה ריקה</button>' + Object.entries(BUILTIN_MAPS).map(([k, n]) => `<button data-mcopy="${k}"><span>העתק את</span> ${esc(n)}</button>`).join('') + '</div>';
+  b.querySelectorAll('[data-mon]').forEach(c => c.onchange = () => { const mm = modLoad(); const r = mm.maps.find(x => x.id === c.dataset.mon); if (r) { r.on = c.checked; modSave(mm); } });
+  b.querySelectorAll('[data-mdel]').forEach(c => c.onclick = () => { if (!confirm('למחוק את המפה?')) return; const mm = modLoad(); mm.maps = mm.maps.filter(x => x.id !== c.dataset.mdel); modSave(mm); renderMods(); });
+  b.querySelectorAll('[data-med]').forEach(c => c.onclick = () => { const x = modLoad().maps.find(q => q.id === c.dataset.med); if (x) startMapEditor(x.id, x.name, x.def); });
+  $('#mmBlank').onclick = () => startMapEditor(modId(), 'המפה שלי', blankDef());
+  b.querySelectorAll('[data-mcopy]').forEach(c => c.onclick = () => startMapEditor(modId(), 'עותק של ' + BUILTIN_MAPS[c.dataset.mcopy], JSON.parse(JSON.stringify(window.MAPS[c.dataset.mcopy].def))));
+}
+const blankDef = () => ({ theme: 'space', rooms: { R1: { name: 'חדר 1', x: 200, y: 200, w: 360, h: 260, c: '#38424f' }, R2: { name: 'חדר 2', x: 760, y: 200, w: 360, h: 260, c: '#2f4a4a' }, R3: { name: 'חדר 3', x: 200, y: 660, w: 360, h: 260, c: '#4a3a32' }, R4: { name: 'חדר 4', x: 760, y: 660, w: 360, h: 260, c: '#30405e' } },
+  corr: [['R1', 'R2'], ['R3', 'R4'], ['R1', 'R3'], ['R2', 'R4']], tasks: [], perRoom: 4, vents: [], button: { x: 380, y: 330 }, world: { w: 1300, h: 1100 } });
+// ----- עורך המפות -----
+let mapEd = null;
+const ROOM_COLORS = ['#38424f', '#2f4a4a', '#4a3a32', '#30405e', '#4a3340', '#2d4a3a', '#4d2f2f', '#4a4530', '#3a3352', '#40556e'];
+function corrFor(a, b, A, B) { // מסדרון בין שני חדרים: אופקי אם הם זה ליד זה עם חפיפה בגובה, אנכי אם זה מעל זה עם חפיפה ברוחב
+  const yo = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y), xo = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x);
+  if (yo >= 60 && (A.x + A.w <= B.x || B.x + B.w <= A.x)) { const L = A.x < B.x; return [L ? a : b, L ? b : a, 'h', Math.round((Math.max(A.y, B.y) + Math.min(A.y + A.h, B.y + B.h)) / 2)]; }
+  if (xo >= 60 && (A.y + A.h <= B.y || B.y + B.h <= A.y)) { const T = A.y < B.y; return [T ? a : b, T ? b : a, 'v', Math.round((Math.max(A.x, B.x) + Math.min(A.x + A.w, B.x + B.w)) / 2)]; }
+  return null;
+}
+function startMapEditor(id, name, def) {
+  const d = JSON.parse(JSON.stringify(def));
+  d.corr = (d.corr || []).map(c => [c[0], c[1]]); d.vents = (d.vents || []).map(v => ({ x: v.x, y: v.y, net: v.net === undefined ? 0 : v.net })); d.tasks = d.tasks || []; if (d.perRoom === undefined) d.perRoom = 0;
+  mapEd = { id, name, d, tool: 'move', sel: null, net: 0, kind: 'wires', link: null, drag: null, err: '', scale: 1, ox: 0, oy: 0 };
+  renderMods();
+}
+function renderMapEditor() {
+  const E = mapEd, b = modsBox();
+  const tools = [['move', '✋ הזז'], ['room', '➕ חדר'], ['link', '🔗 חיבור'], ['task', '🧩 משימה'], ['vent', '🕳️ אוורור'], ['button', '🔴 כפתור חירום'], ['del', '🗑️ מחק']];
+  b.innerHTML = `<div class="mform" style="margin-bottom:8px"><label><span>שם המפה</span> <input id="meName" maxlength="20" value="${esc(E.name)}"></label>
+    <label><span>סגנון</span> <select id="meTheme"><option value="space" ${E.d.theme !== 'ice' ? 'selected' : ''}>${'חלל'}</option><option value="ice" ${E.d.theme === 'ice' ? 'selected' : ''}>${'קרח ושלג'}</option></select></label>
+    <label><span>משימות אוטומטיות בכל חדר</span> <input id="mePer" type="number" min="0" max="8" value="${E.d.perRoom}" style="width:70px"></label></div>
+    <div id="meTools" class="row" style="gap:5px;margin-bottom:6px;flex-wrap:wrap">${tools.map(t => `<button data-tool="${t[0]}" class="${E.tool === t[0] ? 'sel' : ''}">${t[1]}</button>`).join('')}
+      ${E.tool === 'vent' ? `<label class="sub" style="margin:0">רשת <select id="meNet">${[0, 1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === E.net ? 'selected' : ''}>${n + 1}</option>`).join('')}</select></label>` : ''}
+      ${E.tool === 'task' ? `<label class="sub" style="margin:0">סוג <select id="meKind">${window.MAP.KINDS.map(k => `<option value="${k[0]}" ${k[0] === E.kind ? 'selected' : ''}>${esc(k[1])}</option>`).join('')}</select></label>` : ''}</div>
+    <p id="meHint" class="sub" style="margin:0 0 6px"></p>
+    <canvas id="meCv" width="900" height="560" style="width:100%;background:#0a0e1a;border:1px solid var(--line);border-radius:12px;touch-action:none"></canvas>
+    <div id="meSel" class="mform" style="margin-top:8px"></div>
+    <p id="meErr" style="color:#ff8a8a;margin:6px 0"></p>
+    <div class="row" style="gap:8px"><button id="meSave" class="primary">💾 שמור מפה</button><button id="meCancel">חזרה בלי לשמור</button></div>`;
+  $('#meName').oninput = e => { E.name = e.target.value; };
+  $('#meTheme').onchange = e => { E.d.theme = e.target.value; drawMapEditor(); };
+  $('#mePer').oninput = e => { E.d.perRoom = Math.max(0, Math.min(8, +e.target.value || 0)); };
+  document.querySelectorAll('#meTools [data-tool]').forEach(x => x.onclick = () => { E.tool = x.dataset.tool; E.link = null; renderMapEditor(); });
+  const nt = $('#meNet'); if (nt) nt.onchange = e => { E.net = +e.target.value; };
+  const kd = $('#meKind'); if (kd) kd.onchange = e => { E.kind = e.target.value; };
+  $('#meCancel').onclick = () => { mapEd = null; renderMods(); };
+  $('#meSave').onclick = saveMapEditor;
+  const cv = $('#meCv');
+  cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); edDown(edPos(e)); };
+  cv.onpointermove = e => { if (E.drag) edMove(edPos(e)); };
+  cv.onpointerup = e => { edUp(edPos(e)); };
+  const hints = { move: 'גרור חדר כדי להזיז. גרור את הריבוע בפינה הימנית-תחתונה כדי לשנות גודל. לחיצה בוחרת חדר.', room: 'גרור על שטח ריק כדי לצייר חדר חדש.', link: 'לחץ על חדר ואז על חדר אחר כדי לחבר ביניהם במסדרון (או לנתק אם כבר מחוברים). החדרים צריכים להיות זה מול זה.', task: 'לחץ בתוך חדר כדי להוסיף משימה מהסוג שנבחר. לחיצה על משימה קיימת מוחקת אותה.', vent: 'לחץ בתוך חדר כדי להוסיף פתח אוורור. פתחים עם אותו מספר רשת מחוברים זה לזה. לחיצה על פתח מוחקת.', button: 'לחץ בתוך חדר כדי למקם את כפתור החירום.', del: 'לחץ על חדר, משימה או פתח כדי למחוק.' };
+  $('#meHint').textContent = hints[E.tool];
+  drawMapEditor(); renderEdSel();
+}
+function edBounds() { let x = 0, y = 0; for (const r of Object.values(mapEd.d.rooms)) { x = Math.max(x, r.x + r.w); y = Math.max(y, r.y + r.h); } return { w: Math.max(1300, x + 260), h: Math.max(900, y + 260) }; }
+function edPos(e) { const cv = $('#meCv'), r = cv.getBoundingClientRect(), s = mapEd.scale; return { x: Math.round(((e.clientX - r.left) / r.width * cv.width - mapEd.ox) / s), y: Math.round(((e.clientY - r.top) / r.height * cv.height - mapEd.oy) / s) }; }
+const snap = v => Math.round(v / 10) * 10;
+function edRoomAt(p) { const rs = Object.entries(mapEd.d.rooms).reverse(); for (const [id, r] of rs) if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return id; return null; }
+function edHandleAt(p, id) { const r = mapEd.d.rooms[id]; return r && Math.abs(p.x - (r.x + r.w)) < 30 && Math.abs(p.y - (r.y + r.h)) < 30; }
+function edDown(p) {
+  const E = mapEd, d = E.d, id = edRoomAt(p);
+  if (E.tool === 'move') {
+    const hid = E.sel && edHandleAt(p, E.sel) ? E.sel : null;
+    if (hid) { E.drag = { k: 'resize', id: hid }; return; }
+    if (id) { E.sel = id; E.drag = { k: 'move', id, dx: p.x - d.rooms[id].x, dy: p.y - d.rooms[id].y }; renderEdSel(); } else { E.sel = null; renderEdSel(); }
+    drawMapEditor();
+  } else if (E.tool === 'room') { if (!id) E.drag = { k: 'new', x0: snap(p.x), y0: snap(p.y), x1: snap(p.x), y1: snap(p.y) }; }
+  else if (E.tool === 'link') {
+    if (!id) return;
+    if (!E.link) { E.link = id; drawMapEditor(); return; }
+    if (E.link === id) { E.link = null; drawMapEditor(); return; }
+    const a = E.link, i = d.corr.findIndex(c => (c[0] === a && c[1] === id) || (c[0] === id && c[1] === a));
+    if (i >= 0) d.corr.splice(i, 1);
+    else {
+      let A = d.rooms[a], B = d.rooms[id];
+      if (!corrFor(a, id, A, B)) { // ניסיון ליישר: מזיזים את החדר השני כך שימורכז מול הראשון
+        const gx = Math.max(A.x - (B.x + B.w), B.x - (A.x + A.w)), gy = Math.max(A.y - (B.y + B.h), B.y - (A.y + A.h));
+        if (gx >= gy) B.y = snap(A.y + (A.h - B.h) / 2); else B.x = snap(A.x + (A.w - B.w) / 2);
+      }
+      if (corrFor(a, id, A, B)) d.corr.push([a, id]); else toast('החדרים חופפים או רחוקים מדי מהיישור – הזז אותם זה מול זה');
+    }
+    E.link = null; drawMapEditor();
+  } else if (E.tool === 'task' || E.tool === 'vent' || E.tool === 'button') {
+    if (E.tool === 'task') { const i = d.tasks.findIndex(t => Math.hypot(t.x - p.x, t.y - p.y) < 28); if (i >= 0) { d.tasks.splice(i, 1); drawMapEditor(); return; } }
+    if (E.tool === 'vent') { const i = d.vents.findIndex(v => Math.hypot(v.x - p.x, v.y - p.y) < 28); if (i >= 0) { d.vents.splice(i, 1); drawMapEditor(); return; } }
+    if (!id) return;
+    const r = d.rooms[id], x = Math.max(r.x + 30, Math.min(r.x + r.w - 30, p.x)), y = Math.max(r.y + 40, Math.min(r.y + r.h - 30, p.y));
+    if (E.tool === 'task') { const kd = window.MAP.KINDS.find(k => k[0] === E.kind) || window.MAP.KINDS[0]; d.tasks.push({ room: id, x, y, name: kd[1] + ' – ' + r.name + ' ' + (d.tasks.length + 1), kind: kd[0], theme: kd[2] }); }
+    else if (E.tool === 'vent') d.vents.push({ x, y, net: E.net });
+    else d.button = { x, y };
+    drawMapEditor();
+  } else if (E.tool === 'del') {
+    let i = d.tasks.findIndex(t => Math.hypot(t.x - p.x, t.y - p.y) < 28); if (i >= 0) { d.tasks.splice(i, 1); drawMapEditor(); return; }
+    i = d.vents.findIndex(v => Math.hypot(v.x - p.x, v.y - p.y) < 28); if (i >= 0) { d.vents.splice(i, 1); drawMapEditor(); return; }
+    if (id) { if (Object.keys(d.rooms).length <= 3) return toast('צריך לפחות 3 חדרים'); delete d.rooms[id]; d.corr = d.corr.filter(c => c[0] !== id && c[1] !== id); d.tasks = d.tasks.filter(t => t.room !== id); d.vents = d.vents.filter(v => edRoomAt(v)); if (E.sel === id) E.sel = null; renderEdSel(); drawMapEditor(); }
+  }
+}
+function edMove(p) {
+  const E = mapEd, dr = E.drag, d = E.d; if (!dr) return;
+  if (dr.k === 'move') { const r = d.rooms[dr.id], nx = Math.max(40, snap(p.x - dr.dx)), ny = Math.max(40, snap(p.y - dr.dy)), mx = nx - r.x, my = ny - r.y; r.x = nx; r.y = ny; d.tasks.forEach(t => { if (t.room === dr.id) { t.x += mx; t.y += my; } }); d.vents.forEach(v => { if (v.x >= r.x - mx && v.x <= r.x - mx + r.w && v.y >= r.y - my && v.y <= r.y - my + r.h) { v.x += mx; v.y += my; } }); if (d.button.x >= r.x - mx && d.button.x <= r.x - mx + r.w && d.button.y >= r.y - my && d.button.y <= r.y - my + r.h) { d.button.x += mx; d.button.y += my; } }
+  else if (dr.k === 'resize') { const r = d.rooms[dr.id]; r.w = Math.max(200, snap(p.x - r.x)); r.h = Math.max(160, snap(p.y - r.y)); }
+  else if (dr.k === 'new') { dr.x1 = snap(p.x); dr.y1 = snap(p.y); }
+  drawMapEditor();
+}
+function edUp() {
+  const E = mapEd, dr = E.drag; E.drag = null; if (!dr) return;
+  if (dr.k === 'new') {
+    const x = Math.max(40, Math.min(dr.x0, dr.x1)), y = Math.max(40, Math.min(dr.y0, dr.y1)), w = Math.abs(dr.x1 - dr.x0), h = Math.abs(dr.y1 - dr.y0);
+    if (w >= 200 && h >= 160) { let n = 1; while (E.d.rooms['R' + n]) n++; E.d.rooms['R' + n] = { name: 'חדר ' + n, x, y, w, h, c: ROOM_COLORS[n % ROOM_COLORS.length] }; E.sel = 'R' + n; E.tool = 'move'; renderMapEditor(); return; }
+    if (w > 10 || h > 10) toast('חדר קטן מדי (לפחות 200×160)');
+  }
+  renderEdSel(); drawMapEditor();
+}
+function renderEdSel() {
+  const E = mapEd, box = $('#meSel'); if (!box) return;
+  const r = E.sel && E.d.rooms[E.sel]; if (!r) { box.innerHTML = '<p class="sub" style="margin:0">בחר חדר (כלי "הזז") כדי לשנות שם וצבע.</p>'; return; }
+  box.innerHTML = `<label><span>שם החדר</span> <input id="erName" maxlength="14" value="${esc(r.name)}"></label><div class="row" style="gap:4px">${ROOM_COLORS.map(c => `<button data-rc="${c}" style="background:${c};width:30px;height:30px;padding:0;border:${r.c === c ? '2px solid #fff' : '1px solid #555'}"></button>`).join('')}</div>`;
+  $('#erName').oninput = e => { r.name = e.target.value.slice(0, 14); drawMapEditor(); };
+  box.querySelectorAll('[data-rc]').forEach(x => x.onclick = () => { r.c = x.dataset.rc; renderEdSel(); drawMapEditor(); });
+}
+function drawMapEditor() {
+  const E = mapEd, cv = $('#meCv'); if (!cv) return; const g = cv.getContext('2d'), d = E.d, bd = edBounds();
+  E.scale = Math.min(cv.width / bd.w, cv.height / bd.h); E.ox = 0; E.oy = 0; const s = E.scale;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
+  g.fillStyle = d.theme === 'ice' ? '#c9dbe8' : '#070910'; g.fillRect(0, 0, cv.width, cv.height);
+  g.setTransform(s, 0, 0, s, 0, 0);
+  g.strokeStyle = 'rgba(128,140,180,.15)'; g.lineWidth = 1 / s; for (let x = 0; x < bd.w; x += 100) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, bd.h); g.stroke(); } for (let y = 0; y < bd.h; y += 100) { g.beginPath(); g.moveTo(0, y); g.lineTo(bd.w, y); g.stroke(); }
+  // מסדרונות
+  for (const c of d.corr) { const A = d.rooms[c[0]], B = d.rooms[c[1]]; if (!A || !B) continue; const k = corrFor(c[0], c[1], A, B);
+    if (!k) { g.strokeStyle = '#ff5a5a'; g.lineWidth = 5 / s; g.setLineDash([10 / s, 8 / s]); g.beginPath(); g.moveTo(A.x + A.w / 2, A.y + A.h / 2); g.lineTo(B.x + B.w / 2, B.y + B.h / 2); g.stroke(); g.setLineDash([]); continue; }
+    const [a, b2, o, cc] = k, RA = d.rooms[a], RB = d.rooms[b2]; g.fillStyle = '#2b3242';
+    if (o === 'v') g.fillRect(cc - 45, RA.y + RA.h - 30, 90, RB.y - (RA.y + RA.h) + 60); else g.fillRect(RA.x + RA.w - 30, cc - 45, RB.x - (RA.x + RA.w) + 60, 90); }
+  for (const [id, r] of Object.entries(d.rooms)) {
+    g.fillStyle = r.c; g.fillRect(r.x, r.y, r.w, r.h); g.strokeStyle = E.sel === id ? '#ffb547' : E.link === id ? '#5ec8ff' : '#161b27'; g.lineWidth = (E.sel === id || E.link === id ? 6 : 4) / s; g.strokeRect(r.x, r.y, r.w, r.h);
+    g.fillStyle = '#fff'; g.font = 'bold ' + Math.round(34) + 'px Rubik, sans-serif'; g.textAlign = 'center'; g.fillText(r.name, r.x + r.w / 2, r.y + 34);
+    if (E.sel === id && E.tool === 'move') { g.fillStyle = '#ffb547'; g.fillRect(r.x + r.w - 14, r.y + r.h - 14, 28, 28); }
+  }
+  const netCol = ['#4fc3ff', '#ffd54a', '#ff9ad5', '#7dff9a', '#c9a0ff', '#ff9d5c'];
+  g.font = '22px serif'; g.textAlign = 'center';
+  d.tasks.forEach(t => { g.fillStyle = '#ffd646'; g.beginPath(); g.arc(t.x, t.y, 14, 0, 7); g.fill(); g.fillStyle = '#1b1405'; g.font = 'bold 18px Arial'; g.fillText('!', t.x, t.y + 6); });
+  d.vents.forEach(v => { g.fillStyle = netCol[v.net % 6]; g.beginPath(); g.arc(v.x, v.y, 15, 0, 7); g.fill(); g.strokeStyle = '#000'; g.lineWidth = 2 / s; g.stroke(); g.fillStyle = '#000'; g.font = 'bold 14px Arial'; g.fillText(v.net + 1, v.x, v.y + 5); });
+  g.fillStyle = '#e53935'; g.beginPath(); g.arc(d.button.x, d.button.y, 20, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 3 / s; g.stroke();
+  if (E.drag && E.drag.k === 'new') { g.strokeStyle = '#5ec8ff'; g.lineWidth = 4 / s; g.strokeRect(Math.min(E.drag.x0, E.drag.x1), Math.min(E.drag.y0, E.drag.y1), Math.abs(E.drag.x1 - E.drag.x0), Math.abs(E.drag.y1 - E.drag.y0)); }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+}
+function saveMapEditor() {
+  const E = mapEd, d = E.d, rooms = d.rooms, ids = Object.keys(rooms), errs = [];
+  if (ids.length < 3) errs.push('צריך לפחות 3 חדרים');
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { const A = rooms[ids[i]], B = rooms[ids[j]]; if (A.x < B.x + B.w && B.x < A.x + A.w && A.y < B.y + B.h && B.y < A.y + A.h) errs.push(T('החדרים {a} ו{b} חופפים').replace('{a}', A.name).replace('{b}', B.name)); }
+  const corr = []; for (const c of d.corr) { const k = corrFor(c[0], c[1], rooms[c[0]], rooms[c[1]]); if (k) corr.push(k); else errs.push(T('מסדרון לא תקין בין {a} ל{b}').replace('{a}', rooms[c[0]].name).replace('{b}', rooms[c[1]].name)); }
+  // כל החדרים מחוברים?
+  if (ids.length) { const seen = new Set([ids[0]]), q = [ids[0]]; while (q.length) { const c = q.pop(); corr.forEach(k => { const o = k[0] === c ? k[1] : k[1] === c ? k[0] : null; if (o && !seen.has(o)) { seen.add(o); q.push(o); } }); } if (seen.size < ids.length) errs.push('לא כל החדרים מחוברים זה לזה במסדרונות'); }
+  const inRoom = p => ids.some(id => p.x >= rooms[id].x + 20 && p.x <= rooms[id].x + rooms[id].w - 20 && p.y >= rooms[id].y + 20 && p.y <= rooms[id].y + rooms[id].h - 20);
+  if (!inRoom(d.button)) errs.push('כפתור החירום צריך להיות בתוך חדר');
+  if (d.tasks.length + ids.length * d.perRoom < 12) errs.push('צריך לפחות 12 משימות בסך הכל (הוסף משימות או הגדל את המשימות האוטומטיות)');
+  d.vents = d.vents.filter(inRoom); d.tasks = d.tasks.filter(inRoom);
+  $('#meErr').textContent = errs.join(' · ');
+  if (errs.length) return;
+  const bd = edBounds(), def = JSON.parse(JSON.stringify(d)); def.corr = corr; def.world = { w: bd.w - 140, h: bd.h - 140 };
+  try { const t = MAP_FROM('mod_check', def); if (!t || !t.TASKS.length || !t.walkable(def.button.x, def.button.y)) throw new Error('bad'); } catch (e) { $('#meErr').textContent = 'המפה לא נבנתה כראוי – בדוק חדרים ומיקומים'; return; }
+  const mm = modLoad(), i = mm.maps.findIndex(x => x.id === E.id), rec = { id: E.id, name: (E.name || 'המפה שלי').trim().slice(0, 20), def, on: true };
+  if (i >= 0) { rec.on = mm.maps[i].on !== false; mm.maps[i] = rec; } else mm.maps.push(rec);
+  modSave(mm); mapEd = null; toast('✅ המפה נשמרה – בחר אותה בלובי של חדר שתפתח'); renderMods();
+}
+// ---------- ייצוא וייבוא ----------
+function renderModShare() {
+  const b = modsBox(), m = modLoad();
+  b.innerHTML = '<p class="sub" style="margin:0 0 8px">העתק את הקוד ושלח לחבר, או הדבק קוד שקיבלת כדי להוסיף את התפקידים והמפות שלו.</p><textarea id="msTxt" rows="7" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;direction:ltr" placeholder="הדבק כאן קוד לייבוא"></textarea><div class="row" style="gap:8px;margin-top:8px"><button id="msExp">📤 הצג את הקוד שלי</button><button id="msCopy">📋 העתק</button><button id="msImp" class="primary">📥 ייבא</button></div><p id="msMsg" class="sub"></p>';
+  $('#msExp').onclick = () => { $('#msTxt').value = 'MM1:' + btoa(unescape(encodeURIComponent(JSON.stringify({ roles: m.roles, maps: m.maps })))); };
+  $('#msCopy').onclick = () => { const t = $('#msTxt'); if (!t.value) $('#msExp').click(); t.select(); try { document.execCommand('copy'); $('#msMsg').textContent = '✅ הועתק'; } catch (e) {} };
+  $('#msImp').onclick = () => {
+    try {
+      const raw = $('#msTxt').value.trim(); if (!raw.startsWith('MM1:')) throw new Error('x');
+      const o = JSON.parse(decodeURIComponent(escape(atob(raw.slice(4))))), mm = modLoad(); let nr = 0, nm = 0;
+      (o.roles || []).slice(0, 20).forEach(r => { if (r && r.name && TPL[r.tpl]) { mm.roles.push({ id: modId(), name: String(r.name).slice(0, 14), tpl: r.tpl, icon: String(r.icon || '').slice(0, 4), btn: String(r.btn || '').slice(0, 14), cd: +r.cd || 0, uses: +r.uses || 0, dur: +r.dur || 0, desc: String(r.desc || '').slice(0, 260), on: true }); nr++; } });
+      (o.maps || []).slice(0, 10).forEach(x => { if (x && x.def && x.def.rooms) { try { MAP_FROM('mod_check', x.def); mm.maps.push({ id: modId(), name: String(x.name || 'מפה').slice(0, 20), def: x.def, on: true }); nm++; } catch (e) {} } });
+      modSave(mm); $('#msMsg').textContent = T('✅ יובאו {r} תפקידים ו-{m} מפות').replace('{r}', nr).replace('{m}', nm);
+    } catch (e) { $('#msMsg').textContent = '⚠️ הקוד לא תקין'; }
+  };
+}
+$('#modsClose').onclick = closeMods;
+$('#modsBtn').onclick = () => openMods('roles');
+document.querySelectorAll('#modsTabs button').forEach(b => b.onclick = () => { modsTab = b.dataset.mt; modEdit = null; mapEd = null; renderMods(); });
+document.body.appendChild($('#modsScreen'));
+
+function syncMapOptions(s) { // אפשרויות המפה בלובי: המפות המותאמות הפעילות של המארח, ומפה מותאמת שהמארח בחר (אצל האורחים)
+  const sel = document.querySelector('select[data-s="map"]'); if (!sel) return;
+  const want = [];
+  if (s.me.host) modLoad().maps.filter(x => x.on !== false && x.def).forEach(x => want.push(['mod_' + x.id, '🧩 ' + x.name]));
+  if (s.settings.map && s.settings.map.startsWith('mod_') && !want.some(w => w[0] === s.settings.map)) want.push([s.settings.map, '🧩 מפה מותאמת']);
+  const sig = JSON.stringify(want); if (sel.dataset.modSig === sig) return; sel.dataset.modSig = sig;
+  [...sel.options].filter(o => o.value.startsWith('mod_')).forEach(o => o.remove());
+  want.forEach(w => { const o = document.createElement('option'); o.value = w[0]; o.textContent = w[1]; sel.appendChild(o); });
+  if (s.settings.map) sel.value = s.settings.map;
+}
 </script>
 </body>
 </html>

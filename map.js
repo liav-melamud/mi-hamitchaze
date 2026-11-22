@@ -1,8 +1,14 @@
 // מפת "תחנת נוגה" – משותפת לשרת ולדפדפן
 (function (root) {
-  function build(variant) {
-  const small = variant === 'small', ice = variant === 'ice';
-  const ROOMS = ice ? {
+  // סוגי המשימות שאפשר לחלק למפה מותאמת (כולם מיני-משחקים שכבר קיימים במשחק)
+  const KINDS = [['wires', 'חיבור כבלים', 'wires'], ['code', 'הזנת קוד', 'matrix'], ['dial', 'כיול מחוג', 'radar'], ['switches', 'הפעלת מתגים', 'wires'], ['simon', 'רצף אורות', 'sparks'], ['sliders', 'איזון מחוונים', 'waves'], ['tapfill', 'מילוי מיכל', 'bubbles'], ['sortnum', 'מיון מספרים', 'pulse'], ['pairs', 'התאמת זוגות', 'matrix'], ['catch', 'לכידת פסולת', 'stars'], ['timing', 'סנכרון תזמון', 'gears'], ['pattern', 'שחזור תבנית', 'stars'], ['maze', 'מבוך כבלים', 'radar'], ['bins', 'מיון ארגזים', 'conveyor'], ['quiz', 'בחינת ידע', 'matrix'], ['balance', 'איזון מערכת', 'sparks'], ['track', 'מעקב מטרה', 'radar'], ['charge', 'טעינת מצבר', 'sparks'], ['valve', 'כיוון שסתומים', 'gears'], ['lights', 'החלפת נורות', 'pulse'], ['swipe', 'העברת כרטיס', 'matrix']];
+  function ventsFromDef(list) { // וינטים עם net: כל אלה שבאותה רשת מחוברים זה לזה. בלי net משתמשים ב-links שניתנו
+    return list.map((v, i) => ({ x: v.x, y: v.y, links: v.net !== undefined && v.net !== null ? list.map((w, j) => (j !== i && w.net === v.net ? j : -1)).filter(j => j >= 0) : (v.links || []).slice() }));
+  }
+  // build(variant) בונה מפה מובנית. build(null, D) בונה מפה מותאמת מתוך הגדרה (D) שהמשתמש יצר בעורך המודים
+  function build(variant, D) {
+  const small = !D && variant === 'small', ice = D ? D.theme === 'ice' : variant === 'ice';
+  const ROOMS = D ? JSON.parse(JSON.stringify(D.rooms)) : ice ? {
     // "תחנת קרח" – מפה שנייה: 12 חדרים מסביב לאולם מרכזי
     HB: { name: 'מגורים', x: 150, y: 80, w: 360, h: 260, c: '#3d5468' },
     LB: { name: 'מעבדה', x: 700, y: 80, w: 340, h: 260, c: '#35566a' },
@@ -40,7 +46,7 @@
   }
 
   const CW = 90;
-  const CORR = ice ? [
+  const CORR = D ? D.corr.map(x => x.slice()) : ice ? [
     ['HB', 'LB', 'h', 200], ['LB', 'MH', 'h', 200], ['MH', 'GH', 'h', 220],
     ['HB', 'DR', 'v', 300], ['DR', 'GR', 'v', 300], ['LB', 'SC', 'v', 790], ['MH', 'HT', 'v', 1320], ['GH', 'OB', 'v', 1935],
     ['DR', 'SC', 'h', 680], ['SC', 'HT', 'h', 700], ['HT', 'OB', 'h', 700],
@@ -67,7 +73,7 @@
   });
 
   // kind: hold = להחזיק E · scan = משימה גלויה (כולם רואים) · wires/dial/code = מיני-משחק
-  const TASKS = ice ? [
+  const TASKS = D ? JSON.parse(JSON.stringify(D.tasks || [])) : ice ? [
     { room: 'LB', x: 980, y: 220, name: 'סריקה ביולוגית', kind: 'scan' },
     { room: 'GN', x: 760, y: 1240, name: 'תיקון חשמל', kind: 'wires' },
     { room: 'DR', x: 330, y: 800, name: 'הפעלת המקדחה', kind: 'code' },
@@ -133,7 +139,7 @@
   const TASK_TIME = { hold: 2.5, scan: 6, pair: 3.5, candle: 2.5 };
 
   // רשת פתחי אוורור: שלוש רשתות נפרדות (מערב, מרכז, מזרח)
-  const VENTS = ice ? [
+  const VENTS = D ? ventsFromDef(D.vents || []) : ice ? [
     { x: 470, y: 300, links: [1, 2] },    // 0 מגורים
     { x: 110, y: 800, links: [0, 2] },    // 1 מקדחה
     { x: 470, y: 1060, links: [0, 1] },   // 2 מוסך
@@ -168,8 +174,8 @@
     { x: 1600, y: 100, links: [9] },     // 11 חדר אוכל
   ];
 
-  const BUTTON = ice ? { x: 1450, y: 230 } : { x: 1400, y: 230 };
-  const WORLD = ice ? { w: 2300, h: 1400 } : small ? { w: 1800, h: 1340 } : { w: 2700, h: 1400 };
+  const BUTTON = D ? { x: D.button.x, y: D.button.y } : ice ? { x: 1450, y: 230 } : { x: 1400, y: 230 };
+  const WORLD = D ? { w: D.world.w, h: D.world.h } : ice ? { w: 2300, h: 1400 } : small ? { w: 1800, h: 1340 } : { w: 2700, h: 1400 };
   const R = 18;
 
   function walkable(x, y, r) {
@@ -222,9 +228,54 @@
     return pts;
   }
 
+  // ---- מפה מותאמת: מיקומים מחוץ לחדרים מועברים לתוך החדר, ומה שחסר נוצר אוטומטית ----
+  let _seed = 4242;
+  const rnd0 = () => ((_seed = (_seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  function spotIn(roomId, avoid) { // המקום הרחוק ביותר מהנקודות ב-avoid בתוך החדר
+    const r = ROOMS[roomId]; if (!r) return null;
+    let best = null, bs = -1;
+    for (let i = 0; i < 300; i++) {
+      const x = Math.round(r.x + 45 + rnd0() * Math.max(1, r.w - 90)), y = Math.round(r.y + 65 + rnd0() * Math.max(1, r.h - 105));
+      if (!walkable(x, y)) continue;
+      let d = 1e9; for (const q of avoid) d = Math.min(d, Math.hypot(q.x - x, q.y - y));
+      if (d > bs) { bs = d; best = { x, y }; }
+    }
+    return best || { x: Math.round(r.cx), y: Math.round(r.cy) };
+  }
+  function autoCams() {
+    return Object.values(ROOMS).slice(0, 4).map(r => ({ name: r.name, x: Math.round(r.cx), y: Math.round(r.cy), mx: Math.round(r.cx), my: Math.round(r.y + 22) }));
+  }
+  function autoConsole() { const ids = Object.keys(ROOMS), id = ids[1 % ids.length], sp = spotIn(id, [BUTTON, ...TASKS]); return { x: sp.x, y: sp.y }; }
+  function genTasks(Dd) { // משימות אוטומטיות: perRoom בכל חדר, מסוגים שונים. D.newTasks (אם יש) נוספות
+    const out = (Dd.newTasks || []).map(x => x.slice()); const per = Dd.perRoom === undefined ? 4 : Dd.perRoom; let k = 0;
+    for (const id of Object.keys(ROOMS)) for (let j = 0; j < per; j++) { const kd = KINDS[(k++ * 7 + j) % KINDS.length]; out.push([id, kd[1] + ' – ' + ROOMS[id].name + (per > 1 ? ' ' + (j + 1) : ''), kd[0], kd[2]]); }
+    return out;
+  }
+  function fixSab(sb) { // נקודות חבלה: אם חסר או לא תקין – נוצר אוטומטית
+    const ids = Object.keys(ROOMS), pick = (n, name) => { const id = ids[n % ids.length], sp = spotIn(id, [..._used, BUTTON]); if (sp) _used.push(sp); return { x: sp.x, y: sp.y, room: id, name }; };
+    const ok = a => Array.isArray(a) && a.every(p => walkable(p.x, p.y));
+    return {
+      freeze: ok(sb && sb.freeze) ? sb.freeze : [],
+      lights: sb && ok(sb.lights) && sb.lights.length ? sb.lights : [pick(0, 'לוח חשמל')],
+      oxygen: sb && ok(sb.oxygen) && sb.oxygen.length ? sb.oxygen : [pick(1, 'מערכת חמצן'), pick(2, 'בקרת אוויר')],
+      reactor: sb && ok(sb.reactor) ? sb.reactor : (ids.length >= 5 ? [pick(3, 'ליבת הכור'), pick(4, 'קירור כור')] : []),
+    };
+  }
+  const _used = []; // נקודות שכבר תפוסות, כדי שלא ייפלו אחת על השנייה
+  function fixPoint(p, roomId) {
+    if (walkable(p.x, p.y)) { _used.push(p); return true; }
+    const rid = (roomAt(p.x, p.y) || {}).id || roomId || p.room; const sp = rid && ROOMS[rid] ? spotIn(rid, _used) : null;
+    if (!sp) return false; p.x = sp.x; p.y = sp.y; _used.push(p); return true;
+  }
+  if (D) {
+    for (let i = TASKS.length - 1; i >= 0; i--) { const t = TASKS[i]; if (!ROOMS[t.room] || !fixPoint(t, t.room)) TASKS.splice(i, 1); else t.room = (roomAt(t.x, t.y) || {}).id || t.room; }
+    for (let i = VENTS.length - 1; i >= 0; i--) if (!fixPoint(VENTS[i])) VENTS.splice(i, 1);
+    if (!walkable(BUTTON.x, BUTTON.y)) { const big = Object.values(ROOMS).sort((a, b) => b.w * b.h - a.w * a.h)[0]; BUTTON.x = Math.round(big.cx); BUTTON.y = Math.round(big.y + 120); }
+    _used.push(BUTTON);
+  }
   VENTS.forEach(v => { const r = roomAt(v.x, v.y); v.room = r ? r.name : ''; });
   // מצלמות אבטחה: (x,y) מרכז התצוגה, (mx,my) מיקום המצלמה על הקיר
-  const CAMS = ice ? [
+  const CAMS = D ? (D.cams && D.cams.length ? D.cams.map(c => ({ ...c })) : autoCams()) : ice ? [
     { name: 'אולם מרכזי', x: 1450, y: 230, mx: 1450, my: 60 },
     { name: 'מסדרון מערבי', x: 500, y: 680, mx: 500, my: 637 },
     { name: 'מסדרון הסקה', x: 1320, y: 490, mx: 1277, my: 490 },
@@ -235,9 +286,9 @@
     { name: 'מסדרון מרפאה', x: 715, y: 430, mx: 673, my: 430 },
     { name: 'ניהול', x: 1540, y: 700, mx: 1540, my: 578 },
   ];
-  const CAM_CONSOLE = ice ? { x: 680, y: 640 } : { x: 650, y: 660 };
+  const CAM_CONSOLE = D ? (D.camConsole && walkable(D.camConsole.x, D.camConsole.y) ? { x: D.camConsole.x, y: D.camConsole.y } : autoConsole()) : ice ? { x: 680, y: 640 } : { x: 650, y: 660 };
   // נקודות תיקון לחבלות: חשמל (אחת), חמצן (שתיים), כור (שתיים)
-  const SAB_POINTS = ice ? {
+  const SAB_POINTS = D ? fixSab(D.sab) : ice ? {
     lights: [{ x: 760, y: 1100, room: 'GN', name: 'לוח הגנרטור' }],
     oxygen: [{ x: 1920, y: 140, room: 'GH', name: 'מערכת אוויר' }, { x: 1260, y: 120, room: 'MH', name: 'בקרת אוויר' }],
     reactor: [],
@@ -265,7 +316,7 @@
   // 52 משימות נוספות, כל אחת עם סוג משחק וערכת נושא מונפשת. המיקומים נקבעים אוטומטית בתוך כל חדר.
   // kind: wires dial code switches simon sliders tapfill sortnum pairs catch timing pattern
   // theme: wires gears bubbles pulse matrix radar stars sparks waves conveyor
-  const NEW_TASKS = ice ? [
+  const NEW_TASKS = D ? genTasks(D) : ice ? [
     ['HB', 'קיפול שמיכות', 'pairs', 'conveyor'], ['HB', 'כיול מחמם חדר', 'dial', 'sparks'], ['HB', 'סידור ציוד', 'bins', 'conveyor'],
     ['LB', 'בדיקת דגימת קרח', 'lights', 'pulse'], ['LB', 'מיון מבחנות', 'sortnum', 'pulse'], ['LB', 'ניתוח נתונים', 'quiz', 'matrix'],
     ['MH', 'עדכון לוח משמרות', 'code', 'matrix'], ['MH', 'הכנת שוקו חם', 'tapfill', 'bubbles'], ['MH', 'ניקוי שלג מהכניסה', 'swipe', 'waves'],
@@ -359,10 +410,17 @@
     put(ids[2 % ids.length], '🌀 סביבון', 'dreidel', 'dreidel');
     put(ids[(ids.length >> 1) % ids.length], '🌀 סביבון גדול', 'dreidel', 'dreidel');
   })();
-  return { ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, SPOTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant, theme: ice ? 'ice' : 'space' };
+  // הגדרה ניתנת לעריכה של המפה (לעורך המודים): בלי משימות החנוכה, וקשרי הוינטים כרשתות
+  const _nets = []; VENTS.forEach((v, i) => { if (_nets[i] !== undefined) return; const st = [i]; _nets[i] = i; while (st.length) { const c = st.pop(); (VENTS[c].links || []).forEach(j => { if (_nets[j] === undefined) { _nets[j] = i; st.push(j); } }); } });
+  const def = JSON.parse(JSON.stringify({ id: variant || (D && D.id) || 'custom', theme: ice ? 'ice' : 'space', rooms: ROOMS, corr: CORR, tasks: TASKS.filter(t => !t.ev), perRoom: 0, vents: VENTS.map((v, i) => ({ x: v.x, y: v.y, net: _nets[i] })), button: BUTTON, world: WORLD, cams: CAMS, camConsole: CAM_CONSOLE, sab: SAB_POINTS }));
+  return { def, ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, SPOTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant || (D && D.id) || 'custom', theme: ice ? 'ice' : 'space' };
   }
   const MAP = build('big'), SMALL = build('small'), ICE = build('ice');
   MAP.byId = { big: MAP, small: SMALL, ice: ICE };
+  // מפות מותאמות מהעורך: fromDef בונה, register בונה ורושם (כדי שהמנוע והדפדפן ימצאו אותה לפי מזהה)
+  MAP.fromDef = (id, def) => build(null, Object.assign({}, def, { id }));
+  MAP.register = (id, def) => { const m = build(null, Object.assign({}, def, { id })); MAP.byId[id] = m; return m; };
+  MAP.KINDS = KINDS;
   if (typeof module !== 'undefined' && module.exports) module.exports = MAP;
   else { root.MAP = MAP; root.MAPS = MAP.byId; }
 })(this);
