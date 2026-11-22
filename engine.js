@@ -124,7 +124,7 @@ let players = {};
 let phase = 'lobby';
 let lobbyCache = null;
 let hostId = null;
-let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, code: '', raceGoal: 10, jester: true };
+let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, code: '', raceGoal: 10, locked: false, jester: true };
 for (const k in ROLE_SET) settings[k] = ROLE_SET[k][0];
 settings.roleOff = [];
 let usedLines = new Set();
@@ -964,6 +964,19 @@ function act(p, a) {
       if (c >= 0 && c < COLORS.length && !list().some(o => o.id !== p.id && o.color === c)) p.color = c;
       break;
     }
+    case 'kick': { // המארח מוציא שחקן מהחדר (גם באמצע משחק). השחקן לא יכול לחזור עם אותה דמות
+      if (p.id !== hostId) return;
+      const tgt = players[String(a.id)];
+      if (!tgt || tgt.id === hostId || tgt.isBot) return;
+      tgt.kicked = true; tgt.conn = false;
+      if (phase === 'lobby') delete players[tgt.id];
+      else { tgt.alive = false; tgt.spectator = true; }
+      break;
+    }
+    case 'lock': // המארח נועל את החדר: שחקנים חדשים לא נכנסים, מי שכבר בפנים יכול להתחבר מחדש
+      if (p.id !== hostId) return;
+      settings.locked = !!a.on;
+      break;
     case 'start': startGame(p.id); break;
     case 'lobby': backToLobby(p.id); break;
     case 'again': if (p.id === hostId && phase === 'end') { backToLobby(p.id); startGame(p.id); } break;
@@ -2074,7 +2087,8 @@ function viewFor(v) {
 
 
   function join(name, id) {
-    if (id && players[id]) { players[id].conn = true; return id; }
+    if (id && players[id]) { if (players[id].kicked) return null; players[id].conn = true; return id; }
+    if (settings.locked && hostId && players[hostId]) return null; // החדר נעול
     if (humans().length >= MAX_HUMANS) return null; // החדר מלא
     const p = newPlayer(name, freeColor(), false);
     if (phase !== 'lobby') { p.alive = false; p.spectator = true; p.role = 'spectator'; }
@@ -2098,7 +2112,7 @@ function viewFor(v) {
     for (const p of Object.values(players)) { p.conn = p.isBot; p.lastSeen = now(); p.input = { dx: 0, dy: 0 }; p.talking = false; }
     last = now();
   }
-  return { join, act: (id, a) => act(typeof id === 'string' && Object.prototype.hasOwnProperty.call(players, id) ? players[id] : null, a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost, snapshot, restore, hasPlayer: id => !!players[id],
+  return { join, act: (id, a) => act(typeof id === 'string' && Object.prototype.hasOwnProperty.call(players, id) ? players[id] : null, a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost, snapshot, restore, hasPlayer: id => !!players[id], isKicked: id => !!(players[id] && players[id].kicked), isLocked: () => !!settings.locked,
     keyOf: id => players[id] ? players[id].key : null,
     checkKey: (id, key) => !!(players[id] && players[id].key && typeof key === 'string' && players[id].key === key) };
 }

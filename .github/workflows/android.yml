@@ -3,6 +3,7 @@ name: Build Android app
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'android/**'
       - 'index.html'
@@ -34,8 +35,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete app --yes --cleanup-tag --repo "${{ github.repository }}" || true
-          gh release create app android/out/mi-hamitchaze.apk \
+          # מחליפים רק את הקובץ בגרסה הקיימת – הקישור להורדה לא נשבר באמצע הבנייה
+          if gh release view app --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload app android/out/mi-hamitchaze.apk --clobber --repo "${{ github.repository }}"
+          else
+            gh release create app android/out/mi-hamitchaze.apk \
             --repo "${{ github.repository }}" --latest \
             --title "אפליקציית אנדרואיד – מי המתחזה?" \
             --notes "התקנה ישירה ל-Android (בלי Google Play). האפליקציה פותחת את המשחק האונליין, ובלי אינטרנט – מצב אופליין מול בוטים."
+          fi

@@ -87,7 +87,9 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     boolean wantsAudio = false;
                     for (String r : request.getResources()) if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) wantsAudio = true;
-                    if (!wantsAudio) { request.deny(); return; }
+                    // מיקרופון רק לאתר המשחק עצמו (לא לסרטון יוטיוב או לכל מסגרת אחרת)
+                    Uri origin = request.getOrigin();
+                    if (!wantsAudio || origin == null || !HOST.equals(origin.getHost())) { request.deny(); return; }
                     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
                     } else {

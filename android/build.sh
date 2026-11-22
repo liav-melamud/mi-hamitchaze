@@ -30,6 +30,8 @@ if [ -n "${KS_B64:-}" ]; then
   echo "$KS_B64" | base64 --decode > build/release.jks
   KS=build/release.jks; PASS="$KS_PASS"; ALIAS=release
 else
+  # ב-GitHub Actions חייבים את המפתח הקבוע: APK עם מפתח זמני ישבור עדכונים לכל מי שהתקין
+  if [ -n "${CI:-}" ]; then echo "חסר ANDROID_KEYSTORE_B64 – עוצרים (לא מפרסמים APK עם מפתח זמני)"; exit 1; fi
   echo "אין מפתח חתימה – חותם עם מפתח זמני לבדיקה"
   keytool -genkeypair -keystore build/debug.jks -alias debug -keyalg RSA -keysize 2048 -validity 3650 \
     -storepass android -keypass android -dname "CN=debug" >/dev/null 2>&1
