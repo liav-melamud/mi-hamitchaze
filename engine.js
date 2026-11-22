@@ -76,6 +76,7 @@ const roleOn = k => !(settings.roleOff || []).includes(k);
 // ---- מודים: 20 תפקידים נוספים, נפתחים רק עם הקוד 54321 בלובי ----
 const hasCode = c => String(settings.code || '').split(/[\s,]+/).includes(c);
 const modsOn = () => hasCode('54321');
+const jesterOn = () => modsOn() && settings.jester; // הליצן נפתח רק עם הקוד 54321
 const MOD = { // [שם, קבוצה, אייקון, כפתור, קירור, מספר שימושים (0 = ללא הגבלה), תיאור]
   sprinter: ['רץ', 'crew', '🏃', 'ספרינט', 30, 0, 'לחץ O כדי לרוץ מהר פי 1.7 למשך 5 שניות (אחרי זה 30 שניות המתנה). מעולה לברוח – או להגיע לגופה לפני כולם.'],
   medic: ['רופא', 'crew', '🩺', 'החייאה', 0, 1, 'פעם אחת במשחק: עמוד ליד גופה ולחץ O – השחקן חוזר לחיים במקום. אבל כל החיבורים בסביבה יראו אותך שם…'],
@@ -119,7 +120,7 @@ let players = {};
 let phase = 'lobby';
 let lobbyCache = null;
 let hostId = null;
-let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, code: '', raceGoal: 10, jester: !!(opts && opts.jester) };
+let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, code: '', raceGoal: 10, jester: true };
 for (const k in ROLE_SET) settings[k] = ROLE_SET[k][0];
 settings.roleOff = [];
 let usedLines = new Set();
@@ -256,7 +257,7 @@ function simRoles(n, mods) {
   const nSpecial = settings.newRoles ? Math.max(1, Math.round(nCrew * 0.7)) : specials.length;
   const crew = [];
   for (let i = 0; i < nCrew; i++) crew.push(i < Math.min(specials.length, nSpecial) && nCrew > 1 ? specials[i] : 'crew');
-  if (settings.jester && nCrew >= 3 && n >= 5) crew[Math.floor(Math.random() * nCrew)] = 'jester';
+  if (jesterOn() && nCrew >= 3 && n >= 5) crew[Math.floor(Math.random() * nCrew)] = 'jester';
   if (mods && nCrew >= 4 && n >= 5) { const idx = shuffle(crew.map((r, i) => r === 'crew' ? i : -1).filter(i => i >= 0)), nn = shuffle(MOD_NEU.filter(roleOn)); for (let i = 0; i < (nCrew >= 8 ? 2 : 1) && idx[i] !== undefined && nn[i]; i++) crew[idx[i]] = nn[i]; }
   if (settings.newRoles && roleOn('mole') && nImp > 0 && n >= 6 && nCrew >= 4) { const c = shuffle(crew.map((r, i) => r !== 'jester' ? i : -1).filter(i => i >= 0))[0]; if (c !== undefined) crew[c] = 'mole'; }
   return out.concat(crew);
@@ -274,7 +275,7 @@ function lobbyInfo() {
   }
   if (mods) for (const k of Object.keys(MOD)) { const m = MOD[k]; add(k, m[0], m[1], m[2], m[6] + (m[3] ? ` [כפתור: ${m[3]}${m[4] ? ' · המתנה ' + m[4] + ' שניות' : ''}${m[5] ? ' · ' + m[5] + (m[5] > 1 ? ' שימושים' : ' שימוש') : ''}]` : '')); }
   // תפקיד הליצן בהגדרות הוא מתג נפרד
-  const j = roles.find(r => r.k === 'jester'); if (j) j.on = !!settings.jester;
+  const j = roles.find(r => r.k === 'jester'); if (j) j.on = jesterOn();
   return { n, classic, mode: settings.mode, roles };
 }
 
@@ -316,7 +317,7 @@ function startGame(by) {
   const nSpecial = settings.newRoles ? Math.max(1, Math.round(crew.length * 0.7)) : specials.length;
   crew.forEach((p, i) => { p.role = !race && !hide && i < Math.min(specials.length, nSpecial) && crew.length > 1 ? specials[i] : 'crew'; });
   // הליצן (אפשר לכבות בהגדרות): אחד מהצוות הופך לליצן, רק כשיש מספיק שחקנים
-  if (settings.jester && !race && !hide && crew.length >= 3 && all.length >= 5) crew[Math.floor(Math.random() * crew.length)].role = 'jester';
+  if (jesterOn() && !race && !hide && crew.length >= 3 && all.length >= 5) crew[Math.floor(Math.random() * crew.length)].role = 'jester';
   // מודים: תפקידים ניטרליים (עם מטרה משלהם)
   if (mods && crew.length >= 4 && all.length >= 5) { const cand = shuffle(crew.filter(q => q.role === 'crew')), nn = shuffle(MOD_NEU.filter(roleOn)); for (let i = 0; i < (crew.length >= 8 ? 2 : 1) && cand[i] && nn[i]; i++) cand[i].role = nn[i]; }
   // השתול: אחד מהצוות שבעצם עובד בשביל המתחזים (רק כשיש מספיק שחקנים)

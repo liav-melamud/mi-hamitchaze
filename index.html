@@ -574,7 +574,7 @@
       <label>מפה <select data-s="map"><option value="big">גדולה (14 חדרים)</option><option value="small">קטנה (7 חדרים, לקבוצות קטנות)</option><option value="ice">❄️ תחנת קרח (12 חדרים)</option></select></label>
       <label>רמת הבוטים <select data-s="botLevel"><option value="1">🐣 מתחיל (מתבלבלים)</option><option value="2">🙂 רגיל</option><option value="3">🦊 ערמומי (זוכרים הכל ומשקרים טוב)</option></select></label>
       <label>תפקידים חדשים <select data-s="newRoles"><option value="1">כן</option><option value="0">לא</option></select></label>
-      <label>🤡 הליצן <select data-s="jester"><option value="1">כן</option><option value="0">לא</option></select></label>
+      <label id="jesterLbl">🤡 הליצן <select data-s="jester"><option value="1">כן</option><option value="0">לא</option></select></label>
       <label>הצבעות גלויות <select data-s="openVotes"><option value="1">כן</option><option value="0">אנונימיות</option></select></label>
     </div>
     <details id="roleSet"><summary><b>🎭 הגדרות תפקידים</b> <span class="sub" style="margin:0">– אילו תפקידים במשחק, וכמה זמן כל יכולת</span></summary>
@@ -759,7 +759,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-114628'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-114903'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -857,7 +857,7 @@ function getName() {
 // מריץ את מנוע המשחק בדפדפן הזה (מארח או דמו)
 function runEngine(name, demo, resume, offline) {
   isHost = true;
-  engine = createGame(MAP, { demo, jester: clownWeek() });
+  engine = createGame(MAP, { demo, jester: true });
   if (resume && resume.snapshot) { try { engine.restore(resume.snapshot); } catch (e) { console.warn('restore failed', e); } }
   ID = engine.join(name, resume && resume.pid);
   if (resume && resume.snapshot) engine.setHost(ID);
@@ -1309,6 +1309,7 @@ function renderLobby(s) {
   const off = s.settings.roleOff || [];
   document.querySelectorAll('#roleToggles input, #modToggles input').forEach(el => { el.checked = !off.includes(el.dataset.role); el.disabled = !s.me.host; });
   $('#modBox').classList.toggle('hidden', !hasCode('54321'));
+  $('#jesterLbl').classList.toggle('hidden', !hasCode('54321'));
 }
 $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) { api({ type: 'color', color: +b.dataset.c }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.color = +b.dataset.c; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
 document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 16 }, (_, i) => `<option>${i}</option>`).join('');

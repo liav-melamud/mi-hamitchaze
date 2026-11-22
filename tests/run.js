@@ -38,7 +38,7 @@ function newGame({ bots = 4, role = null, humans = 1, cfg = {}, tries = 800 } = 
     const g = createGame(MAP);
     const ids = [g.join('מארח')];
     for (let h = 1; h < humans; h++) ids.push(g.join('חבר' + h));
-    g.act(ids[0], { type: 'settings', impostors: 1, bots, killCd: 10, tasks: 4, newRoles: true, ...cfg });
+    g.act(ids[0], { type: 'settings', impostors: 1, bots, killCd: 10, tasks: 4, newRoles: true, ...(cfg.jester && !cfg.code ? { code: '54321' } : {}), ...cfg });
     g.act(ids[0], { type: 'start' });
     if (!role || g.view(ids[0]).me.role === role) return { g, a: ids[0], ids };
   }
@@ -248,7 +248,7 @@ test('הליצן: אם מדלגים עליו המשחק ממשיך, והוא נ�
   let v; for (let i = 0; i < 30 * 20; i++) { tick(g, 1); v = g.view(a); if (v.phase === 'play') break; }
   ok(v.phase === 'play', 'המשחק לא המשיך אחרי דילוג: ' + v.phase);
   // 1 מתחזה + ליצן + 1 צוות בחיים: המשחק לא נגמר (הליצן נספר מול המתחזה)
-  place(g, sn => { const ps = Object.values(sn.players); const imp = ps.find(p => ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role)); let keep = 1;
+  place(g, sn => { const ps = Object.values(sn.players); const imp = ps.find(p => ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'sniper', 'poisoner', 'blinker', 'cleaner', 'zapper', 'vampire', 'bomber'].includes(p.role)); let keep = 1;
     ps.forEach(p => { if (p.id === a || p.id === imp.id) return; if (keep-- > 0) { p.alive = true; p.role = 'crew'; } else p.alive = false; }); });
   tick(g, 2); ok(g.view(a).phase === 'play', 'המתחזים ניצחו מוקדם מדי – הליצן לא נספר');
 });
@@ -985,6 +985,18 @@ test('בוטים מבינים האשמות באנגלית', () => {
   ok(/impostor/i.test('Dana is the impostor'), 'sanity');
   const src = fs.readFileSync(path.join(dir, 'engine.js'), 'utf8');
   ok(/impostor\|imposter\|suspect/.test(src) && /not \(the \)\?\(impostor/.test(src), 'חסרות מילות מפתח באנגלית');
+});
+
+test('הליצן מופיע רק עם הקוד 54321', () => {
+  for (let i = 0; i < 40; i++) {
+    const g = createGame(MAP); const a = g.join('מארח');
+    g.act(a, { type: 'settings', impostors: 1, bots: 6, newRoles: true, jester: true });
+    g.act(a, { type: 'start' });
+    ok(!g.view(a).players.some(p => p.role === 'הליצן') && g.view(a).me.role !== 'הליצן', 'ליצן הופיע בלי הקוד');
+  }
+  let seen = false;
+  for (let i = 0; i < 60 && !seen; i++) { const { g, a } = newGame({ bots: 6, cfg: { jester: true } }); seen = JSON.parse(g.snapshot()).players && Object.values(JSON.parse(g.snapshot()).players).some(p => p.role === 'jester'); }
+  ok(seen, 'עם הקוד הליצן לא הופיע');
 });
 
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
