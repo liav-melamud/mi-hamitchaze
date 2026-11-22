@@ -767,7 +767,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-123006'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-123816'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -2285,19 +2285,103 @@ function buildRound() {
 // ---------- מיני-משחק הסביבון ----------
 function buildDreidel(b, tk) {
   let spins = 0, busy = false;
-  b.innerHTML = '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p><div class="dreidelBox"><svg id="drSvg" class="spinning-dreidel" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg"><rect x="44" y="5" width="12" height="20" rx="3" fill="#d97706"/><rect x="25" y="25" width="50" height="50" rx="6" fill="#2563eb"/><polygon points="25,75 75,75 50,110" fill="#1d4ed8"/><circle cx="50" cy="50" r="15" fill="#facc15"/><text id="drLetter" x="50" y="57" text-anchor="middle" font-size="20" font-weight="bold" font-family="Arial" fill="#1b1405">ש</text></svg></div><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
-  const svg = $('#drSvg'), L = $('#drLetter'), faces = ['נ', 'ג', 'ה', 'ש'];
+  b.innerHTML = '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p><canvas id="drCv" width="380" height="290" style="display:block;margin:0 auto;max-width:100%"></canvas><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
+  const g = $('#drCv').getContext('2d'), LET = ['נ', 'ג', 'ה', 'ש'];
+  // סביבון תלת-ממדי אמיתי: מודל של קוביה + פירמידה + ידית, סיבוב במרחב והקרנה בפרספקטיבה (בלי ספריות, כדי שיעבוד גם אופליין)
+  const CX = 190, BASE = 232, D = 560, F = 600, EL = 0.5, SC = 1.5, cE = Math.cos(EL), sE = Math.sin(EL);
+  const H1 = 35, H2 = 85, H3 = 105, W = 25, HW = 6, L = [-0.5, 0.9, 0.6];
+  const ln = Math.hypot(...L); L[0] /= ln; L[1] /= ln; L[2] /= ln;
+  const corner = (ang, y, r) => [r * Math.SQRT2 * Math.cos(ang), y, r * Math.SQRT2 * Math.sin(ang)];
+  const faces = [], P4 = Math.PI / 4;
+  for (let k = 0; k < 4; k++) { // פירמידה תחתונה (השפיץ)
+    const a0 = k * Math.PI / 2 - P4, a1 = a0 + Math.PI / 2;
+    faces.push({ v: [[0, 0, 0], corner(a0, H1, W), corner(a1, H1, W)], pc: [0, 12, 0], col: [29, 78, 216] });
+  }
+  for (let k = 0; k < 4; k++) { // ארבע פאות הגוף, על כל אחת אות
+    const a = k * Math.PI / 2, a0 = a - P4, a1 = a + P4;
+    faces.push({ v: [corner(a0, H1, W), corner(a1, H1, W), corner(a1, H2, W), corner(a0, H2, W)], pc: [0, 60, 0], col: [37, 99, 235], letter: k, a });
+  }
+  faces.push({ v: [0, 1, 2, 3].map(k => corner(k * Math.PI / 2 - P4, H2, W)), pc: [0, 60, 0], col: [59, 120, 245] });
+  for (let k = 0; k < 4; k++) { // ידית
+    const a0 = k * Math.PI / 2 - P4, a1 = a0 + Math.PI / 2;
+    faces.push({ v: [corner(a0, H2, HW / Math.SQRT2 * 1), corner(a1, H2, HW / Math.SQRT2), corner(a1, H3, HW / Math.SQRT2), corner(a0, H3, HW / Math.SQRT2)], pc: [0, 95, 0], col: [217, 119, 6] });
+  }
+  faces.push({ v: [0, 1, 2, 3].map(k => corner(k * Math.PI / 2 - P4, H3, HW / Math.SQRT2)), pc: [0, 95, 0], col: [245, 158, 11] });
+  const rot = (p, phi, th, psi) => { // Ry(phi) ואז Rz(th) ואז Ry(psi)
+    let [x, y, z] = p;
+    let c = Math.cos(phi), s = Math.sin(phi); [x, z] = [x * c + z * s, -x * s + z * c];
+    c = Math.cos(th); s = Math.sin(th); [x, y] = [x * c - y * s, x * s + y * c];
+    c = Math.cos(psi); s = Math.sin(psi); [x, z] = [x * c + z * s, -x * s + z * c];
+    return [x * SC, y * SC, z * SC];
+  };
+  const proj = (x, y, z) => { const dist = D - (z * cE + y * sE), sc = F / dist; return [CX + x * sc, BASE - (y * cE - z * sE) * sc, sc]; };
+  const cam = [0, D * sE, D * cE];
+  const drawFrame = (phi, th, psi, blend) => {
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 380, 290);
+    const gr = g.createLinearGradient(0, 0, 0, 290); gr.addColorStop(0, '#2a3453'); gr.addColorStop(0.55, '#1b2238'); gr.addColorStop(0.56, '#a8743b'); gr.addColorStop(1, '#7d5226');
+    g.fillStyle = gr; g.fillRect(0, 0, 380, 290);
+    // טרנספורם לכל הקדקודים, והנחת הגוף על השולחן
+    const T = faces.map(f => f.v.map(p => rot(p, phi, th, psi)));
+    let minY = 1e9, minX = 1e9, maxX = -1e9, sx = 0, sz = 0, n = 0;
+    T.forEach(vs => vs.forEach(p => { minY = Math.min(minY, p[1]); minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); sx += p[0]; sz += p[2]; n++; }));
+    const tx = -(minX + maxX) / 2 * blend, ty = -minY;
+    const out = [];
+    faces.forEach((f, i) => {
+      const vs = T[i].map(p => [p[0] + tx, p[1] + ty, p[2]]);
+      const pcw = rot(f.pc, phi, th, psi); pcw[0] += tx; pcw[1] += ty;
+      const c = vs.reduce((a, p) => [a[0] + p[0] / vs.length, a[1] + p[1] / vs.length, a[2] + p[2] / vs.length], [0, 0, 0]);
+      let nx = (vs[1][1] - vs[0][1]) * (vs[2][2] - vs[0][2]) - (vs[1][2] - vs[0][2]) * (vs[2][1] - vs[0][1]);
+      let ny = (vs[1][2] - vs[0][2]) * (vs[2][0] - vs[0][0]) - (vs[1][0] - vs[0][0]) * (vs[2][2] - vs[0][2]);
+      let nz = (vs[1][0] - vs[0][0]) * (vs[2][1] - vs[0][1]) - (vs[1][1] - vs[0][1]) * (vs[2][0] - vs[0][0]);
+      const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      if (nx * (c[0] - pcw[0]) + ny * (c[1] - pcw[1]) + nz * (c[2] - pcw[2]) < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      const toCam = [cam[0] - c[0], cam[1] - c[1], cam[2] - c[2]];
+      if (nx * toCam[0] + ny * toCam[1] + nz * toCam[2] <= 0) return;
+      out.push({ f, vs, c, n: [nx, ny, nz], depth: D - (c[2] * cE + c[1] * sE), tx });
+    });
+    // צל על השולחן
+    const gc = proj((sx / n) * 1 + tx, 0, sz / n), span = (maxX - minX) / 2 * gc[2] + 22;
+    g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(gc[0], gc[1] + 2, span * 0.9, span * 0.2 + 5, 0, 0, 7); g.fill();
+    out.sort((a, b2) => b2.depth - a.depth);
+    for (const o of out) {
+      const lum = 0.42 + 0.58 * Math.max(0, o.n[0] * L[0] + o.n[1] * L[1] + o.n[2] * L[2]);
+      g.fillStyle = `rgb(${Math.round(o.f.col[0] * lum)},${Math.round(o.f.col[1] * lum)},${Math.round(o.f.col[2] * lum)})`;
+      g.strokeStyle = 'rgba(8,14,50,.55)'; g.lineWidth = 1.4; g.lineJoin = 'round';
+      g.beginPath(); o.vs.forEach((p, i) => { const q = proj(p[0], p[1], p[2]); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath(); g.fill(); g.stroke();
+      if (o.f.letter !== undefined) { // עיגול צהוב ואות על הפאה (מסתובבים עם הפאה בפרספקטיבה)
+        const a = o.f.a, ctr = rot([W * Math.cos(a), (H1 + H2) / 2, W * Math.sin(a)], phi, th, psi); ctr[0] += tx; ctr[1] += ty;
+        const tg = rot([Math.sin(a), 0, -Math.cos(a)], phi, th, psi).map(v => v / SC), up = rot([0, 1, 0], phi, th, psi).map(v => v / SC);
+        const p0 = proj(ctr[0], ctr[1], ctr[2]), pt = proj(ctr[0] + tg[0] * 10, ctr[1] + tg[1] * 10, ctr[2] + tg[2] * 10), pu = proj(ctr[0] - up[0] * 10, ctr[1] - up[1] * 10, ctr[2] - up[2] * 10);
+        g.save(); g.setTransform((pt[0] - p0[0]) / 10, (pt[1] - p0[1]) / 10, (pu[0] - p0[0]) / 10, (pu[1] - p0[1]) / 10, p0[0], p0[1]);
+        g.fillStyle = 'rgba(250,204,21,.97)'; g.beginPath(); g.arc(0, 0, 17 * SC, 0, 7); g.fill();
+        g.fillStyle = '#1b1405'; g.font = 'bold ' + Math.round(26 * SC) + 'px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(LET[o.f.letter], 0, 3); g.restore();
+      }
+    }
+  };
+  // u: 0..1. סיבוב זקוף מהיר, נדנוד (פרצסיה) שגדל, נפילה על הצד ושקיעה קטנה. האות שמסתיימת למעלה = target
+  const ease = x => x * x * (3 - 2 * x);
+  const pose = (u, target, dir) => {
+    const phiEnd = target * Math.PI / 2 - (dir > 0 ? 0 : Math.PI), A0 = 2 * Math.PI * 9, PSI = 2 * Math.PI * 7;
+    if (u < 0.8) { const k = u / 0.8; return { phi: phiEnd - A0 * (1 - k) ** 2, th: dir * (0.03 + 0.5 * Math.pow(k, 2.2)), psi: PSI * (0.5 * k + 0.5 * k * k), blend: 0 }; }
+    if (u < 0.93) { const k = (u - 0.8) / 0.13, e = k * k; return { phi: phiEnd, th: dir * (0.53 + e * (Math.PI / 2 - 0.53)), psi: PSI, blend: e }; }
+    const k = (u - 0.93) / 0.07; return { phi: phiEnd, th: dir * (Math.PI / 2 + 0.05 * Math.sin(k * Math.PI * 3) * (1 - k)), psi: PSI, blend: 1 };
+  };
+  const frame = (u, t, d) => { const p = pose(u, t, d); drawFrame(p.phi, p.th, p.psi, p.blend); };
+  frame(0, 3, 1);
+  b._frame = frame;
   $('#drBtn').onclick = () => {
     if (busy) return; busy = true; spins++;
-    const target = spins >= 3 || Math.random() < 0.34 ? 1 : [0, 2, 3][Math.floor(Math.random() * 3)];
-    $('#drRes').textContent = ''; svg.classList.add('spin');
-    const flick = setInterval(() => { if (!alive(tk)) return clearInterval(flick); L.textContent = faces[Math.floor(Math.random() * 4)]; }, 140);
-    setTimeout(() => {
-      clearInterval(flick); if (!alive(tk)) return;
-      svg.classList.remove('spin'); L.textContent = faces[target];
-      if (target === 1) { $('#drRes').innerHTML = '<span style="color:var(--ok)">🎉 ג׳! נס גדול!</span>'; setTimeout(() => { if (alive(tk)) miniDone(); }, 650); }
+    const target = spins >= 3 || Math.random() < 0.34 ? 1 : [0, 2, 3][Math.floor(Math.random() * 3)], dir = Math.random() < 0.5 ? -1 : 1;
+    $('#drRes').textContent = '';
+    const t0 = performance.now(), dur = 4200;
+    const step = now => {
+      if (!alive(tk)) return;
+      const u = Math.min(1, (now - t0) / dur); frame(u, target, dir);
+      if (u < 1) return requestAnimationFrame(step);
+      if (target === 1) { $('#drRes').innerHTML = '<span style="color:var(--ok)">🎉 ג׳! נס גדול!</span>'; setTimeout(() => { if (alive(tk)) miniDone(); }, 1000); }
       else { $('#drRes').textContent = '😅 לא יצא ג׳ – עוד פעם'; busy = false; }
-    }, 2100);
+    };
+    requestAnimationFrame(step);
   };
 }
 // ---------- חנוכייה בלובי ----------
