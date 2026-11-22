@@ -28,7 +28,7 @@ const ROLES = {
   shifter: { name: 'משנה צורה', team: 'imp', desc: 'מתחזה שיכול להתחפש לשחקן הקרוב (F) ל-20 שניות.' },
   photographer: { name: 'הצלם', team: 'crew', desc: 'צלם (P) שחקנים וגופות שלידך. בישיבה אפשר להציג את התמונות כראיה.' },
   detective: { name: 'בלש', team: 'crew', desc: 'חקור (I) שחקן קרוב: תגלה אם הוא היה ליד זירת חיסול.' },
-  judge: { name: 'שופט', team: 'crew', desc: 'ההצבעה שלך בישיבה שווה קול כפול.' },
+  judge: { name: 'שופט', team: 'crew', desc: 'אחרי שסיימת את כל המשימות שלך, פעם אחת במשחק אפשר לפסוק בישיבה (⚖️): הפטיש יורד והשחקן שבחרת מודח מיד, בלי הצבעה. ההצבעה הרגילה שלך שווה קול אחד. תיזהר – פסק דין על חף מפשע הוא טעות.' },
   phantom: { name: 'נעלם', team: 'imp', desc: 'היעלם (H) ל-8 שניות: אף אחד לא רואה אותך, אבל אי אפשר לחסל בזמן ההיעלמות.' },
   viper: { name: 'מרקיב', team: 'imp', desc: 'הגופות של מי שחיסלת מתפרקות אחרי 8 שניות, ואי אפשר לדווח עליהן.' },
   bodyguard: { name: 'שומר ראש', team: 'crew', desc: 'הגן (B) על שחקן קרוב ל-20 שניות: ניסיון חיסול שלו ייכשל, ותקבל התראה.' },
@@ -356,6 +356,7 @@ function startGame(by) {
   all.forEach(p => {
     p.alive = true; p.ejected = false; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
+    p.verdictUsed = false;
     p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.hiding = null; p.hideSince = 0; p.hideCd = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15; p.modCd = 0; p.modUsed = 0; p.sprintUntil = 0; p.radarUntil = 0; p.luckUsed = false; p.poisonAt = 0; p.poisonBy = null; p.eaten = 0;
     if (team(p) === 'crew') {
       if (settings.mode === 5) { p.tasks = candleIdx().map(i => ({ i, done: false })); }
@@ -548,12 +549,13 @@ function callMeeting(by, body) {
   });
 }
 
-function resolveMeeting() {
+const judgeReady = p => p.tasks.length > 0 && p.tasks.every(x => x.done);
+function resolveMeeting(forced, judge) { // forced = פסק דין של השופט: מודחים מיד את מי שנבחר, בלי ספירת קולות
   const voters = list().filter(p => p.alive && !p.spectator);
   const tally = {};
-  voters.forEach(v => { const t = meeting.votes[v.id]; if (t) tally[t] = (tally[t] || 0) + (v.role === 'judge' ? 2 : 1); });
-  let best = null, max = 0, tie = false;
-  for (const k in tally) {
+  if (!forced) voters.forEach(v => { const t = meeting.votes[v.id]; if (t) tally[t] = (tally[t] || 0) + 1; });
+  let best = forced || null, max = 0, tie = false;
+  if (!forced) for (const k in tally) {
     if (tally[k] > max) { max = tally[k]; best = k; tie = false; }
     else if (tally[k] === max) tie = true;
   }
@@ -562,8 +564,9 @@ function resolveMeeting() {
     ej = players[best]; ej.alive = false; ej.ejected = true; if (team(ej) === 'crew') wrongEjects++;
   }
   // סטטיסטיקה: מי הצביע נכון (נגד מתחזה) ומי טעה (נגד איש צוות)
-  voters.forEach(v => { const tg = meeting.votes[v.id]; if (tg && tg !== 'skip' && players[tg]) { if (team(players[tg]) === 'imp') v.stats.goodVotes++; else v.stats.badVotes++; } });
-  ev('eject', ej ? `🚀 ${nm(ej)} הודח (היה ${ROLES[ej.role].name})` : (tie ? '🤝 תיקו בהצבעה – אף אחד לא הודח' : '⏭ ההצבעה דילגה – אף אחד לא הודח'));
+  if (!forced) voters.forEach(v => { const tg = meeting.votes[v.id]; if (tg && tg !== 'skip' && players[tg]) { if (team(players[tg]) === 'imp') v.stats.goodVotes++; else v.stats.badVotes++; } });
+  if (forced && ej) ev('verdict', `⚖️ השופט ${nm(judge)} פסק והדיח את ${nm(ej)} (היה ${ROLES[ej.role].name})`);
+  else ev('eject', ej ? `🚀 ${nm(ej)} הודח (היה ${ROLES[ej.role].name})` : (tie ? '🤝 תיקו בהצבעה – אף אחד לא הודח' : '⏭ ההצבעה דילגה – אף אחד לא הודח'));
   eject = ej
     ? { id: ej.id, name: ej.name, color: ej.color, role: settings.confirm || ej.role === 'jester' ? ROLES[ej.role].name : null, team: settings.confirm || ej.role === 'jester' ? team(ej) : null, jester: ej.role === 'jester', tally, t: EJECT_TIME }
     : { id: null, tally, t: EJECT_TIME, tie };
@@ -571,18 +574,19 @@ function resolveMeeting() {
   list().forEach(p => { if (p.bot && p.bot.sawVent && (!players[p.bot.sawVent.id] || (ej && p.bot.sawVent.id === ej.id))) p.bot.sawVent = null; });
   lastMistake = ej && settings.confirm && team(ej) === 'crew'
     ? { name: bare(ej.name), by: voters.filter(v => meeting.votes[v.id] === ej.id && v.id !== ej.id).map(v => v.id) } : null;
+  if (forced && ej) eject.verdict = { j: judge.name, jc: COLORS[judge.color].c, t: ej.name };
   // מי הצביע למי (אלא אם ההצבעות אנונימיות)
-  if (settings.openVotes) {
+  if (settings.openVotes && !forced) {
     eject.votes = voters.map(v => {
       const t = meeting.votes[v.id];
       const tp = t && t !== 'skip' ? players[t] : null;
-      return { id: v.id, tid: tp ? tp.id : null, hat: v.hat || 0, w: v.role === 'judge' ? 2 : 1, n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
+      return { id: v.id, tid: tp ? tp.id : null, hat: v.hat || 0, w: 1, n: v.name, c: COLORS[v.color].c, to: !t ? 'none' : t === 'skip' ? 'skip' : 'p', tn: tp ? tp.name : '', tc: tp ? COLORS[tp.color].c : '' };
     });
   }
   // לאנימציה: הצבע והכובע של המודח, כמה מתחזים נשארו, וזמן לסצנת ההצבעות + הזריקה לחלל
   if (ej) { eject.c = COLORS[ej.color].c; eject.hat = ej.hat || 0; }
   if (settings.confirm && settings.mode !== 4 && !(ej && ej.role === 'jester')) eject.impLeft = list().filter(o => o.alive && !o.spectator && team(o) === 'imp').length;
-  eject.t = (eject.votes ? 0.4 + voters.length * 0.3 + 1 : 0) + 6;
+  eject.t = (eject.votes ? 0.4 + voters.length * 0.3 + 1 : 0) + 6 + (forced ? 3 : 0);
   meeting = null;
   phase = 'eject';
 }
@@ -919,6 +923,14 @@ function act(p, a) {
       if (phase !== 'meeting' || meeting.reveal || !p.alive || p.spectator || meeting.votes[p.id]) return;
       if (a.target !== 'skip' && !(players[a.target] && players[a.target].alive)) return;
       meeting.votes[p.id] = a.target;
+      break;
+    }
+    case 'verdict': { // פסק דין של השופט: פעם אחת במשחק, אחרי שסיים את כל המשימות שלו
+      if (phase !== 'meeting' || !meeting || meeting.reveal || p.role !== 'judge' || !p.alive || p.spectator || p.verdictUsed) return;
+      if (!judgeReady(p)) return toast(p, '⚖️ צריך לסיים את כל המשימות שלך כדי לפסוק');
+      const tg = players[a.target];
+      if (!tg || !tg.alive || tg.spectator || tg.id === p.id) return;
+      p.verdictUsed = true; resolveMeeting(tg.id, p);
       break;
     }
     case 'talk': p.talking = !!a.on; p.talkT = now(); break;
@@ -1751,6 +1763,8 @@ function botMeeting(p) {
       else { const opts = list().filter(o => ok(o.id) && !o.spectator); vote = opts.length ? pick(opts).id : 'skip'; }
     }
     meeting.votes[p.id] = vote || 'skip';
+    // שופט בוט פוסק רק כשהוא בטוח (ראה בעצמו חיסול או שינוי צורה)
+    if (p.role === 'judge' && !p.verdictUsed && judgeReady(p) && vote && vote !== 'skip' && (b.sawKill === vote || b.sawShift === vote) && Math.random() < 0.8) act(p, { type: 'verdict', target: vote });
   }
 }
 
@@ -1996,6 +2010,7 @@ function viewFor(v) {
     team: v.role ? team(v) : null, desc: v.role ? roleDesc(v.role) : '',
     tasks: v.tasks.map(x => ({ name: MAP.TASKS[x.i].name, i: x.i, done: x.done })),
     killCd: Math.ceil(v.killCd), shiftCd: Math.ceil(v.shiftCd), shifted: !!v.shapeAs, gaCd: Math.ceil(v.gaCd),
+    verdict: v.role === 'judge' ? { ready: judgeReady(v), used: !!v.verdictUsed, done: v.tasks.filter(x => x.done).length, total: v.tasks.length } : null,
     emergencyUsed: v.emergencyUsed, work: v.work && !v.work.mini ? v.work.t / taskTime(v.work.ref.i) : 0,
     mini: v.work && v.work.mini ? v.work.ref.i : null, inVent: v.inVent, hat: v.hat, cam: !!v.cam, host: v.id === hostId,
     sabMini: v.sabWork && sab ? { kind: { lights: 'switches', oxygen: 'code', reactor: 'sliders', freeze: 'tapfill' }[sab.type], i: v.sabWork.i } : null,
@@ -2049,7 +2064,7 @@ function viewFor(v) {
       t: Math.ceil(meeting.t), by: by ? by.name : '', body: body ? body.name : meeting.fake ? '?' : null, room: meeting.room, bodyRoom: meeting.bodyRoom,
       voted: Object.keys(meeting.votes), myVote: meeting.votes[v.id] || null,
       reveal: !!meeting.reveal,
-      votes: meeting.reveal && settings.openVotes ? Object.entries(meeting.votes).map(([id, to]) => ({ w: players[id] && players[id].role === 'judge' ? 2 : 1, c: players[id] ? COLORS[players[id].color].c : '#888', to })) : null,
+      votes: meeting.reveal && settings.openVotes ? Object.entries(meeting.votes).map(([id, to]) => ({ w: 1, c: players[id] ? COLORS[players[id].color].c : '#888', to })) : null,
     };
   }
   if (phase === 'alert' && meeting) {

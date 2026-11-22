@@ -60,6 +60,13 @@
   .spinning-dreidel { width: 130px; height: 156px; }
   .spinning-dreidel.spin { animation: spin-dreidel 1.2s linear infinite; }
   @keyframes spin-dreidel { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+  #gavel { text-align: center; padding: 26px 0 10px; }
+  #gavel .hm { font-size: 96px; display: inline-block; transform-origin: 80% 90%; animation: hammer 1.2s ease-in forwards; }
+  #gavel .gtxt { font-size: 22px; opacity: 0; animation: gfade .4s 0.95s forwards; margin-top: 8px; }
+  #eject .card:has(#gavel) { animation: gshake .35s 0.85s 1; }
+  @keyframes hammer { 0% { transform: rotate(-70deg); } 55% { transform: rotate(-70deg); } 70% { transform: rotate(18deg); } 80% { transform: rotate(-8deg); } 100% { transform: rotate(0deg); } }
+  @keyframes gfade { to { opacity: 1; } }
+  @keyframes gshake { 0%, 100% { transform: translate(0); } 25% { transform: translate(-7px, 4px); } 50% { transform: translate(6px, -5px); } 75% { transform: translate(-4px, 3px); } }
   #hanukBanner { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; text-align: center; color: #0b1a4a; background: linear-gradient(90deg, #5ec8ff, #ffffff, #ffd54a, #ffffff, #5ec8ff); background-size: 300% 100%; animation: clownbg 7s linear infinite; box-shadow: 0 0 18px rgba(110,190,255,.45); }
   #hanukBanner .hbT { font-weight: 900; font-size: 18px; }
   #hanukBanner small { display: block; font-weight: 700; font-size: 12.5px; margin-top: 3px; }
@@ -545,6 +552,7 @@
       <div class="row linkRow">
         <button id="langBtn" class="link">🌐 English / עברית</button>
         <button class="statsBtn link">📊 הסטטיסטיקה והתגים שלי</button>
+        <button id="funDreidelBtn" class="link">🌀 סביבון לכיף</button>
       </div>
     </div>
     <button id="moreOpts" class="link hidden" style="width:100%;margin-top:10px">אפשרויות נוספות</button>
@@ -672,6 +680,7 @@
       <p class="sub" style="margin-top:0">מה כל תפקיד עושה, וכמה אחוז הוא יופיע לפי ההגדרות. המארח משנה את זה במחשב.</p>
       <div id="roleBoard"></div>
     </div></div>
+    <div id="dreidelModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>🌀 סביבון</h2><div id="dreidelBody"></div></div></div>
     <div id="menorahModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose">✖</button><h2>🕎 חנוכייה</h2><div id="menBody"></div></div></div>
     <p id="waitHost" class="sub hidden">ממתין שהמארח 👑 יתחיל את המשחק…</p>
     <div class="help">
@@ -712,7 +721,7 @@
     </div>
     <p id="msub" class="sub" style="margin-top:6px"></p>
     <div id="mgrid"></div>
-    <div class="row" style="margin-bottom:12px"><button id="skipBtn">⏭ דלג על ההצבעה</button><span id="skipDots" class="vdots"></span><span id="mstatus" class="sub" style="margin:0"></span></div>
+    <div class="row" style="margin-bottom:12px"><button id="skipBtn">⏭ דלג על ההצבעה</button><button id="verdictBtn" class="hidden" style="background:#7a4a10">⚖️ פסק דין</button><span id="skipDots" class="vdots"></span><span id="mstatus" class="sub" style="margin:0"></span></div>
     <div id="micHeard" class="micHeard hidden"></div>
     <div id="nowSpeaking" class="hidden"></div>
     <div id="mExtras" class="hidden"></div>
@@ -802,7 +811,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-124451'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-131003'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1495,11 +1504,12 @@ const LOB = { W: 1000, H: 560, st: [
   { id: 'wardrobe', x: 170, y: 112, ic: '👕', n: 'ארון בגדים', hint: 'שנה צבע, כובע וחיית מחמד' },
   { id: 'comp', x: 500, y: 112, ic: '💻', n: 'מחשב המארח', hint: 'הגדרות המשחק' },
   { id: 'board', x: 830, y: 112, ic: '📋', n: 'לוח תפקידים', hint: 'מה כל תפקיד עושה ובאיזה אחוז' },
+  { id: 'dreidel', x: 150, y: 470, ny: 470, ic: '🌀', n: 'סביבון', hint: 'סובבו סביבון לכיף', toy: true },
   { id: 'menorah', x: 500, y: 327, ic: '🕎', n: 'חנוכייה', hint: 'הנרות, התגים והפרסים של חנוכה', evt: true },
 ] };
 const lobStations = () => LOB.st.filter(q => !q.evt || hanukOn());
-const lobbyModals = { wardrobe: '#wardrobeModal', comp: '#compModal', board: '#boardModal', crew: '#crewModal', menorah: '#menorahModal' };
-['#wardrobeModal', '#compModal', '#boardModal', '#crewModal', '#menorahModal'].forEach(sel => document.body.appendChild($(sel))); // מחוץ לכרטיס, כדי שיכסו את כל המסך
+const lobbyModals = { wardrobe: '#wardrobeModal', comp: '#compModal', board: '#boardModal', crew: '#crewModal', menorah: '#menorahModal', dreidel: '#dreidelModal' };
+['#wardrobeModal', '#compModal', '#boardModal', '#crewModal', '#menorahModal', '#dreidelModal'].forEach(sel => document.body.appendChild($(sel))); // מחוץ לכרטיס, כדי שיכסו את כל המסך
 let LI = null, lobOpen = null, lobRaf = 0;
 const lobDisp = {};
 function openStation(id) {
@@ -1509,13 +1519,15 @@ function openStation(id) {
   keys.clear(); window.__joyEnd && window.__joyEnd(); sendInput();
   if (id === 'comp') $('#compNote').textContent = S.me.host ? '👑 אתה המארח – שינויים נשמרים מיד ונשלחים לכולם.' : 'רק המארח 👑 יכול לשנות. אתה יכול לראות את ההגדרות.';
   if (id === 'menorah') renderMenorah();
+  if (id === 'dreidel') buildDreidel($('#dreidelBody'), 0, true);
   renderOdds();
 }
-function closeStation() { clearInterval(menTimer); if (lobOpen) { show(lobbyModals[lobOpen], false); lobOpen = null; } }
+function closeStation() { clearInterval(menTimer); show('#dreidelModal', false); if (lobOpen) { show(lobbyModals[lobOpen], false); lobOpen = null; } }
 document.querySelectorAll('.lmClose').forEach(b => b.onclick = closeStation);
 document.querySelectorAll('.lmodal').forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) closeStation(); }));
 document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => openStation(b.dataset.st));
 $('#startBtn2').onclick = () => api({ type: 'start' });
+$('#funDreidelBtn').onclick = () => { show('#dreidelModal', true); buildDreidel($('#dreidelBody'), 0, true); };
 
 // טלפון (מגע או מסך נמוך): החללית ממלאת את המסך, והשחקנים/צ'אט עוברים לחלון
 const phoneMQ = matchMedia('(pointer: coarse), (max-height: 560px)');
@@ -1531,7 +1543,7 @@ $('#chipWa').onclick = () => $('#waBtn').click();
 $('#chipCopy').onclick = () => $('#copyBtn').click();
 function nearStation() {
   const me = S && S.players.find(p => p.id === S.me.id); if (!me) return null;
-  return lobStations().find(st => Math.hypot(me.x - st.x, me.y - (st.y + 70)) < 110) || null;
+  return lobStations().find(st => Math.hypot(me.x - st.x, me.y - (st.ny || st.y + 70)) < 110) || null;
 }
 addEventListener('keydown', e => {
   if (!S || S.phase !== 'lobby') return;
@@ -1579,11 +1591,12 @@ function drawShip(t) {
   g.fillStyle = '#243052'; g.beginPath(); g.ellipse(500, 327, 85, 46, 0, 0, 7); g.fill(); g.strokeStyle = '#4a5a86'; g.lineWidth = 4; g.stroke();
   g.font = '28px serif'; g.textAlign = 'center';
   const hk = hanukOn(), meP0 = S && S.players.find(p => p.id === S.me.id);
-  if (hk) { drawShipHanuk(g, t, meP0); drawMenorah(g, 500, 336, 0.95, hanukLitFlags(), t, true); g.font = 'bold 14px sans-serif'; g.fillStyle = '#ffe27a'; g.fillText('🕎 חנוכייה', 500, 392); } else g.fillText('🗺️', 500, 337);
+  if (hk) { drawShipHanuk(g, t, meP0); drawMenorah(g, 500, 336, 0.95, hanukLitFlags(), t, true); g.font = 'bold 14px sans-serif'; g.fillStyle = '#ffe27a'; g.fillText('🕎 חנוכייה', 500, 392); } else { g.fillText('🗺️', 500, 337); const nr = meP0 && Math.hypot(meP0.x - 150, meP0.y - 470) < 95; drawDreidel(g, 150, 470, 1.5, t / (nr ? 55 : 600), null); }
+  { g.font = 'bold 13px sans-serif'; g.fillStyle = '#ffe27a'; g.textAlign = 'center'; g.fillText('🌀 סביבון', 150, 508); }
   // תחנות
   const near = nearStation();
   for (const st of lobStations()) {
-    if (st.evt) continue;
+    if (st.evt || st.toy) continue;
     const on = near && near.id === st.id;
     g.fillStyle = on ? '#2d4a86' : '#26304e'; g.strokeStyle = on ? '#ffb547' : '#4a5a86'; g.lineWidth = on ? 4 : 3;
     g.beginPath(); g.roundRect ? g.roundRect(st.x - 80, st.y - 62, 160, 110, 14) : g.rect(st.x - 80, st.y - 62, 160, 110); g.fill(); g.stroke();
@@ -1806,7 +1819,7 @@ function renderHud(s) {
 }
 
 // ---------- ישיבה ----------
-let meetSig = '', chatLen = -1;
+let meetSig = '', chatLen = -1, verdictMode = false;
 function renderMeeting(s) {
   const m = s.meeting, me = s.me;
   $('#mtitle').textContent = m.body ? '💀 דווחה גופה!' : '🚨 ישיבת חירום!';
@@ -1815,19 +1828,23 @@ function renderMeeting(s) {
   const roles = {};
   s.players.forEach(p => { if (p.role) roles[p.id] = p; });
   const canVote = me.alive && !me.spec && !m.myVote && !m.reveal;
+  const vd = me.verdict, canVerdict = !!vd && me.alive && !m.reveal && !vd.used;
+  if (!canVerdict) verdictMode = false;
   const dots = id => (m.votes || []).filter(v => v.to === id).map(v => `<i class="vdot" style="background:${esc(v.c)}">${COLOR_SYMS[v.c] && pref.cb ? COLOR_SYMS[v.c] : ''}</i>`.repeat(v.w || 1)).join('');
   const roster = s.roster.filter(p => !p.spec);
-  const sig = JSON.stringify([roster, m.voted, m.myVote, Object.keys(roles), s.settings.reveal, m.reveal, m.votes]);
+  const sig = JSON.stringify([roster, m.voted, m.myVote, Object.keys(roles), s.settings.reveal, m.reveal, m.votes, vd, verdictMode]);
   if (sig !== meetSig) {
     meetSig = sig;
     $('#mgrid').innerHTML = roster.map(p => {
       const r = roles[p.id];
-      return `<button class="vote ${p.alive ? '' : 'dead'} ${m.myVote === p.id ? 'mine' : ''}" data-v="${esc(p.id)}" ${canVote && p.alive ? '' : 'disabled'}>
+      return `<button class="vote ${p.alive ? '' : 'dead'} ${m.myVote === p.id ? 'mine' : ''}" data-v="${esc(p.id)}" ${(verdictMode ? p.alive && p.id !== me.id : canVote && p.alive) ? '' : 'disabled'}>
         <span class="dot" style="background:${esc(p.color)};width:22px;height:22px"></span>
         <span class="nm">${esc(cs(p.color) + p.name)}${p.id === me.id ? ' (אתה)' : ''}${r ? `<br><span class="tag ${esc(r.team)}">${esc(r.role)}</span>` : ''}</span>
         ${m.reveal ? `<span class="vdots">${dots(p.id)}</span>` : (m.voted.includes(p.id) ? '<span class="ok">✓ הצביע</span>' : '')}</button>`;
     }).join('');
-    $('#skipBtn').disabled = !canVote;
+    $('#skipBtn').disabled = !canVote || verdictMode;
+    show('#verdictBtn', canVerdict);
+    if (canVerdict) { const vb = $('#verdictBtn'); vb.disabled = !vd.ready; vb.textContent = vd.ready ? (verdictMode ? '⚖️ בחר את מי להדיח… (לחץ לביטול)' : '⚖️ פסק דין – פעם אחת') : '⚖️ פסק דין (' + vd.done + '/' + vd.total + ' משימות)'; }
     $('#skipDots').innerHTML = m.reveal ? dots('skip') : '';
     $('#mstatus').textContent = m.reveal ? 'סופרים את הקולות…' : me.alive ? (m.myVote ? (m.myVote === 'skip' ? 'בחרת לדלג' : 'ההצבעה שלך נקלטה') : 'לחץ על שחקן כדי להצביע נגדו') : 'רוחות לא מצביעות 👻';
     $('#chatIn').disabled = !me.alive;
@@ -1862,7 +1879,12 @@ function renderExtras(s) {
     b.disabled = true;
   };
 }
-$('#mgrid').onclick = e => { const b = e.target.closest('button'); if (b && !b.disabled) api({ type: 'vote', target: b.dataset.v }); };
+$('#mgrid').onclick = e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (verdictMode) { const nm = b.querySelector('.nm') ? b.querySelector('.nm').firstChild.textContent : ''; if (confirm(T('⚖️ פסק דין סופי! להדיח את {t} מיד, בלי הצבעה?').replace('{t}', nm))) { verdictMode = false; meetSig = ''; api({ type: 'verdict', target: b.dataset.v }); } return; }
+  api({ type: 'vote', target: b.dataset.v });
+};
+$('#verdictBtn').onclick = () => { verdictMode = !verdictMode; meetSig = ''; };
 $('#skipBtn').onclick = () => api({ type: 'vote', target: 'skip' });
 const sendChat = () => { const t = $('#chatIn').value.trim(); if (t) api({ type: 'chat', text: t }); $('#chatIn').value = ''; };
 $('#chatBtn').onclick = sendChat;
@@ -2030,6 +2052,13 @@ function renderEject(s) {
     const dot = c => `<span class="dot" style="background:${esc(c)}"></span>`;
     $('#ejectTxt').innerHTML += '<div class="vlist">' + e.votes.map(v =>
       `<div class="vrow">${dot(v.c)}<span>${esc(v.n)}${v.w > 1 ? ' ×2' : ''}</span><b>←</b>${v.to === 'p' ? dot(v.tc) + '<span>' + esc(v.tn) + '</span>' : '<span class="sub" style="margin:0">' + (v.to === 'skip' ? 'דילג' : 'לא הצביע') + '</span>'}</div>`).join('') + '</div>';
+  }
+  if (e.verdict) { // פסק דין של השופט: הפטיש יורד ואז הסצנה הרגילה של ההדחה
+    const cv = $('#voteCv'); cv.style.visibility = 'hidden';
+    $('#ejectTxt').insertAdjacentHTML('afterbegin', `<div id="gavel"><div class="hm">🔨</div><div class="gtxt">${T('⚖️ השופט {j} פסק: {t} מודח!').replace('{j}', `<b style="color:${esc(e.verdict.jc)}">${esc(e.verdict.j)}</b>`).replace('{t}', `<b>${esc(e.verdict.t)}</b>`)}</div></div>`);
+    try { const ac = new (window.AudioContext || window.webkitAudioContext)(), o = ac.createOscillator(), gn = ac.createGain(); o.type = 'square'; o.frequency.setValueAtTime(150, ac.currentTime + 0.85); o.frequency.exponentialRampToValueAtTime(45, ac.currentTime + 1.1); gn.gain.setValueAtTime(0.0001, ac.currentTime); gn.gain.setValueAtTime(0.35, ac.currentTime + 0.85); gn.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 1.15); o.connect(gn); gn.connect(ac.destination); o.start(); o.stop(ac.currentTime + 1.2); } catch (er) {}
+    setTimeout(() => { const g2 = $('#gavel'); if (g2) g2.remove(); const c2 = $('#voteCv'); if (c2) { c2.style.visibility = ''; voteScene(e); } }, 3000);
+    return;
   }
   voteScene(e); // אחרי שכל ה-HTML נבנה, אחרת הקנבס מוחלף
 }
@@ -2343,9 +2372,11 @@ function buildRound() {
 }
 
 // ---------- מיני-משחק הסביבון ----------
-function buildDreidel(b, tk) {
-  let spins = 0, busy = false;
-  b.innerHTML = '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p><canvas id="drCv" width="380" height="290" style="display:block;margin:0 auto;max-width:100%"></canvas><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
+function buildDreidel(b, tk, fun) {
+  let spins = 0, busy = false, coins = 10, pot = 0;
+  const live = () => fun ? !$('#dreidelModal').classList.contains('hidden') : alive(tk);
+  b.innerHTML = (fun ? '<p class="sub" style="margin:8px 0">סביבון לכיף! כל סיבוב עולה מטבע לקופה. ג׳ – לוקחים הכל, ה׳ – חצי, ש׳ – מוסיפים מטבע, נ׳ – כלום.</p><div id="drStats" class="big" style="text-align:center;font-size:20px;margin-bottom:4px"></div>' : '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p>') + '<canvas id="drCv" width="380" height="290" style="display:block;margin:0 auto;max-width:100%"></canvas><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
+  const stats = () => { if (fun) $('#drStats').textContent = '🪙 ' + coins + '   ·   קופה: ' + pot; };
   const g = $('#drCv').getContext('2d'), LET = ['נ', 'ג', 'ה', 'ש'];
   // סביבון תלת-ממדי אמיתי: מודל של קוביה + פירמידה + ידית, סיבוב במרחב והקרנה בפרספקטיבה (בלי ספריות, כדי שיעבוד גם אופליין)
   const CX = 190, BASE = 232, D = 560, F = 600, EL = 0.5, SC = 1.5, cE = Math.cos(EL), sE = Math.sin(EL);
@@ -2427,17 +2458,29 @@ function buildDreidel(b, tk) {
     const k = (u - 0.93) / 0.07; return { phi: phiEnd, th: dir * (Math.PI / 2 + 0.05 * Math.sin(k * Math.PI * 3) * (1 - k)), psi: PSI, blend: 1 };
   };
   const frame = (u, t, d) => { const p = pose(u, t, d); drawFrame(p.phi, p.th, p.psi, p.blend); };
-  frame(0, 3, 1);
+  frame(0, 3, 1); stats();
   b._frame = frame;
   $('#drBtn').onclick = () => {
-    if (busy) return; busy = true; spins++;
-    const target = spins >= 3 || Math.random() < 0.34 ? 1 : [0, 2, 3][Math.floor(Math.random() * 3)], dir = Math.random() < 0.5 ? -1 : 1;
+    if (busy) return;
+    if (fun && coins <= 0) { coins = 10; pot = 0; stats(); $('#drRes').textContent = ''; $('#drBtn').textContent = '🌀 סובב'; return; }
+    busy = true; spins++;
+    if (fun) { coins--; pot++; stats(); }
+    const target = fun ? Math.floor(Math.random() * 4) : spins >= 3 || Math.random() < 0.34 ? 1 : [0, 2, 3][Math.floor(Math.random() * 3)], dir = Math.random() < 0.5 ? -1 : 1;
     $('#drRes').textContent = '';
     const t0 = performance.now(), dur = 4200;
     const step = now => {
-      if (!alive(tk)) return;
+      if (!live()) return;
       const u = Math.min(1, (now - t0) / dur); frame(u, target, dir);
       if (u < 1) return requestAnimationFrame(step);
+      if (fun) {
+        const R = ['נ׳ – נס: לא קורה כלום', 'ג׳ – גדול היה שם נס! לקחת את כל הקופה 🎉', 'ה׳ – הלך: חצי מהקופה', 'ש׳ – שם: הוספת מטבע לקופה'];
+        let gain = 0;
+        if (target === 1) { gain = pot; coins += pot; pot = 0; } else if (target === 2) { gain = Math.ceil(pot / 2); coins += gain; pot -= gain; } else if (target === 3 && coins > 0) { coins--; pot++; }
+        stats(); busy = false;
+        $('#drRes').innerHTML = R[target] + (gain ? ' <b style="color:var(--ok)">+' + gain + ' 🪙</b>' : '');
+        if (coins <= 0 && pot >= 0) { $('#drRes').innerHTML += '<br><span class="sub">נגמרו המטבעות – לחץ כדי להתחיל מחדש</span>'; $('#drBtn').textContent = '🔄 התחל מחדש'; }
+        return;
+      }
       if (target === 1) { $('#drRes').innerHTML = '<span style="color:var(--ok)">🎉 ג׳! נס גדול!</span>'; setTimeout(() => { if (alive(tk)) miniDone(); }, 1000); }
       else { $('#drRes').textContent = '😅 לא יצא ג׳ – עוד פעם'; busy = false; }
     };

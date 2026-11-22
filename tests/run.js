@@ -138,12 +138,24 @@ test('המרקיב: גופה שלא דווחה מתפרקת', () => {
   }
   ok(done, 'לא הצלחתי לבדוק פירוק גופה');
 });
-test('שופט: ההצבעה שלו שווה כפול', () => {
+test('שופט: ההצבעה שלו שווה קול אחד, ופסק דין מדיח מיד – רק אחרי שסיים משימות ורק פעם אחת', () => {
   const { g, a, ids } = newGame({ role: 'שופט', bots: 3, humans: 2 });
   callMeeting(g, a); const tgt = g.view(a).roster.find(r => r.bot && r.alive);
   g.act(a, { type: 'vote', target: tgt.id }); g.act(ids[1], { type: 'vote', target: 'skip' });
   let w = null; for (let i = 0; i < 30 * 70; i++) { tick(g, 1); const v = g.view(a); if (v.meeting && v.meeting.reveal) { w = (v.meeting.votes || []).find(x => x.to === tgt.id); break; } }
-  ok(w && w.w === 2, 'משקל הקול של השופט צריך להיות 2');
+  ok(w && w.w === 1, 'קול השופט צריך להיות רגיל (1)');
+  // פסק דין בלי משימות שהושלמו – נדחה
+  const h = newGame({ role: 'שופט', bots: 4, humans: 1, cfg: { roleOff: ['mole'] } });
+  const tg2 = h.g.view(h.a).roster.find(r => r.bot && r.alive);
+  callMeeting(h.g, h.a);
+  h.g.act(h.a, { type: 'verdict', target: tg2.id });
+  ok(h.g.view(h.a).phase === 'meeting' && !h.g.view(h.a).me.verdict.ready, 'פסק דין התקבל בלי לסיים משימות');
+  { const sn = JSON.parse(h.g.snapshot()); sn.players[h.a].tasks.forEach(x => { x.done = true; }); h.g.restore(JSON.stringify(sn)); }
+  ok(h.g.view(h.a).me.verdict.ready, 'השופט לא נפתח אחרי סיום משימות');
+  h.g.act(h.a, { type: 'verdict', target: tg2.id });
+  const v2 = h.g.view(h.a);
+  ok(v2.phase === 'eject' && v2.eject.id === tg2.id && v2.eject.verdict && v2.eject.verdict.t === tg2.name, 'פסק הדין לא הדיח את הנבחר');
+  ok(JSON.parse(h.g.snapshot()).players[h.a].verdictUsed, 'לא נרשם שהשתמש');
 });
 test('חבלות: חמצן מחייב שתי נקודות, ואם לא מתקנים המתחזים מנצחים', () => {
   // שלושה שחקנים אנושיים שלא עושים כלום (אין בוטים שיתקנו), כדי שהמשבר ייגמר בהפסד
