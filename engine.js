@@ -1425,8 +1425,8 @@ function acknowledge(sp, text) {
   const n = bare(sp.name);
   let line;
   if (/דלג|סקיפ|skip/i.test(text)) line = fresh(['גם אני חושב שכדאי לדלג', 'אין לנו מספיק מידע, אני בעד לדלג', 'דלג זה לא רעיון רע']);
-  else if (/חושד|חשוד|המתחזה|מתחזה|משקר/.test(text)) line = fresh([`למה אתה חושד? יש לך הוכחה, ${n}?`, 'מעניין… על מה אתה מבסס את זה?', 'שמעתי. מי עוד חושב ככה?']);
-  else if (/הייתי|ראיתי|עשיתי/.test(text)) line = fresh(['אוקיי, שמעתי אותך', 'תודה, זה עוזר. מישהו יכול לאשר?', 'נרשם. מי עוד ראה משהו?']);
+  else if (/חושד|חשוד|המתחזה|מתחזה|משקר|suspect|\bsus\b|impostor|imposter|liar|lying/i.test(text)) line = fresh([`למה אתה חושד? יש לך הוכחה, ${n}?`, 'מעניין… על מה אתה מבסס את זה?', 'שמעתי. מי עוד חושב ככה?']);
+  else if (/הייתי|ראיתי|עשיתי|i was|i saw|i did|i've seen/i.test(text)) line = fresh(['אוקיי, שמעתי אותך', 'תודה, זה עוזר. מישהו יכול לאשר?', 'נרשם. מי עוד ראה משהו?']);
   else line = fresh(['שמעתי אותך, ' + n, 'אוקיי, תמשיך', 'מעניין, מה עוד יש לך?', 'אני מקשיב', 'בוא נשמע גם אחרים']);
   queueSay(bots[0], line, 1.6);
 }
@@ -1492,7 +1492,7 @@ function analyze(sp, text) {
 
 // מישהו מאשים שחקן ("X המתחזה", "תצביעו על X"): כל בוט עונה לפי מה שהוא יודע
 function accusation(sp, text) {
-  if (!/מתחזה|חשוד|תצביעו|משקר|הרוצח|רוצח|להדיח|תדיחו|מצביע על/.test(text) || /לא חשוד|נקי|לא מתחזה|לא הוא/.test(text)) return false;
+  if (!/מתחזה|חשוד|תצביעו|משקר|הרוצח|רוצח|להדיח|תדיחו|מצביע על|impostor|imposter|suspect|\bsus\b|vote|killer|liar/i.test(text) || /לא חשוד|נקי|לא מתחזה|לא הוא|not (the )?(impostor|imposter|sus)|innocent|clean/i.test(text)) return false;
   const named = list().filter(o => o.id !== sp.id && o.alive && !o.spectator && bare(o.name).length >= 2 && text.includes(bare(o.name)));
   if (named.length !== 1) return false;
   const x = named[0], xN = bare(x.name), spN = bare(sp.name);

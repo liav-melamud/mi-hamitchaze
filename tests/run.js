@@ -953,5 +953,39 @@ test('אף שחקן לא מקבל את אותו תפקיד מיוחד פעמיי
   ok(games > 0 && repeats === 0, 'תפקיד חזר פעמיים ברצף ' + repeats + ' פעמים מתוך ' + games);
 });
 
+test('לובי-חללית: הליכה בקלט, חומות, ושחקן אחד לא מזיז אחר', () => {
+  const g = createGame(MAP); const a = g.join('מארח'); const b = g.join('חבר');
+  const pos = id => { const p = JSON.parse(g.snapshot()).players[id]; return [p.x, p.y]; };
+  const a0 = pos(a), b0 = pos(b);
+  g.act(a, { type: 'input', dx: 1, dy: 0 }); sec(g, 1);
+  const a1 = pos(a);
+  ok(a1[0] > a0[0] + 20, 'השחקן לא זז בלובי עם קלט');
+  ok(pos(b)[0] === b0[0] && pos(b)[1] === b0[1], 'שחקן אחר זז בלי קלט');
+  g.act(a, { type: 'input', dx: -1, dy: -1 }); sec(g, 30);
+  const a2 = pos(a);
+  ok(a2[0] >= 40 && a2[1] >= 130 && a2[0] <= 960 && a2[1] <= 520, 'השחקן יצא מגבולות החללית: ' + a2);
+  g.act(a, { type: 'input', dx: 0, dy: 0 }); const s = pos(a); sec(g, 1);
+  ok(pos(a)[0] === s[0] && pos(a)[1] === s[1], 'השחקן ממשיך לזוז אחרי עצירה');
+});
+
+test('לובי-חללית: מידע האחוזים נשלח פעם אחת ונשלח שוב כשההגדרות משתנות', () => {
+  const g = createGame(MAP); const a = g.join('מארח'); g.join('חבר'); g.join('עוד');
+  const v1 = g.view(a);
+  ok(v1.lobbyInfo && v1.lobbyInfo.roles.length > 3, 'אין מידע על תפקידים');
+  ok(!g.view(a).lobbyInfo, 'המידע נשלח שוב בלי שינוי');
+  for (const r of v1.lobbyInfo.roles) ok(r.game >= 0 && r.game <= 100 && r.per >= 0 && r.per <= 100, 'אחוז לא תקין ב' + r.name);
+  ok(v1.lobbyInfo.roles.find(r => r.k === 'crew').game === 100, 'חבר צוות תמיד אמור להופיע');
+  g.act(a, { type: 'settings', impostors: 2 });
+  ok(g.view(a).lobbyInfo, 'שינוי הגדרות לא שלח מידע חדש');
+  g.act(a, { type: 'lobbyinfo' });
+  ok(g.view(a).lobbyInfo, 'בקשת שליחה מחדש לא עבדה');
+});
+
+test('בוטים מבינים האשמות באנגלית', () => {
+  ok(/impostor/i.test('Dana is the impostor'), 'sanity');
+  const src = fs.readFileSync(path.join(dir, 'engine.js'), 'utf8');
+  ok(/impostor\|imposter\|suspect/.test(src) && /not \(the \)\?\(impostor/.test(src), 'חסרות מילות מפתח באנגלית');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
