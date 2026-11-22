@@ -1035,5 +1035,55 @@ test('חנוכה: השמש מגן ל-15 שניות, ובלי אירוע אין �
   }
 });
 
+test('בוטים חכמים: מי שמציג הערה אמיתית מהמערכת לא מקבל קולות מאנשי הצוות', () => {
+  const { g, a } = newGame({ bots: 6, role: 'בלש', cfg: { roleOff: ['mole'] } });
+  g.setConn(a, true);
+  place(g, sn => { sn.players[a].notes = ['💔 בוטי (שאתה שומר עליו) חוסל בתקשורת!']; Object.values(sn.players).forEach(p => { if (p.bot) p.bot.wait = 999; }); });
+  callMeeting(g, a);
+  g.act(a, { type: 'chat', text: '💔 בוטי (שאתה שומר עליו) חוסל בתקשורת!' });
+  let sn; for (let i = 0; i < 30 * 70; i++) { tick(g, 1); sn = JSON.parse(g.snapshot()); if (!sn.meeting || sn.phase !== 'meeting') break; }
+  const sn0 = JSON.parse(g.snapshot());
+  const crewBots = Object.values(sn0.players).filter(p => p.bot && !['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'mole'].includes(p.role));
+  const lastVotes = (sn && sn.meeting && sn.meeting.votes) || {};
+  ok(crewBots.every(b => lastVotes[b.id] !== a), 'בוט צוות הצביע על מי שהציג הערה אמיתית');
+});
+
+test('בוטים חכמים: מי שחזר לחיים בהחזרת זמן זוכר מי הרג אותו, מספר, והבוטים מצביעים עליו', () => {
+  const { g, a } = newGame({ bots: 6, role: 'שומר הזמן', cfg: { roleOff: ['mole', 'bodyguard', 'angel'] } });
+  place(g, sn => { Object.values(sn.players).forEach(p => { p.killCd = 999; if (p.bot) p.bot.wait = 999; }); });
+  g.setConn(a, true); sec(g, 3);
+  const sn = JSON.parse(g.snapshot()); const imp = Object.values(sn.players).find(p => ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role));
+  const vic = Object.values(sn.players).find(p => p.id !== a && p.id !== imp.id && p.bot && p.role === 'crew');
+  place(g, s2 => { const k = s2.players[imp.id], o = s2.players[vic.id]; k.killCd = 0; k.vanishUntil = 0; o.shieldUntil = 0; k.x = o.x + 30; k.y = o.y; });
+  g.act(imp.id, { type: 'kill' });
+  g.act(a, { type: 'rewind' }); tick(g, 1);
+  const s3 = JSON.parse(g.snapshot());
+  ok(s3.players[vic.id].alive && s3.players[vic.id].bot.sawKill === imp.id && s3.players[vic.id].bot.sawVictim === vic.id, 'הבוט שחזר לא זוכר מי הרג אותו');
+  callMeeting(g, a);
+  const impN = imp.name.replace(/^🤖\s*/, ''); let said = false, last;
+  for (let i = 0; i < 30 * 70; i++) { tick(g, 1); const v = g.view(a); if (v.chat && v.chat.some(c => c.text.includes(impN) && c.name === vic.name)) said = true; last = JSON.parse(g.snapshot()); if (!last.meeting) break; }
+  ok(said, 'הבוט שחזר לא סיפר מי הרג אותו');
+});
+
+test('בוטים חכמים: שחקן שחזר לחיים אומר "X הרג אותי" – הבוטים מאמינים ומצביעים על X', () => {
+  const { g, a, ids } = newGame({ bots: 5, humans: 2, role: 'שומר הזמן', cfg: { roleOff: ['mole', 'bodyguard', 'angel'] } });
+  const b = ids[1];
+  place(g, sn => { Object.values(sn.players).forEach(p => { p.killCd = 999; if (p.bot) p.bot.wait = 999; }); sn.players[b].role = 'crew'; });
+  ids.forEach(i => g.setConn(i, true)); sec(g, 3);
+  const sn = JSON.parse(g.snapshot()); const imp = Object.values(sn.players).find(p => ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker'].includes(p.role));
+  place(g, s2 => { const k = s2.players[imp.id], o = s2.players[b]; k.killCd = 0; k.vanishUntil = 0; o.shieldUntil = 0; k.x = o.x + 30; k.y = o.y; });
+  g.act(imp.id, { type: 'kill' });
+  g.act(a, { type: 'rewind' }); tick(g, 1);
+  ok(JSON.parse(g.snapshot()).players[b].alive, 'השחקן לא חזר לחיים');
+  callMeeting(g, a);
+  const impN = imp.name.replace(/^🤖\s*/, '');
+  g.act(b, { type: 'chat', text: impN + ' הרג אותי!' });
+  let last, voted = 0;
+  for (let i = 0; i < 30 * 70; i++) { tick(g, 1); const s = JSON.parse(g.snapshot()); if (!s.meeting) break; last = s; }
+  const crewBots = Object.values(last.players).filter(p => p.bot && p.alive && !['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist'].includes(p.role));
+  voted = crewBots.filter(p => last.meeting.votes[p.id] === imp.id).length;
+  ok(crewBots.length && voted >= Math.ceil(crewBots.length * 0.6), 'הבוטים לא הצביעו על מי שהואשם ע"י מי שחזר: ' + voted + '/' + crewBots.length);
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
