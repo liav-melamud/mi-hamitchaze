@@ -491,7 +491,7 @@ function blowCandle(p, i) {
   ev('candle', `💨 ${nm(p)} כיבה נר ב${rn}`);
 }
 function completeTask(p, t) {
-  if (MAP.TASKS[t.i].ev === 'dreidel') { p.sprintUntil = now() + 6; toast(p, '🪀 גימל! נס גדול היה שם – תוספת מהירות ל-6 שניות'); }
+  if (MAP.TASKS[t.i].ev === 'dreidel') { p.sprintUntil = now() + 6; toast(p, '🪀 גימל! נס גדול היה פה – תוספת מהירות ל-6 שניות'); }
   if (settings.mode === 5 && MAP.TASKS[t.i].ev === 'candle') { t.done = true; lightCandle(p, t.i); return; }
   t.done = true;
   if (team(p) === 'crew') taskDone++;

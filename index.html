@@ -823,7 +823,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-155355'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261122-155521'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -955,7 +955,7 @@ function hanukGarland(c, x0, y0, x1, y1, sag, t, seed) {
 // סביבון (משמש כחיית מחמד, כקישוט וכצעצוע בלובי). ang = זווית הסיבוב, letter = האות על הפנים הקדמיות (ברירת מחדל לפי הזווית)
 function drawDreidel(c, x, y, s, ang, letter) {
   const q = Math.PI / 2, ph = ((ang % q) + q) % q, w = Math.abs(Math.cos(ph - q / 2)) * 1.4;
-  const L = letter || ['נ', 'ג', 'ה', 'ש'][Math.floor((((ang / q) % 4) + 4) % 4)];
+  const L = letter || ['נ', 'ג', 'ה', 'פ'][Math.floor((((ang / q) % 4) + 4) % 4)];
   c.save(); c.translate(x, y); c.scale(s, s); c.lineJoin = 'round'; c.lineWidth = 1.8; c.strokeStyle = 'rgba(20,20,40,.7)';
   c.fillStyle = '#d9a441'; c.fillRect(-2, -26, 4, 10); c.strokeRect(-2, -26, 4, 10);
   const bw = 15 * Math.min(1, 0.55 + 0.45 * w);
@@ -2390,9 +2390,9 @@ function buildRound() {
 function buildDreidel(b, tk, fun) {
   let spins = 0, busy = false, coins = 10, pot = 0;
   const live = () => fun ? !$('#dreidelModal').classList.contains('hidden') : alive(tk);
-  b.innerHTML = (fun ? '<p class="sub" style="margin:8px 0">סביבון לכיף! כל סיבוב עולה מטבע לקופה. ג׳ – לוקחים הכל, ה׳ – חצי, ש׳ – מוסיפים מטבע, נ׳ – כלום.</p><div id="drStats" class="big" style="text-align:center;font-size:20px;margin-bottom:4px"></div>' : '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – גדול היה שם נס!</p>') + '<canvas id="drCv" width="380" height="290" style="display:block;margin:0 auto;max-width:100%"></canvas><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
+  b.innerHTML = (fun ? '<p class="sub" style="margin:8px 0">סביבון לכיף! כל סיבוב עולה מטבע לקופה. נ׳ נס – כלום, ג׳ גדול – לוקחים הכל, ה׳ היה – חצי, פ׳ פה – מוסיפים מטבע.</p><div id="drStats" class="big" style="text-align:center;font-size:20px;margin-bottom:4px"></div>' : '<p class="sub" style="margin:8px 0">סובב את הסביבון עד שיוצא ג׳ – נס גדול היה פה!</p>') + '<canvas id="drCv" width="380" height="290" style="display:block;margin:0 auto;max-width:100%"></canvas><div id="drRes" class="big" style="text-align:center;min-height:30px;font-size:20px"></div><button id="drBtn" class="primary" style="width:100%;margin-top:6px">🌀 סובב</button>';
   const stats = () => { if (fun) $('#drStats').textContent = '🪙 ' + coins + '   ·   קופה: ' + pot; };
-  const g = $('#drCv').getContext('2d'), LET = ['נ', 'ג', 'ה', 'ש'];
+  const g = $('#drCv').getContext('2d'), LET = ['נ', 'ג', 'ה', 'פ'];
   // סביבון תלת-ממדי אמיתי: מודל של קוביה + פירמידה + ידית, סיבוב במרחב והקרנה בפרספקטיבה (בלי ספריות, כדי שיעבוד גם אופליין)
   const CX = 190, BASE = 232, D = 560, F = 600, EL = 0.5, SC = 1.5, cE = Math.cos(EL), sE = Math.sin(EL);
   const H1 = 35, H2 = 85, H3 = 105, W = 25, HW = 6, L = [-0.5, 0.9, 0.6];
@@ -2488,7 +2488,7 @@ function buildDreidel(b, tk, fun) {
       const u = Math.min(1, (now - t0) / dur); frame(u, target, dir);
       if (u < 1) return requestAnimationFrame(step);
       if (fun) {
-        const R = ['נ׳ – נס: לא קורה כלום', 'ג׳ – גדול היה שם נס! לקחת את כל הקופה 🎉', 'ה׳ – הלך: חצי מהקופה', 'ש׳ – שם: הוספת מטבע לקופה'];
+        const R = ['נ׳ – נס: לא קורה כלום', 'ג׳ – גדול: לקחת את כל הקופה 🎉', 'ה׳ – היה: חצי מהקופה', 'פ׳ – פה: הוספת מטבע לקופה'];
         let gain = 0;
         if (target === 1) { gain = pot; coins += pot; pot = 0; } else if (target === 2) { gain = Math.ceil(pot / 2); coins += gain; pot -= gain; } else if (target === 3 && coins > 0) { coins--; pot++; }
         stats(); busy = false;
@@ -2496,7 +2496,7 @@ function buildDreidel(b, tk, fun) {
         if (coins <= 0 && pot >= 0) { $('#drRes').innerHTML += '<br><span class="sub">נגמרו המטבעות – לחץ כדי להתחיל מחדש</span>'; $('#drBtn').textContent = '🔄 התחל מחדש'; }
         return;
       }
-      if (target === 1) { $('#drRes').innerHTML = '<span style="color:var(--ok)">🎉 ג׳! נס גדול!</span>'; setTimeout(() => { if (alive(tk)) miniDone(); }, 1000); }
+      if (target === 1) { $('#drRes').innerHTML = '<span style="color:var(--ok)">🎉 ג׳! נס גדול היה פה!</span>'; setTimeout(() => { if (alive(tk)) miniDone(); }, 1000); }
       else { $('#drRes').textContent = '😅 לא יצא ג׳ – עוד פעם'; busy = false; }
     };
     requestAnimationFrame(step);
