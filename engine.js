@@ -465,11 +465,16 @@ function checkWin() {
 
 const candleIdx = () => MAP.TASKS.map((T, i) => T.ev === 'candle' ? i : -1).filter(i => i >= 0);
 // מאגר המשימות: משימות הסביבון רק באירוע חנוכה, והנרות רק במצב שמונה נרות
-const taskPool = () => MAP.TASKS.map((_, i) => i).filter(i => { const k = MAP.TASKS[i].ev; return !k || (k === 'dreidel' && hanukOn() && settings.mode !== 5); });
+const taskPool = () => MAP.TASKS.map((_, i) => i).filter(i => { const k = MAP.TASKS[i].ev; return !k || ((k === 'dreidel' || k === 'hanuk') && hanukOn() && settings.mode !== 5); });
 function addDreidel(p) {
-  if (!hanukOn() || settings.mode === 2 || p.tasks.some(x => MAP.TASKS[x.i].ev === 'dreidel') || Math.random() > 0.6) return;
-  const d = taskPool().filter(i => MAP.TASKS[i].ev === 'dreidel' && !p.tasks.some(x => x.i === i))[0];
+  if (!hanukOn() || settings.mode === 2) return;
+  const d = p.tasks.some(x => MAP.TASKS[x.i].ev === 'dreidel') || Math.random() > 0.6 ? undefined : taskPool().filter(i => MAP.TASKS[i].ev === 'dreidel' && !p.tasks.some(x => x.i === i))[0];
   if (d !== undefined && p.tasks.length) p.tasks[p.tasks.length - 1] = { i: d, done: false };
+  // משימת חנוכה נוספת (סופגניות / שמן / זוגות / זכור את הנרות) – תמיד אחת לכל שחקן
+  if (!p.tasks.some(x => MAP.TASKS[x.i].ev === 'hanuk') && p.tasks.length > 1) {
+    const h = shuffle(taskPool().filter(i => MAP.TASKS[i].ev === 'hanuk' && !p.tasks.some(x => x.i === i)))[0];
+    if (h !== undefined) p.tasks[0] = { i: h, done: false };
+  }
 }
 const roomOf = i => (MAP.ROOMS[MAP.TASKS[i].room] || {}).name || 'המסדרון';
 function candleCount() { return candleIdx().filter(i => candleLit[i]).length; }
@@ -1735,7 +1740,7 @@ function botLine0(p) {
 
 function botMeeting(p) {
   const b = p.bot;
-  if (!p.alive || p.spectator) return;
+  if (!p.alive || p.spectator || !meeting) return; // בוט קודם יכול היה לסיים את הדיון (הצבעה אחרונה)
   const T = meeting.t;
   if (T < b.chatAt) { b.chatAt = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
   if (T < b.chat2At) { b.chat2At = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
@@ -1940,6 +1945,7 @@ function tick() {
   } else if (phase === 'meeting') {
     meeting.t -= dt;
     list().filter(p => p.isBot).forEach(botMeeting);
+    if (!meeting || phase !== 'meeting') return; // בוט שסיים את הדיון (למשל פסק דין) – אין מה להמשיך
     // תור דיבור: בוט מדבר רק כשאף אחד לא מדבר, ואחרי שמסיים לדבר הבא בתור ממתין רגע
     meeting.queue.sort((x, y) => y.at - x.at);
     const talking = humanTalking();

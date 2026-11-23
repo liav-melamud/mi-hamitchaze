@@ -1072,6 +1072,17 @@ test('חנוכה: השמש מגן ל-15 שניות, ובלי אירוע אין �
   }
 });
 
+test('חנוכה: לכל שחקן צוות יש משימת חנוכה (סופגניות/שמן/זוגות/נרות)', () => {
+  for (let i = 0; i < 10; i++) {
+    const g = createGame(MAP, { hanuk: true }); const a = g.join('מארח');
+    g.act(a, { type: 'settings', impostors: 1, bots: 6 }); g.act(a, { type: 'start' });
+    const sn = JSON.parse(g.snapshot());
+    const crew = Object.values(sn.players).filter(p => p.tasks && p.tasks.length && p.role !== 'mole');
+    ok(crew.length > 0 && crew.every(p => p.tasks.some(x => MAP.TASKS[x.i].ev === 'hanuk')), 'שחקן בלי משימת חנוכה');
+  }
+  ok(['sufganiya', 'oil', 'gelt', 'menorahmem'].every(k => MAP.TASKS.some(T => T.kind === k && T.ev === 'hanuk')), 'חסרה משימת חנוכה במפה');
+});
+
 test('בוטים חכמים: מי שמציג הערה אמיתית מהמערכת לא מקבל קולות מאנשי הצוות', () => {
   const { g, a } = newGame({ bots: 6, role: 'בלש', cfg: { roleOff: ['mole'] } });
   g.setConn(a, true);

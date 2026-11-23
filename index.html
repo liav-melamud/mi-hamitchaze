@@ -823,7 +823,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261122-175116'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261123-140146'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -2387,6 +2387,69 @@ function buildRound() {
   (MINI_BUILD[miniCur.kind] || buildCode)($('#miniBody'), tk);
 }
 
+// ---------- משימות חנוכה ----------
+function buildGelt(b, tk) { buildPairs(b, tk, ['🪙', '🕎', '🍩', '🌀', '🕯️', '🫒', '⭐', '🧈']); }
+function buildMenorahMem(b, tk) {
+  const N = 5, seq = Array.from({ length: 5 }, () => Math.floor(Math.random() * N));
+  b.innerHTML = '<p class="sub" id="mmMsg" style="margin:8px 0">צפה באילו נרות נדלקים, ואז הדלק אותם באותו סדר</p><div id="mmRow" style="display:flex;gap:10px;justify-content:center;margin:18px 0">' + Array.from({ length: N }, (_, i) => `<button data-i="${i}" style="width:54px;height:110px;border-radius:12px;background:#2a3350;font-size:34px;transition:all .15s">🕯️</button>`).join('') + '</div>';
+  const pads = [...b.querySelectorAll('#mmRow button')], msg = $('#mmMsg');
+  let inp = 0, ready = false;
+  const flash = i => { pads[i].style.background = '#ffb547'; pads[i].style.boxShadow = '0 0 22px #ffb547'; setTimeout(() => { pads[i].style.background = '#2a3350'; pads[i].style.boxShadow = 'none'; }, 380); };
+  const play = async () => { ready = false; await sleep(700); for (const i of seq) { if (!alive(tk)) return; flash(i); await sleep(650); } if (!alive(tk)) return; ready = true; inp = 0; msg.textContent = 'עכשיו אתה!'; };
+  play();
+  $('#mmRow').onclick = e => {
+    const t = e.target.closest('button'); if (!t || !ready) return;
+    const i = +t.dataset.i; flash(i);
+    if (i === seq[inp]) { if (++inp === seq.length) miniDone(); }
+    else { msg.textContent = 'טעות – צפה שוב'; play(); }
+  };
+}
+function buildSufganiya(b, tk) {
+  const N = 3, st = Array.from({ length: N }, (_, i) => ({ v: -i * 14, ok: false }));
+  b.innerHTML = '<p class="sub" style="margin:8px 0">לחץ על כל סופגנייה כשהיא זהובה – לא לפני ולא אחרי! (<span id="sfL">' + N + '</span> נותרו)</p><div style="display:flex;gap:12px;justify-content:center;margin:14px 0">' + st.map((_, i) => `<div style="text-align:center"><button data-i="${i}" class="sfb" style="width:84px;height:84px;border-radius:50%;font-size:46px;background:#3a2a1a;border:4px solid #444"><span>🍩</span></button><div style="height:10px;border-radius:5px;background:#26304a;margin-top:8px;position:relative;overflow:hidden"><i style="position:absolute;left:55%;width:25%;top:0;bottom:0;background:#4ade80"></i><b class="sfm" style="position:absolute;left:0;top:0;bottom:0;width:4px;background:#fff"></b></div></div>`).join('') + '</div>';
+  const btns = [...b.querySelectorAll('.sfb')], marks = [...b.querySelectorAll('.sfm')];
+  let left = N, last = 0;
+  btns.forEach((el, i) => el.onclick = () => {
+    const o = st[i]; if (o.ok) return;
+    if (o.v >= 55 && o.v <= 80) { o.ok = true; el.style.borderColor = '#4ade80'; el.style.background = '#6a4a1a'; marks[i].style.background = '#4ade80'; $('#sfL').textContent = --left; if (!left) miniDone(); }
+    else { o.v = 0; el.style.borderColor = '#e53935'; setTimeout(() => { if (!o.ok) el.style.borderColor = '#444'; }, 250); }
+  });
+  const loop = now => {
+    if (!alive(tk)) return;
+    const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+    st.forEach((o, i) => {
+      if (o.ok) return;
+      o.v += 26 * dt; if (o.v > 100) { o.v = 0; btns[i].style.borderColor = '#e53935'; setTimeout(() => { if (!o.ok) btns[i].style.borderColor = '#444'; }, 250); }
+      marks[i].style.left = Math.max(0, Math.min(98, o.v)) + '%';
+      const f = Math.max(0, o.v) / 100; btns[i].firstChild.style.filter = `brightness(${1.2 - f * 0.55}) sepia(${f})`;
+    });
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+function buildOil(b, tk) {
+  let val = 0, hold = false, hits = 0, last = 0;
+  const zc = 62 + Math.random() * 20, zw = 10;
+  b.innerHTML = `<p class="sub" style="margin:8px 0">החזק כדי לצקת שמן לחנוכייה, והרפה כשהשמן בקו הירוק (<span id="oiH">0</span>/2)</p><div style="position:relative;width:96px;height:190px;margin:10px auto;border:4px solid #8a93ad;border-radius:8px 8px 26px 26px;overflow:hidden;background:#141a2a"><i style="position:absolute;left:0;right:0;bottom:${zc - zw / 2}%;height:${zw}%;background:rgba(74,222,128,.35);border-top:2px solid #4ade80;border-bottom:2px solid #4ade80"></i><b id="oiF" style="position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#e8c547,#b8860b)"></b></div><button id="oiB" class="primary chbtn">🫒 החזק לצקת…</button>`;
+  const btn = $('#oiB');
+  const release = () => {
+    if (!hold) return; hold = false;
+    if (Math.abs(val - zc) <= zw / 2) hits++; else hits = 0;
+    $('#oiH').textContent = hits; if (hits >= 2) { miniDone(); return; } val = 0;
+  };
+  btn.onpointerdown = e => { hold = true; btn.setPointerCapture(e.pointerId); };
+  btn.onpointerup = release; btn.onpointercancel = release;
+  const loop = now => {
+    if (!alive(tk)) return;
+    const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+    if (hold) val = Math.min(100, val + 45 * dt); else if (val > 0 && hits < 2) val = Math.max(0, val - 160 * dt);
+    $('#oiF').style.height = val + '%';
+    if (hold && val >= 100) release();
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
 // ---------- מיני-משחק הסביבון ----------
 function buildDreidel(b, tk, fun) {
   let spins = 0, busy = false, coins = 10, pot = 0;
@@ -2804,8 +2867,8 @@ function buildSortnum(b) {
     else { b.querySelectorAll('.numgrid button').forEach(x => { x.disabled = false; x.classList.remove('ok'); }); next = 1; t.animate([{ transform: 'translateX(-6px)' }, { transform: 'translateX(6px)' }, { transform: 'none' }], 200); }
   };
 }
-function buildPairs(b, tk) {
-  const four = shuffle(['🔧', '⚡', '💧', '🧪', '🔩', '📡', '🧬', '🔋', '🧰', '💾']).slice(0, 4);
+function buildPairs(b, tk, set) {
+  const four = shuffle(set || ['🔧', '⚡', '💧', '🧪', '🔩', '📡', '🧬', '🔋', '🧰', '💾']).slice(0, 4);
   const deck = shuffle([...four, ...four]);
   b.innerHTML = '<p class="sub" style="margin:8px 0">מצא את כל הזוגות</p><div class="cards">' + deck.map((c, i) => `<button class="card2" data-i="${i}"><span>${c}</span></button>`).join('') + '</div>';
   const cards = [...b.querySelectorAll('.card2')];
@@ -3199,7 +3262,7 @@ function buildDownload(b, tk) {
   }, 60);
   btn.onclick = () => { st.className = 'dlSt'; st.textContent = '🔌 מתחבר…'; btn.classList.add('hidden'); setTimeout(() => { stall = false; }, 700); };
 }
-const MINI_BUILD = { scrub: buildScrub, combo: buildCombo, pipes: buildPipes, download: buildDownload,  maze: buildMaze, valve: buildValve, balance: buildBalance, bins: buildBins, quiz: buildQuiz, track: buildTrack, charge: buildCharge, swipe: buildSwipe, slide: buildSlide, lights: buildLights, wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern, dreidel: buildDreidel };
+const MINI_BUILD = { scrub: buildScrub, combo: buildCombo, pipes: buildPipes, download: buildDownload,  maze: buildMaze, valve: buildValve, balance: buildBalance, bins: buildBins, quiz: buildQuiz, track: buildTrack, charge: buildCharge, swipe: buildSwipe, slide: buildSlide, lights: buildLights, wires: buildWires, dial: buildDial, code: buildCode, switches: buildSwitches, simon: buildSimon, sliders: buildSliders, tapfill: buildTapfill, sortnum: buildSortnum, pairs: buildPairs, catch: buildCatch, timing: buildTiming, pattern: buildPattern, dreidel: buildDreidel, gelt: buildGelt, menorahmem: buildMenorahMem, sufganiya: buildSufganiya, oil: buildOil };
 
 function miniKey(e) {
   if (e.code === 'Escape') { closeMini(); return; }

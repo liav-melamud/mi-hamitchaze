@@ -409,6 +409,10 @@
     for (let i = 0; i < 8; i++) put(ids[i % ids.length], '🕯️ הדלקת נר ' + (i + 1), 'candle', 'candle');
     put(ids[2 % ids.length], '🌀 סביבון', 'dreidel', 'dreidel');
     put(ids[(ids.length >> 1) % ids.length], '🌀 סביבון גדול', 'dreidel', 'dreidel');
+    put(ids[3 % ids.length], '🍩 טיגון סופגניות', 'sufganiya', 'hanuk');
+    put(ids[5 % ids.length], '🫒 מילוי שמן בחנוכייה', 'oil', 'hanuk');
+    put(ids[6 % ids.length], '🪙 גלידת חנוכה – זוגות', 'gelt', 'hanuk');
+    put(ids[7 % ids.length], '🕎 זכור את הנרות', 'menorahmem', 'hanuk');
   })();
   // הגדרה ניתנת לעריכה של המפה (לעורך המודים): בלי משימות החנוכה, וקשרי הוינטים כרשתות
   const _nets = []; VENTS.forEach((v, i) => { if (_nets[i] !== undefined) return; const st = [i]; _nets[i] = i; while (st.length) { const c = st.pop(); (VENTS[c].links || []).forEach(j => { if (_nets[j] === undefined) { _nets[j] = i; st.push(j); } }); } });
