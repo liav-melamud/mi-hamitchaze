@@ -559,6 +559,7 @@
         <button id="funDreidelBtn" class="link">🌀 סביבון לכיף</button>
         <button id="modsBtn" class="link">🧩 מודים</button>
         <button id="bigTxtBtn" class="link">🔎 טקסט גדול</button>
+        <button id="proCodesBtn" class="link hidden">🔑 קודי פרו</button>
       </div>
     </div>
     <button id="moreOpts" class="link hidden" style="width:100%;margin-top:10px">אפשרויות נוספות</button>
@@ -566,6 +567,8 @@
     <div id="appBox" class="hidden"></div>
   </div>
 </div>
+
+<div id="proCodes" class="lmodal hidden"><div class="lmBox"><button class="lmClose" id="proCodesClose">✖</button><h2>🔑 קודי פרו</h2><p class="sub" style="margin-top:0">כותבים את הקוד בשדה "🔑 קוד מיוחד" בלובי (אפשר כמה קודים יחד, עם רווח). רק המארח צריך להזין.</p><div id="proCodesBody"></div></div></div>
 
 <div id="modsScreen" class="lmodal hidden"><div class="lmBox">
   <button class="lmClose" id="modsClose">✖</button>
@@ -825,11 +828,12 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261123-164320'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261123-170112'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
-const hasCode = c => String((S && S.settings && S.settings.code) || '').split(/[\s,]+/).includes(c);
+const PRO = !!window.MM_PRO; // גרסת פרו (נטענת מ-pro.js באתר הפרו בלבד)
+const hasCode = c => (PRO && ['54321', '8888', '12345'].includes(c)) || String((S && S.settings && S.settings.code) || '').split(/[\s,]+/).includes(c) || (c === '3000' || c === '1000') && String((S && S.settings && S.settings.code) || '').split(/[\s,]+/).includes('5555');
 const MOD_LIST = [['sprinter', '🏃 רץ', 'c'], ['medic', '🩺 רופא', 'c'], ['scout', '🔭 סייר', 'c'], ['lucky', '🍀 בר מזל', 'c'], ['trapper', '🪤 מלכודן', 'c'], ['radar', '📡 מכ"ם', 'c'], ['taskmaster', '⚡ אשף משימות', 'c'], ['jailer', '🔒 סוהר', 'c'], ['empath', '😨 רגיש', 'c'],
   ['sniper', '🎯 צלף', 'imp'], ['poisoner', '☠️ מרעיל', 'imp'], ['blinker', '🌀 מתעתע', 'imp'], ['cleaner', '🧹 מנקה', 'imp'], ['zapper', '⚡ חשמלאי', 'imp'], ['vampire', '🧛 ערפד', 'imp'], ['bomber', '💣 מפוצץ', 'imp'],
   ['martyr', '🕊️ קורבן', 'n'], ['vulture', '🦅 נשר', 'n'], ['survivor', '🛟 ניצול', 'n'], ['instigator', '🗣️ מסית', 'n']];
@@ -1017,7 +1021,7 @@ function emojiRain(list, count, ms) {
 // מריץ את מנוע המשחק בדפדפן הזה (מארח או דמו)
 function runEngine(name, demo, resume, offline) {
   isHost = true;
-  engine = createGame(MAP, { demo, jester: true, hanuk: hanukActive });
+  engine = createGame(MAP, { demo, jester: true, hanuk: hanukActive, pro: PRO });
   applyMods(engine);
   if (resume && resume.snapshot) { try { engine.restore(resume.snapshot); } catch (e) { console.warn('restore failed', e); } }
   ID = engine.join(name, resume && resume.pid);
@@ -1321,6 +1325,13 @@ $('#hostBtn').onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(tr
 $('#demoBtn').onclick = startDemo;
 $('#offBtn').onclick = startOffline;
 const setBigTxt = on => { document.documentElement.classList.toggle('bigtxt', on); try { localStorage.setItem('mm_bigtxt', on ? '1' : ''); } catch (e) {} const b = $('#bigTxtBtn'); if (b) b.style.color = on ? 'var(--accent)' : ''; };
+if (PRO) {
+  show('#proCodesBtn', true);
+  const rows = [['54321', '🧩 מודים + ליצן', 'תמיד פתוח בפרו: תפקידי מודים, הליצן והסטודיו'], ['8888', '🕎 חנוכה', 'תמיד פתוח בפרו: נרות, השמש, סביבונים ומשימות חנוכה'], ['12345', '🙈 מחבואים', 'תמיד פתוח בפרו: מקומות מחבוא במצב מחבואים']].concat(window.MM_PRO_CODES || []);
+  $('#proCodesBody').innerHTML = rows.map(r => `<div class="badge"><span class="bi" style="font-size:18px;direction:ltr">${esc(r[0])}</span><span style="flex:1"><b>${esc(r[1])}</b><small>${esc(r[2])}</small></span></div>`).join('') + `<p class="sub">🎭 בפרו יש ${(window.MM_PRO_ROLES || []).length} תפקידי פרו נוספים, מעבר לתפקידים הרגילים והמודים.</p>`;
+  $('#proCodesBtn').onclick = () => show('#proCodes', true);
+  $('#proCodesClose').onclick = () => show('#proCodes', false);
+}
 $('#bigTxtBtn').onclick = () => setBigTxt(!document.documentElement.classList.contains('bigtxt'));
 try { if (localStorage.getItem('mm_bigtxt')) setBigTxt(true); } catch (e) {}
 if (new URLSearchParams(location.search).get('play') === 'offline') setTimeout(startOffline, 0); // מהדף "אין חיבור" באפליקציה
@@ -4805,7 +4816,12 @@ const modId = () => Math.random().toString(36).slice(2, 8);
 function applyMods(eng) {
   const m = modLoad(), maps = {};
   m.maps.filter(x => x.on !== false && x.def).forEach(x => { maps['mod_' + x.id] = x.def; });
-  try { eng.setCustomRoles(m.roles.filter(r => r.on !== false)); eng.setCustomMaps(maps); } catch (e) { console.warn('mods failed', e); }
+  let roles = m.roles.filter(r => r.on !== false);
+  if (PRO && window.MM_PRO_ROLES) { // חבילת פרו: 100 תפקידים מוכנים, ואחריהם התפקידים של המשתמש
+    const pk = window.MM_PRO_ROLES.map(r => { const t = TPL[r.tpl]; return Object.assign({}, r, { desc: r.name + ' – ' + T(t[6]) + (r.cd ? ' · המתנה ' + r.cd + 'ש׳' : '') + (r.uses ? ' · ' + r.uses + ' שימושים' : '') + (r.dur ? ' · ' + r.dur + 'ש׳ אפקט' : '') }); });
+    roles = pk.concat(roles);
+  }
+  try { eng.setCustomRoles(roles); eng.setCustomMaps(maps); } catch (e) { console.warn('mods failed', e); }
 }
 // ----- תבניות יכולת: כל תפקיד חדש נבנה מאחת מהן, עם שם, אייקון, זמנים ותיאור משלכם -----
 // [מפתח, אייקון, שם, קבוצה (c/imp/n), יש כפתור, ברירות מחדל {cd,uses,dur}, תיאור]

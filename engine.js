@@ -74,7 +74,14 @@ const ROLE_SET = {
 const TOGGLE_ROLES = ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper', 'shifter', 'phantom', 'viper', 'noisemaker', 'saboteur', 'poltergeist', 'mole'];
 const roleOn = k => !(settings.roleOff || []).includes(k);
 // ---- מודים: 20 תפקידים נוספים, נפתחים רק עם הקוד 54321 בלובי ----
-const hasCode = c => String(settings.code || '').split(/[\s,]+/).includes(c);
+const PRO_OPEN = ['54321', '8888', '12345']; // בגרסת פרו המודים, אירוע חנוכה ומחבואים תמיד פתוחים
+const proCode = c => !!(typeof opts !== 'undefined' && opts && opts.pro) && hasCode(c); // קודי פרו עובדים רק באתר הפרו
+const CODE_ALIAS = { '5555': ['3000', '1000'] }; // 5555 = שילוב של כמה קודים
+const hasCode = c => {
+  if (typeof opts !== 'undefined' && opts && opts.pro && PRO_OPEN.includes(c)) return true;
+  const have = String(settings.code || '').split(/[\s,]+/);
+  return have.includes(c) || have.some(h => (CODE_ALIAS[h] || []).includes(c));
+};
 const modsOn = () => hasCode('54321');
 const hanukOn = () => !!(typeof opts !== 'undefined' && opts && (typeof opts.hanuk === 'function' ? opts.hanuk() : opts.hanuk)) || hasCode('8888'); // אירוע חנוכה: בתאריכים, או תמיד עם הקוד 8888
 const jesterOn = () => modsOn() && settings.jester; // הליצן נפתח רק עם הקוד 54321
@@ -278,8 +285,8 @@ function simRoles(n, mods) {
   for (let i = 0; i < nImp; i++) out.push(impPool[i % impPool.length]);
   if (out.every(r => NON_KILLERS.includes(r))) out[0] = 'impostor';
   const nCrew = n - nImp;
-  const specials = shuffle((settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'] : ['engineer', 'scientist', 'angel']).concat((mods ? MOD_CREW : []).concat(CUSTOM.crew)).filter(roleOn));
-  const nSpecial = settings.newRoles ? Math.max(1, Math.round(nCrew * 0.7)) : specials.length;
+  const specials = shuffle((proCode('4000') ? [] : settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'] : ['engineer', 'scientist', 'angel']).concat((mods ? MOD_CREW : []).concat(CUSTOM.crew)).filter(roleOn));
+  const nSpecial = proCode('3000') ? nCrew : settings.newRoles ? Math.max(1, Math.round(nCrew * 0.7)) : specials.length; // 3000 – כל אנשי הצוות עם תפקיד מיוחד
   const crew = [];
   for (let i = 0; i < nCrew; i++) crew.push(i < Math.min(specials.length, nSpecial) && nCrew > 1 ? specials[i] : 'crew');
   if (jesterOn() && nCrew >= 3 && n >= 5) crew[Math.floor(Math.random() * nCrew)] = 'jester';
@@ -339,8 +346,8 @@ function startGame(by) {
   let impPool = shuffle((settings.newRoles ? ['impostor', 'shifter', 'phantom', 'viper', 'noisemaker', 'impostor'].concat(nImp >= 2 ? ['saboteur', 'poltergeist'] : []) : ['impostor', 'shifter', 'impostor']).filter(r => r === 'impostor' || roleOn(r)).concat((mods ? MOD_IMP : []).concat(CUSTOM.imp).filter(roleOn)));
   imps.forEach((p, i) => { p.role = hide ? 'seeker' : impPool[i % impPool.length]; });
   if (imps.length && imps.every(p => NON_KILLERS.includes(p.role))) imps[0].role = 'impostor'; // חייב להיות לפחות מתחזה אחד שיכול לחסל
-  const specials = shuffle((settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'] : ['engineer', 'scientist', 'angel']).concat((mods ? MOD_CREW : []).concat(CUSTOM.crew)).filter(roleOn));
-  const nSpecial = settings.newRoles ? Math.max(1, Math.round(crew.length * 0.7)) : specials.length;
+  const specials = shuffle((proCode('4000') ? [] : settings.newRoles ? ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'] : ['engineer', 'scientist', 'angel']).concat((mods ? MOD_CREW : []).concat(CUSTOM.crew)).filter(roleOn));
+  const nSpecial = proCode('3000') ? crew.length : settings.newRoles ? Math.max(1, Math.round(crew.length * 0.7)) : specials.length;
   crew.forEach((p, i) => { p.role = !race && !hide && i < Math.min(specials.length, nSpecial) && crew.length > 1 ? specials[i] : 'crew'; });
   // הליצן (אפשר לכבות בהגדרות): אחד מהצוות הופך לליצן, רק כשיש מספיק שחקנים
   if (jesterOn() && !race && !hide && crew.length >= 3 && all.length >= 5) crew[Math.floor(Math.random() * crew.length)].role = 'jester';
@@ -995,6 +1002,10 @@ function act(p, a) {
       settings.mode = [1, 2, 3, 4].concat(hanukOn() ? [5] : []).includes(a.mode) ? a.mode : 1;
       settings.raceGoal = Math.round(cl(a.raceGoal, 4, 25, 10));
       for (const k in ROLE_SET) settings[k] = Math.round(cl(a[k] === undefined ? settings[k] : a[k], ROLE_SET[k][1], ROLE_SET[k][2], ROLE_SET[k][0]));
+      // קודי פרו: משנים הגדרות (נבדקים אחרי שהקוד נקבע)
+      if (proCode('1000')) settings.speed = Math.max(settings.speed, 1.4);          // 1000 – אולטרה: מהירות גבוהה
+      if (proCode('2000')) settings.vision = Math.min(settings.vision, 0.5);         // 2000 – ליל חשכה: טווח ראייה קצר מאוד
+      if (proCode('9000')) { settings.killCd = 10; settings.taskLevel = 3; }          // 9000 – מלחמה: חיסולים מהירים ומשימות ארוכות
       break;
     case 'color': {
       if (phase !== 'lobby') return;
@@ -2156,7 +2167,7 @@ function viewFor(v) {
     for (const p of Object.values(players)) { p.conn = p.isBot; p.lastSeen = now(); p.input = { dx: 0, dy: 0 }; p.talking = false; }
     last = now();
   }
-  const setCustomRoles = list => { clearCustomRoles(); const keys = []; (Array.isArray(list) ? list : []).slice(0, 12).forEach(d => { const k = d && addCustomRole(d); if (k) keys.push(k); }); return keys; };
+  const setCustomRoles = list => { clearCustomRoles(); const keys = []; (Array.isArray(list) ? list : []).slice(0, opts && opts.pro ? 150 : 12).forEach(d => { const k = d && addCustomRole(d); if (k) keys.push(k); }); return keys; };
   const setCustomMaps = obj => { Object.keys(customMapDefs).forEach(k => delete customMapDefs[k]); Object.keys(obj || {}).forEach(k => { if (/^mod_\w{1,16}$/.test(k)) { customMapDefs[k] = obj[k]; MAPREG && MAPREG(k, obj[k]); } }); };
   return { setCustomRoles, setCustomMaps, join, act: (id, a) => act(typeof id === 'string' && Object.prototype.hasOwnProperty.call(players, id) ? players[id] : null, a), view: id => players[id] ? viewFor(players[id]) : null, tick, setConn, setHost, snapshot, restore, hasPlayer: id => !!players[id], isKicked: id => !!(players[id] && players[id].kicked), isLocked: () => !!settings.locked,
     keyOf: id => players[id] ? players[id].key : null,

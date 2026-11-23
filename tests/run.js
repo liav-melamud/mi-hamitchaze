@@ -1072,6 +1072,21 @@ test('חנוכה: השמש מגן ל-15 שניות, ובלי אירוע אין �
   }
 });
 
+test('פרו: 100 תפקידי פרו נטענים, וקודי 3000/4000/5555 עובדים', () => {
+  global.window = {}; require(path.join(dir, 'pro', 'pro.js')); const roles = global.window.MM_PRO_ROLES; delete global.window;
+  ok(roles.length === 100 && new Set(roles.map(r => r.name)).size === 100, 'צריך 100 תפקידים עם שמות שונים');
+  const base = ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'];
+  for (let i = 0; i < 12; i++) {
+    const g = createGame(MAP, { pro: true }); ok(g.setCustomRoles(roles).length === 100, 'לא כל התפקידים נטענו');
+    const a = g.join('מארח'); g.act(a, { type: 'settings', impostors: 2, bots: 12, code: i % 2 ? '3000 4000' : '5555' }); g.act(a, { type: 'start' });
+    const pl = Object.values(JSON.parse(g.snapshot()).players);
+    if (i % 2) ok(!pl.some(p => base.includes(p.role)), '4000 אמור להוציא תפקידים רגילים');
+    else ok(g.view(a).settings.speed >= 1.4, '5555 אמור להפעיל מהירות');
+  }
+  const f = createGame(MAP); ok(f.setCustomRoles(roles).length === 12, 'בגרסה החינמית יש תקרה של 12 תפקידים מותאמים');
+  const fa = f.join('מארח'); f.act(fa, { type: 'settings', bots: 6, code: '1000 5555' }); ok(f.view(fa).settings.speed < 1.4, 'קוד פרו עבד באתר החינמי');
+});
+
 test('חנוכה: לכל שחקן צוות יש משימת חנוכה (סופגניות/שמן/זוגות/נרות)', () => {
   for (let i = 0; i < 10; i++) {
     const g = createGame(MAP, { hanuk: true }); const a = g.join('מארח');
