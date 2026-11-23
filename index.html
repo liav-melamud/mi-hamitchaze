@@ -178,6 +178,7 @@
   .pad button { height: 52px; font-size: 22px; font-weight: 700; }
   #ventPanel { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 2px solid #59647e; border-radius: 14px; padding: 10px 14px; text-align: center; }
   #ventPanel .row { justify-content: center; margin-top: 8px; }
+  .bigtxt body { font-size: 120%; } .bigtxt button, .bigtxt select, .bigtxt input, .bigtxt .sub { font-size: 118%; } .bigtxt #chatbox, .bigtxt #lobbyChat { font-size: 120%; }
   #settingsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 6px 0; font-size: 14px; }
   #settingsGrid label { display: flex; justify-content: space-between; align-items: center; gap: 6px; background: #151b2c; padding: 6px 10px; border-radius: 10px; }
   #settingsGrid select { padding: 4px 6px; }
@@ -558,6 +559,7 @@
         <button class="statsBtn link">📊 הסטטיסטיקה והתגים שלי</button>
         <button id="funDreidelBtn" class="link">🌀 סביבון לכיף</button>
         <button id="modsBtn" class="link">🧩 מודים</button>
+        <button id="bigTxtBtn" class="link">🔎 טקסט גדול</button>
       </div>
     </div>
     <button id="moreOpts" class="link hidden" style="width:100%;margin-top:10px">אפשרויות נוספות</button>
@@ -622,6 +624,7 @@
     <div id="compModal" class="lmodal hidden"><div class="lmBox"><button class="lmClose" aria-label="סגור">✖</button><h2>💻 מחשב החללית</h2>
       <p class="sub" id="compNote" style="margin-top:0"></p>
     <b>⚙️ הגדרות משחק</b>
+    <div id="presetRow" class="row hostOnlyS" style="gap:6px;margin:6px 0"><button data-pre="fast">⚡ מהיר</button><button data-pre="calm">😌 רגוע</button><button data-pre="chaos">🌪️ בלגן</button><button data-pre="small">👥 חבורה קטנה</button></div>
     <div id="settingsGrid">
       <label>מתחזים <select data-s="impostors"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
       <label>בוטים <select data-s="bots"></select></label>
@@ -823,7 +826,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261123-140146'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261123-145703'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -834,10 +837,9 @@ const MOD_LIST = [['sprinter', '🏃 רץ', 'c'], ['medic', '🩺 רופא', 'c'
 const MOD_IMP = MOD_LIST.filter(r => r[2] === 'imp').map(r => r[0]);
 // מצב רשת: 'local' – כולם באותו Wi-Fi (בלי שום הגדרה); 'online' – חברים מרחוק (דרך שרת ההכוונה הפרטי)
 let LOCAL = null; // פרטי שרת בית, אם הדף נטען ממנו (לא חובה)
-let NET = 'local';
-try { NET = localStorage.getItem('mm_net') === 'online' ? 'online' : 'local'; } catch (e) {}
+let NET = 'online'; // הכל אונליין: בלי בחירה בין אונליין למקומי
 const urlNet = new URLSearchParams(location.search).get('net');
-if (urlNet === 'local' || urlNet === 'online') NET = urlNet; // קישור מהמארח קובע את המצב
+
 // איזה שרת הכוונה משמש כל מצב (מחרוזת לזיהוי – אם שני המצבים על אותו שרת, אין טעם לנסות את השני)
 const brokerOf = m => m === 'online' && SIGNAL ? 'private' : m === 'local' && LOCAL && LOCAL.signal ? 'home' : SIGNAL ? 'private' : 'public'; // בלי שרת בית – משתמשים בשרת ההכוונה שלנו (השרת הציבורי של PeerJS נופל)
 // שרת האונליין החינמי נרדם אחרי זמן בלי שימוש – מעירים אותו לפני שמתחברים (עד כדקה)
@@ -1262,7 +1264,7 @@ function joinGame(name, code, silent, flipped) {
   });
   peer.on('error', e => {
     if (reconnecting || silent) { scheduleRetry(); return; }
-    const other = NET === 'local' ? 'online' : 'local';
+    const other = NET; // הכל אונליין – אין מעבר למצב אחר
     if (e.type === 'peer-unavailable' && !flipped && brokerOf(other) !== brokerOf(NET)) {
       // אולי המארח בחר את המצב השני – מנסים גם שם
       NET = other; renderNet();
@@ -1305,7 +1307,7 @@ const urlRoom = new URLSearchParams(location.search).get('room');
 if (urlRoom) {
   const rc = urlRoom.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
   $('#codeIn').value = rc; $('#joinBtn').classList.add('primary');
-  $('#join').classList.add('invited'); $('#inviteCode').textContent = rc; show('#inviteBox', true); show('#moreOpts', true);
+  $('#join').classList.add('invited'); $('#inviteCode').textContent = rc; show('#inviteBox', true);
   $('#moreOpts').onclick = () => { $('#join').classList.remove('invited'); show('#moreOpts', false); };
 }
 try { $('#fixedRoom').checked = localStorage.getItem('mm_fixed') === '1'; } catch (e) {}
@@ -1319,6 +1321,9 @@ $('#hostBtn').onclick = () => { busy(true); LOCAL_READY.then(() => wakeSignal(tr
 }); };
 $('#demoBtn').onclick = startDemo;
 $('#offBtn').onclick = startOffline;
+const setBigTxt = on => { document.documentElement.classList.toggle('bigtxt', on); try { localStorage.setItem('mm_bigtxt', on ? '1' : ''); } catch (e) {} const b = $('#bigTxtBtn'); if (b) b.style.color = on ? 'var(--accent)' : ''; };
+$('#bigTxtBtn').onclick = () => setBigTxt(!document.documentElement.classList.contains('bigtxt'));
+try { if (localStorage.getItem('mm_bigtxt')) setBigTxt(true); } catch (e) {}
 if (new URLSearchParams(location.search).get('play') === 'offline') setTimeout(startOffline, 0); // מהדף "אין חיבור" באפליקציה
 $('#langBtn').onclick = () => setLang(window.MM_LANG === 'en' ? 'he' : 'en');
 function renderNet() {
@@ -1342,7 +1347,6 @@ wakeSignal(false); // אם כבר במצב אונליין – מעירים את 
 const LOCAL_READY = location.protocol !== 'http:' ? Promise.resolve() : fetch('local.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => {
   if (!j) return;
   LOCAL = j;
-  show('#netPick', !!j.signal); show('#netHint', !!j.signal); // הבחירה מקומי/אונליין רלוונטית רק בשרת בית
   renderNet();
 }).catch(() => {});
 // המשך חדר שהייתי המארח שלו (אחרי נפילה, רענון או סגירה בטעות)
@@ -1513,6 +1517,18 @@ const sendSettings = () => {
   api(o);
 };
 document.querySelectorAll('#settingsGrid select, #roleSet select, #roleToggles input, #modToggles input').forEach(el => el.onchange = sendSettings);
+const PRESETS = {
+  fast: { speed: 1.25, killCd: 15, taskLevel: 1, tasks: 3, meetingTime: 30, mode: 1 },
+  calm: { speed: 1, killCd: 25, taskLevel: 2, tasks: 4, meetingTime: 90, mode: 1 },
+  chaos: { speed: 1.5, killCd: 10, taskLevel: 1, tasks: 5, meetingTime: 45, mode: 4, impostors: 2 },
+  small: { speed: 1, killCd: 20, taskLevel: 2, tasks: 4, meetingTime: 60, mode: 1, impostors: 1, map: 'small' },
+};
+document.querySelectorAll('#presetRow button').forEach(b => b.onclick = () => {
+  const P = PRESETS[b.dataset.pre]; if (!P) return;
+  for (const k in P) { const el = document.querySelector('#settingsGrid [data-s="' + k + '"]'); if (el && [...el.options].some(o => o.value == P[k])) el.value = P[k]; }
+  sendSettings();
+});
+
 $('#secretCode').onchange = sendSettings;
 $('#startBtn').onclick = () => api({ type: 'start' });
 // ---------- חללית הלובי: הולכים בה, ארון בגדים, מחשב מארח ולוח תפקידים ----------
@@ -3283,7 +3299,7 @@ const HATS = ['ללא', 'מסיבה', 'כתר', 'מצחייה', 'ארנב', 'ה�
 // ---------- סטטיסטיקה אישית, תגים ופריטים שנפתחים (נשמר בדפדפן) ----------
 const PETS = ['', '🐶', '🐱', '🐧', '🐹', '🦊', '🐸', '🐙', '🦄', '🍩', '@dreidel'];
 const PET_NAMES = ['ללא', 'כלב', 'חתול', 'פינגווין', 'אוגר', 'שועל', 'צפרדע', 'תמנון', 'חד-קרן', 'סופגנייה', 'סביבון'];
-const loadStats = () => { try { return Object.assign({ games: 0, wins: 0, impGames: 0, impWins: 0, crewWins: 0, jesterWins: 0, moleWins: 0, kills: 0, tasks: 0, goodVotes: 0, badVotes: 0, ejected: 0, survived: 0, reports: 0, hideWins: 0, streak: 0, best: 0, last: 0, badges: [], hanukDays: 0, hanukSeen: [], hanukCount: 0 }, JSON.parse(localStorage.getItem('mm_stats') || '{}')); } catch (e) { return { games: 0, wins: 0, badges: [] }; } };
+const loadStats = () => { try { return Object.assign({ games: 0, wins: 0, impGames: 0, impWins: 0, crewWins: 0, jesterWins: 0, moleWins: 0, kills: 0, tasks: 0, goodVotes: 0, badVotes: 0, ejected: 0, survived: 0, reports: 0, hideWins: 0, streak: 0, best: 0, last: 0, badges: [], hanukDays: 0, hanukSeen: [], hanukCount: 0, dailyDay: '', dailyCount: 0 }, JSON.parse(localStorage.getItem('mm_stats') || '{}')); } catch (e) { return { games: 0, wins: 0, badges: [] }; } };
 // דרישה לפתיחה: [שם השדה, כמה]
 const HAT_REQ = { 8: ['wins', 2, 'ניצחונות'], 9: ['tasks', 60, 'משימות'], 10: ['impWins', 3, 'ניצחונות כמתחזה'], 11: ['games', 15, 'משחקים'], 12: ['hanukDays', 1, 'ימי חנוכה שבהם שיחקת'], 13: ['hanukCount', 8, 'נרות חנוכה (מכבי מלא)'] };
 const PET_REQ = { 1: null, 2: ['games', 1, 'משחקים'], 3: ['games', 3, 'משחקים'], 4: ['wins', 1, 'ניצחונות'], 5: ['impWins', 1, 'ניצחונות כמתחזה'], 6: ['tasks', 50, 'משימות'], 7: ['kills', 10, 'חיסולים'], 8: ['wins', 10, 'ניצחונות'], 9: ['hanukDays', 1, 'ימי חנוכה שבהם שיחקת'], 10: ['hanukDays', 3, 'ימי חנוכה שבהם שיחקת'] };
@@ -3302,8 +3318,21 @@ const BADGES = [
   { id: 'vet', ic: '🎮', name: 'ותיק', d: 'משחקים', k: 'games', n: 25 },
   { id: 'wrong', ic: '🤦', name: 'יד קלה על ההדק', d: 'הצבעות נגד חפים מפשע', k: 'badVotes', n: 10 },
   ...Array.from({ length: 8 }, (_, i) => ({ id: 'han' + (i + 1), han: 1, ic: '🕯️', name: 'נר חנוכה ' + (i + 1), d: 'שיחקת משחק ביום החנוכה ' + (i + 1), k: 'hanuk' + (i + 1), n: 1 })),
+  { id: 'daily5', ic: '🎯', name: 'אלוף האתגרים', d: 'אתגרים יומיים שהושלמו', k: 'dailyCount', n: 5 },
   { id: 'macabi', han: 1, ic: '🕎', name: 'מכבי מלא', d: 'הדלקת כל שמונת הנרות', k: 'hanukCount', n: 8 },
 ];
+// אתגר יומי: אחד לכל יום, אותו אתגר לכל השחקנים; ההשלמה נשמרת בסטטיסטיקה
+const DAILY = [
+  { txt: 'השלם לפחות 5 משימות במשחק אחד', ok: m => (m.tasks || 0) >= 5 },
+  { txt: 'שרוד עד סוף המשחק', ok: m => !!m.alive },
+  { txt: 'נצח משחק', ok: m => !!m.won },
+  { txt: 'דווח על גופה', ok: m => (m.reports || 0) >= 1 },
+  { txt: 'נצח כמתחזה', ok: m => m.team === 'imp' && !!m.won },
+  { txt: 'הצבע נכון פעמיים', ok: m => (m.goodVotes || 0) >= 2 },
+  { txt: 'חסל לפחות שחקן אחד', ok: m => (m.kills || 0) >= 1 },
+];
+const dayKey = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+const dailyToday = () => { const d = new Date(); return DAILY[(d.getFullYear() * 366 + d.getMonth() * 31 + d.getDate()) % DAILY.length]; };
 // סוף משחק: מעדכנים את הסטטיסטיקה פעם אחת לכל משחק, ומחזירים תגים חדשים שהושגו
 function recordGame(m) {
   const st = loadStats();
@@ -3324,16 +3353,19 @@ function recordGame(m) {
     const n = hanukCandles();
     if (n >= 1 && !st['hanuk' + n]) { st['hanuk' + n] = 1; st.hanukCount = (st.hanukCount || 0) + 1; }
   }
+  let dch = null;
+  if (st.dailyDay !== dayKey() && dailyToday().ok(m)) { st.dailyDay = dayKey(); st.dailyCount++; dch = { ic: '🎯', name: 'אתגר יומי הושלם!', d: dailyToday().txt, n: '✔' }; }
   const fresh = BADGES.filter(b => !st.badges.includes(b.id) && (st[b.k] || 0) >= b.n);
   fresh.forEach(b => st.badges.push(b.id));
   try { localStorage.setItem('mm_stats', JSON.stringify(st)); } catch (e) {}
-  return fresh;
+  return dch ? [dch, ...fresh] : fresh;
 }
 function openStats() {
   const st = loadStats(), pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
   const cell = (n, l) => `<div><b>${n}</b>${l}</div>`;
   let h = '<div class="stGrid">' + cell(st.games, 'משחקים') + cell(st.wins, 'ניצחונות') + cell(pct(st.wins, st.games), 'אחוז ניצחון') + cell(st.impWins + '/' + st.impGames, 'ניצחונות כמתחזה') +
     cell(st.kills, 'חיסולים') + cell(st.tasks, 'משימות') + cell(st.goodVotes, 'הדחות נכונות') + cell(st.badVotes, 'הצבעות שגויות') + cell(st.ejected, 'פעמים שהודחת') + cell(st.best, 'רצף ניצחונות שיא') + '</div>';
+  h = `<div class="badge ${st.dailyDay === dayKey() ? '' : 'off'}"><span class="bi">🎯</span><span style="flex:1"><b>אתגר היום</b><small>${dailyToday().txt}</small></span>${st.dailyDay === dayKey() ? '✅' : ''}</div>` + h;
   h += '<h3 style="margin:6px 0">🏅 תגים</h3>' + BADGES.filter(b => !b.han || hanukActive() || st.hanukDays).map(b => { const v = Math.min(st[b.k] || 0, b.n), on = st.badges.includes(b.id) || v >= b.n;
     return `<div class="badge ${on ? '' : 'off'}"><span class="bi">${b.ic}</span><span style="flex:1"><b>${b.name}</b><small>${b.d}: ${v}/${b.n}</small>${on ? '' : `<div class="bar"><i style="width:${100 * v / b.n}%"></i></div>`}</span>${on ? '✅' : ''}</div>`; }).join('');
   h += '<h3 style="margin:10px 0 6px">🎁 פריטים שנפתחים</h3>' + [...Object.entries(HAT_REQ).map(([i, r]) => ['🎩 כובע ' + HATS[i], r]), ...Object.entries(PET_REQ).filter(([, r]) => r).map(([i, r]) => [petHtml(i) + ' ' + PET_NAMES[i], r])]
