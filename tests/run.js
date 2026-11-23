@@ -1073,8 +1073,10 @@ test('חנוכה: השמש מגן ל-15 שניות, ובלי אירוע אין �
 });
 
 test('פרו: 100 תפקידי פרו נטענים, וקודי 3000/4000/5555 עובדים', () => {
-  global.window = {}; require(path.join(dir, 'pro', 'pro.js')); const roles = global.window.MM_PRO_ROLES; delete global.window;
-  ok(roles.length === 100 && new Set(roles.map(r => r.name)).size === 100, 'צריך 100 תפקידים עם שמות שונים');
+  // חבילת הפרו עצמה נמצאת במאגר הפרו; כאן בודקים את המנוע עם 100 תפקידים מותאמים שנבנים מ-20 תבניות
+  const fam = ['sprinter', 'medic', 'scout', 'lucky', 'trapper', 'radar', 'taskmaster', 'jailer', 'empath', 'sniper', 'poisoner', 'blinker', 'cleaner', 'zapper', 'vampire', 'bomber', 'martyr', 'vulture', 'survivor', 'instigator'];
+  const roles = []; fam.forEach(f => { for (let i = 1; i <= 5; i++) roles.push({ id: 'p' + (roles.length + 1), tpl: f, name: f + i }); });
+  ok(roles.length === 100, 'צריך 100 תפקידים');
   const base = ['engineer', 'scientist', 'angel', 'photographer', 'detective', 'judge', 'bodyguard', 'guardian', 'timekeeper'];
   for (let i = 0; i < 12; i++) {
     const g = createGame(MAP, { pro: true }); ok(g.setCustomRoles(roles).length === 100, 'לא כל התפקידים נטענו');
@@ -1085,6 +1087,12 @@ test('פרו: 100 תפקידי פרו נטענים, וקודי 3000/4000/5555 ע
   }
   const f = createGame(MAP); ok(f.setCustomRoles(roles).length === 12, 'בגרסה החינמית יש תקרה של 12 תפקידים מותאמים');
   const fa = f.join('מארח'); f.act(fa, { type: 'settings', bots: 6, code: '1000 5555' }); ok(f.view(fa).settings.speed < 1.4, 'קוד פרו עבד באתר החינמי');
+});
+
+test('כמה קודים יחד בשדה אחד: 54321 8888 נשמרים ושניהם פעילים', () => {
+  const g = createGame(MAP); const a = g.join('מארח'); g.act(a, { type: 'settings', bots: 5, code: '54321, 8888  12345' });
+  ok(g.view(a).settings.code === '54321 8888 12345', 'הקודים לא נשמרו: ' + g.view(a).settings.code);
+  g.act(a, { type: 'settings', bots: 5, mode: 5, code: '54321 8888' }); ok(g.view(a).settings.mode === 5, 'קוד 8888 לא עבד יחד עם 54321');
 });
 
 test('חנוכה: לכל שחקן צוות יש משימת חנוכה (סופגניות/שמן/זוגות/נרות)', () => {

@@ -998,7 +998,7 @@ function act(p, a) {
       settings.map = typeof a.map === 'string' && Object.prototype.hasOwnProperty.call(MAPS, a.map) ? a.map : 'big';
       settings.rounds = [1, 3, 5].includes(Number(a.rounds)) ? Number(a.rounds) : 1;
       settings.hideTime = Math.round(cl(a.hideTime, 60, 600, 180));
-      if (a.code !== undefined) settings.code = String(a.code).trim().slice(0, 12);
+      if (a.code !== undefined) settings.code = String(a.code).replace(/[^0-9 ,]/g, '').replace(/[ ,]+/g, ' ').trim().slice(0, 60); // אפשר כמה קודים יחד, מופרדים ברווח
       settings.mode = [1, 2, 3, 4].concat(hanukOn() ? [5] : []).includes(a.mode) ? a.mode : 1;
       settings.raceGoal = Math.round(cl(a.raceGoal, 4, 25, 10));
       for (const k in ROLE_SET) settings[k] = Math.round(cl(a[k] === undefined ? settings[k] : a[k], ROLE_SET[k][1], ROLE_SET[k][2], ROLE_SET[k][0]));
