@@ -682,7 +682,7 @@
       <div class="rgroup"><div class="rname">🐍 מרקיב</div><div class="roleGrid">
           <label>גופה נעלמת אחרי <select data-s="rotTime"><option value="5">5ש׳</option><option value="8">8ש׳</option><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option></select></label>
       </div></div>
-      <div class="rgroup"><div class="rname">🤡 ליצן</div><div class="roleGrid">
+      <div class="rgroup" id="jesterGroup"><div class="rname">🤡 ליצן</div><div class="roleGrid">
           <label>המתנה לבננה <select data-s="bananaCd"><option value="10">10ש׳</option><option value="15">15ש׳</option><option value="20">20ש׳</option><option value="30">30ש׳</option></select></label>
           <label>המתנה לגופה מזויפת <select data-s="fakeCd"><option value="30">30ש׳</option><option value="45">45ש׳</option><option value="60">60ש׳</option><option value="90">90ש׳</option></select></label>
       </div></div>
@@ -826,7 +826,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261123-145703'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261123-152725'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -1501,6 +1501,7 @@ function renderLobby(s) {
   document.querySelectorAll('#roleToggles input, #modToggles input').forEach(el => { el.checked = !off.includes(el.dataset.role); el.disabled = !s.me.host; });
   $('#modBox').classList.toggle('hidden', !hasCode('54321'));
   $('#jesterLbl').classList.toggle('hidden', !hasCode('54321'));
+  $('#jesterGroup').classList.toggle('hidden', !hasCode('54321')); // הליצן וההגדרות שלו רק עם הקוד
 }
 $('#colors').onclick = e => { const b = e.target.closest('button'); if (b) { api({ type: 'color', color: +b.dataset.c }); try { const l = JSON.parse(localStorage.getItem('mm_look') || '{}'); l.color = +b.dataset.c; localStorage.setItem('mm_look', JSON.stringify(l)); } catch (er) {} } };
 document.querySelector('[data-s="bots"]').innerHTML = Array.from({ length: 16 }, (_, i) => `<option>${i}</option>`).join('');
