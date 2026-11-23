@@ -828,7 +828,7 @@ const store = {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // ---------- רשת: המארח מריץ את המשחק בדפדפן, החברים מתחברים ישירות (PeerJS) ----------
-const VERSION = '20261123-170808'; // מוחלף אוטומטית בכל העלאה
+const VERSION = '20261123-171041'; // מוחלף אוטומטית בכל העלאה
 const PREFIX = 'mimitchaze-he-';
 // שרת הכוונה פרטי (אם הוגדר); אחרת שרת ציבורי של PeerJS
 const SIGNAL = (window.MM_SIGNAL && window.MM_SIGNAL.host) ? window.MM_SIGNAL : null;
@@ -3306,6 +3306,7 @@ $('#ventBtns').onclick = e => {
 
 // ---------- כובעים ----------
 const HATS = ['ללא', 'מסיבה', 'כתר', 'מצחייה', 'ארנב', 'הילה', 'פרח', 'קש', 'משקפיים', 'שף', 'קרניים', 'אוזניות', 'חנוכייה', 'מכבי זהב'];
+if (window.MM_PRO) HATS.push('קסדת אסטרונאוט', 'קוסם', 'ויקינג', 'פיראט', 'כתר יהלומים', 'נינג׳ה', 'צילינדר', 'גיבור על'); // תלבושות פרו (14–21)
 // ---------- סטטיסטיקה אישית, תגים ופריטים שנפתחים (נשמר בדפדפן) ----------
 const PETS = ['', '🐶', '🐱', '🐧', '🐹', '🦊', '🐸', '🐙', '🦄', '🍩', '@dreidel'];
 const PET_NAMES = ['ללא', 'כלב', 'חתול', 'פינגווין', 'אוגר', 'שועל', 'צפרדע', 'תמנון', 'חד-קרן', 'סופגנייה', 'סביבון'];
@@ -3313,7 +3314,7 @@ const loadStats = () => { try { return Object.assign({ games: 0, wins: 0, impGam
 // דרישה לפתיחה: [שם השדה, כמה]
 const HAT_REQ = { 8: ['wins', 2, 'ניצחונות'], 9: ['tasks', 60, 'משימות'], 10: ['impWins', 3, 'ניצחונות כמתחזה'], 11: ['games', 15, 'משחקים'], 12: ['hanukDays', 1, 'ימי חנוכה שבהם שיחקת'], 13: ['hanukCount', 8, 'נרות חנוכה (מכבי מלא)'] };
 const PET_REQ = { 1: null, 2: ['games', 1, 'משחקים'], 3: ['games', 3, 'משחקים'], 4: ['wins', 1, 'ניצחונות'], 5: ['impWins', 1, 'ניצחונות כמתחזה'], 6: ['tasks', 50, 'משימות'], 7: ['kills', 10, 'חיסולים'], 8: ['wins', 10, 'ניצחונות'], 9: ['hanukDays', 1, 'ימי חנוכה שבהם שיחקת'], 10: ['hanukDays', 3, 'ימי חנוכה שבהם שיחקת'] };
-const unlocked = (req, st) => !req || (st[req[0]] || 0) >= req[1];
+const unlocked = (req, st) => !req || window.MM_PRO || (st[req[0]] || 0) >= req[1]; // בפרו הכל פתוח
 const BADGES = [
   { id: 'detective', ic: '🕵️', name: 'הבלש הטוב', d: 'הצבעת נכון נגד מתחזים', k: 'goodVotes', n: 10 },
   { id: 'liar', ic: '🤥', name: 'השקרן הגדול', d: 'ניצחונות כמתחזה', k: 'impWins', n: 5 },
@@ -3439,11 +3440,51 @@ function drawHat(h, dir) {
       c.fillStyle = '#d62828';
       for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 3, -16); c.quadraticCurveTo(s * 10, -24, s * 14, -33); c.lineTo(s * 12, -15); c.closePath(); c.fill(); c.stroke(); } break;
     case 12: case 13: drawHanukHat(c, h); break;
+    case 14: case 15: case 16: case 17: case 18: case 19: case 20: case 21: drawProHat(c, h, dir); break;
     case 11:
       c.strokeStyle = '#333'; c.lineWidth = 4; c.beginPath(); c.arc(0, -2, 21, Math.PI * 1.08, Math.PI * 1.92); c.stroke();
       c.fillStyle = '#ff4d6d'; c.fillRect(-24, -9, 7, 13); c.fillRect(17, -9, 7, 13); break;
   }
   c.restore();
+}
+
+function drawProHat(c, h, dir) { // תלבושות פרו
+  const tt = performance.now();
+  c.lineWidth = 2; c.strokeStyle = 'rgba(0,0,0,.55)';
+  if (h === 14) { // קסדת אסטרונאוט
+    c.fillStyle = 'rgba(190,225,255,.55)'; c.beginPath(); c.arc(0, -8, 22, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 3; c.beginPath(); c.arc(0, -8, 22, Math.PI * 1.1, Math.PI * 1.4); c.stroke();
+    c.fillStyle = '#e8edf5'; c.fillRect(-23, 6, 46, 5); c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = 2; c.strokeRect(-23, 6, 46, 5);
+  } else if (h === 15) { // קוסם
+    c.fillStyle = '#4b2e9a'; c.beginPath(); c.moveTo(-14, -14); c.lineTo(2, -46); c.lineTo(14, -14); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(0, -14, 19, 4.5, 0, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = '#ffd23f'; for (const [x, y] of [[-3, -24], [5, -32], [0, -18]]) { c.beginPath(); c.arc(x, y, 1.8, 0, 7); c.fill(); }
+  } else if (h === 16) { // ויקינג
+    c.fillStyle = '#9aa3b2'; c.beginPath(); c.arc(0, -13, 13, Math.PI, 0); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#f5f0e0';
+    for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 11, -15); c.quadraticCurveTo(s * 22, -20, s * 20, -34); c.quadraticCurveTo(s * 15, -24, s * 8, -20); c.closePath(); c.fill(); c.stroke(); }
+    c.fillStyle = '#6b4a2a'; c.fillRect(-13, -16, 26, 3);
+  } else if (h === 17) { // פיראט
+    c.fillStyle = '#1b1b24'; c.beginPath(); c.moveTo(-22, -12); c.quadraticCurveTo(0, -42, 22, -12); c.quadraticCurveTo(0, -18, -22, -12); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(0, -22, 3.5, 0, 7); c.fill(); c.fillRect(-1.5, -19, 3, 4);
+    c.strokeStyle = '#fff'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-6, -17); c.lineTo(6, -25); c.moveTo(6, -17); c.lineTo(-6, -25); c.stroke();
+  } else if (h === 18) { // כתר יהלומים
+    c.fillStyle = '#ffc93c'; c.beginPath(); c.moveTo(-15, -13); c.lineTo(-15, -32); c.lineTo(-7, -24); c.lineTo(0, -38); c.lineTo(7, -24); c.lineTo(15, -32); c.lineTo(15, -13); c.closePath(); c.fill(); c.stroke();
+    const sp = 0.6 + 0.4 * Math.sin(tt / 220);
+    for (const [x, y, col] of [[-8, -18, '#5ad1ff'], [0, -20, '#ff5fa2'], [8, -18, '#7dff9a']]) { c.fillStyle = col; c.globalAlpha = sp; c.beginPath(); c.moveTo(x, y - 4); c.lineTo(x + 3.4, y); c.lineTo(x, y + 4); c.lineTo(x - 3.4, y); c.closePath(); c.fill(); c.globalAlpha = 1; }
+  } else if (h === 19) { // נינג'ה
+    c.fillStyle = '#16161e'; c.fillRect(-16, -20, 32, 9); c.strokeRect(-16, -20, 32, 9);
+    c.fillStyle = '#d62828'; c.fillRect(-16, -16, 32, 2.5);
+    c.beginPath(); c.moveTo(-16, -17); c.lineTo(-27, -12 + Math.sin(tt / 160) * 2); c.lineTo(-16, -13); c.closePath(); c.fill();
+  } else if (h === 20) { // צילינדר
+    c.fillStyle = '#17171f'; c.fillRect(-11, -42, 22, 28); c.strokeRect(-11, -42, 22, 28);
+    c.beginPath(); c.ellipse(0, -14, 19, 4.5, 0, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = '#c0392b'; c.fillRect(-11, -22, 22, 5);
+  } else { // גיבור על: מסיכה + גלימה קטנה
+    c.fillStyle = '#e53935'; c.beginPath(); c.roundRect(dir * 1 - 13, -9, 26, 10, 5); c.fill(); c.stroke();
+    c.fillStyle = '#fff'; for (const s of [-1, 1]) { c.beginPath(); c.ellipse(dir * 1 + s * 5, -4, 3, 2, 0, 0, 7); c.fill(); }
+    c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(0, -35); c.lineTo(5, -26); c.lineTo(0, -29); c.lineTo(-5, -26); c.closePath(); c.fill(); c.stroke();
+  }
 }
 
 let hatSig = '';

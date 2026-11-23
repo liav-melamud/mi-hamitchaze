@@ -1089,6 +1089,19 @@ test('פרו: 100 תפקידי פרו נטענים, וקודי 3000/4000/5555 ע
   const fa = f.join('מארח'); f.act(fa, { type: 'settings', bots: 6, code: '1000 5555' }); ok(f.view(fa).settings.speed < 1.4, 'קוד פרו עבד באתר החינמי');
 });
 
+test('פרו: לכל שחקן צוות שתי משימות פרו, ובחינמי אין, וכל כובעי הפרו מתקבלים', () => {
+  for (let i = 0; i < 8; i++) {
+    const g = createGame(MAP, { pro: true }); const a = g.join('מארח'); g.act(a, { type: 'settings', impostors: 1, bots: 6, tasks: 5 }); g.act(a, { type: 'start' });
+    const crew = Object.values(JSON.parse(g.snapshot()).players).filter(p => p.tasks && p.tasks.length && p.role !== 'mole');
+    ok(crew.every(p => p.tasks.filter(x => MAP.TASKS[x.i].ev === 'pro').length >= 2), 'חסרות משימות פרו');
+  }
+  const f = createGame(MAP); const b = f.join('מארח'); f.act(b, { type: 'settings', impostors: 1, bots: 6 }); f.act(b, { type: 'start' });
+  ok(Object.values(JSON.parse(f.snapshot()).players).every(p => (p.tasks || []).every(x => MAP.TASKS[x.i].ev !== 'pro')), 'משימת פרו הופיעה באתר החינמי');
+  const g2 = createGame(MAP, { pro: true }); const c = g2.join('מארח'); g2.act(c, { type: 'hat', hat: 21 }); ok(g2.view(c).me.hat === 21, 'כובע פרו לא נשמר');
+  g2.act(c, { type: 'hat', hat: 22 }); ok(g2.view(c).me.hat === 21, 'כובע מעבר לטווח התקבל');
+  const g3 = createGame(MAP); const d = g3.join('מארח'); g3.act(d, { type: 'hat', hat: 20 }); ok(g3.view(d).me.hat !== 20, 'כובע פרו התקבל באתר החינמי');
+});
+
 test('כמה קודים יחד בשדה אחד: 54321 8888 נשמרים ושניהם פעילים', () => {
   const g = createGame(MAP); const a = g.join('מארח'); g.act(a, { type: 'settings', bots: 5, code: '54321, 8888  12345' });
   ok(g.view(a).settings.code === '54321 8888 12345', 'הקודים לא נשמרו: ' + g.view(a).settings.code);

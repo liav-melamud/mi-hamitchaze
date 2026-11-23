@@ -57,7 +57,7 @@ const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', '�
 
 const SPEED = 220, KILL_RANGE = 90, REPORT_RANGE = 110, USE_RANGE = 60;
 const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15, TASK_TIME = 2.5;
-const MEETING_TIME = 60, EJECT_TIME = 6, HAT_BASE = 12, HAT_COUNT = 14, PET_BASE = 9, PET_COUNT = 11; // כובעים וחיות מחמד: הבסיס, ועם פריטי חנוכה
+const MEETING_TIME = 60, EJECT_TIME = 6, HAT_BASE = 12, HAT_COUNT = 14, PRO_HAT_COUNT = 22, PET_BASE = 9, PET_COUNT = 11; // כובעים וחיות מחמד: הבסיס, ועם פריטי חנוכה
 // הגדרות תפקידים (כמו במשחק האמיתי): [ברירת מחדל, מינימום, מקסימום]
 const ROLE_SET = {
   engVent: [15, 0, 60], engVentCd: [15, 0, 60],       // מהנדס: כמה זמן אפשר להיות בפתח (0 = בלי הגבלה), והמתנה בין זחילות
@@ -257,7 +257,7 @@ function newPlayer(name, color, isBot) {
     id, key: isBot ? null : secretKey(), name: String(name || 'שחקן').replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, '').slice(0, 14) || 'שחקן', color, isBot,
     x: MAP.BUTTON.x, y: MAP.BUTTON.y, dir: 1, alive: true, role: null, tasks: [],
     input: { dx: 0, dy: 0 }, work: null, killCd: 0, shiftCd: 0, shapeAs: null, shapeUntil: 0,
-    shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * ((hanukOn() ? HAT_COUNT : HAT_BASE) - 1)) : 0, pet: isBot && Math.random() < 0.3 ? 1 + Math.floor(Math.random() * ((hanukOn() ? PET_COUNT : PET_BASE) - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
+    shieldUntil: 0, gaCd: 0, emergencyUsed: false, inVent: null, hat: isBot ? 1 + Math.floor(Math.random() * ((opts.pro ? PRO_HAT_COUNT : hanukOn() ? HAT_COUNT : HAT_BASE) - 1)) : 0, pet: isBot && Math.random() < 0.3 ? 1 + Math.floor(Math.random() * ((hanukOn() ? PET_COUNT : PET_BASE) - 1)) : 0, toast: [], conn: !isBot, lastSeen: now(),
     bot: isBot ? { plan: [], wait: 0, goal: null, voteAt: 0, chatAt: 0, persona: pick(['suspicious', 'quiet', 'chatty', 'aggressive', 'helpful', 'normal', 'normal']) } : null,
   };
   players[id] = p;
@@ -388,7 +388,7 @@ function startGame(by) {
     p.stats = { tasks: 0, kills: 0, goodVotes: 0, badVotes: 0, reports: 0 }; p.photos = []; p.notes = []; p.noteMeta = []; p.photoCd = 0; p.investCd = 0; p.guardCd = 0; p.guardedBy = null; p.vanishUntil = 0; p.vanishCd = 0; p.hauntDoorCd = 10; p.darkCd = 10; p.dragCd = 0; p.drag = null; p.nearKill = 0; p.bananaCd = 8; p.fakeCd = 25; p.slip = null; p.hideVents = 0; p.hiding = null; p.hideSince = 0; p.hideCd = 0; p.ward = null; p.wardSwap = true; p.wardDied = null; p.rewindUsed = false; p.noiseCd = 15; p.modCd = 0; p.modUsed = 0; p.sprintUntil = 0; p.radarUntil = 0; p.luckUsed = false; p.poisonAt = 0; p.poisonBy = null; p.eaten = 0;
     if (team(p) === 'crew') {
       if (settings.mode === 5) { p.tasks = candleIdx().map(i => ({ i, done: false })); }
-      else { p.tasks = shuffle(taskPool()).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false })); addDreidel(p); }
+      else { p.tasks = shuffle(taskPool()).slice(0, race ? 3 : tasksEach).map(i => ({ i, done: false })); addDreidel(p); addPro(p); }
       taskTotal += p.tasks.length;
     } else if (p.role === 'mole') p.tasks = shuffle(settings.mode === 5 ? candleIdx() : taskPool()).slice(0, tasksEach).map(i => ({ i, done: false })); // משימות מזויפות
     else p.tasks = [];
@@ -472,7 +472,13 @@ function checkWin() {
 
 const candleIdx = () => MAP.TASKS.map((T, i) => T.ev === 'candle' ? i : -1).filter(i => i >= 0);
 // מאגר המשימות: משימות הסביבון רק באירוע חנוכה, והנרות רק במצב שמונה נרות
-const taskPool = () => MAP.TASKS.map((_, i) => i).filter(i => { const k = MAP.TASKS[i].ev; return !k || ((k === 'dreidel' || k === 'hanuk') && hanukOn() && settings.mode !== 5); });
+const taskPool = () => MAP.TASKS.map((_, i) => i).filter(i => { const k = MAP.TASKS[i].ev; return !k || ((k === 'dreidel' || k === 'hanuk') && hanukOn() && settings.mode !== 5) || (k === 'pro' && !!opts.pro && settings.mode !== 5); });
+function addPro(p) { // באתר הפרו: שתי משימות פרו לכל שחקן (במקום משימות רגילות)
+  if (!opts.pro || settings.mode === 2 || settings.mode === 5 || p.tasks.length < 3) return;
+  const have = () => p.tasks.filter(x => MAP.TASKS[x.i].ev === 'pro').length;
+  const pool = shuffle(taskPool().filter(i => MAP.TASKS[i].ev === 'pro' && !p.tasks.some(x => x.i === i)));
+  for (let j = p.tasks.length - 1; j >= 0 && have() < 2 && pool.length; j--) { if (!MAP.TASKS[p.tasks[j].i].ev) p.tasks[j] = { i: pool.pop(), done: false }; }
+}
 function addDreidel(p) {
   if (!hanukOn() || settings.mode === 2) return;
   const d = p.tasks.some(x => MAP.TASKS[x.i].ev === 'dreidel') || Math.random() > 0.6 ? undefined : taskPool().filter(i => MAP.TASKS[i].ev === 'dreidel' && !p.tasks.some(x => x.i === i))[0];
@@ -929,7 +935,7 @@ function act(p, a) {
     case 'hat': {
       if (phase !== 'lobby') return;
       const h = Number(a.hat);
-      if (h >= 0 && h < HAT_COUNT) p.hat = h;
+      if (h >= 0 && h < (opts.pro ? PRO_HAT_COUNT : HAT_COUNT)) p.hat = h;
       break;
     }
     case 'shift': {

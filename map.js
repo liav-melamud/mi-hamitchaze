@@ -413,6 +413,9 @@
     put(ids[5 % ids.length], '🫒 מילוי שמן בחנוכייה', 'oil', 'hanuk');
     put(ids[6 % ids.length], '🪙 גלידת חנוכה – זוגות', 'gelt', 'hanuk');
     put(ids[7 % ids.length], '🕎 זכור את הנרות', 'menorahmem', 'hanuk');
+    // משימות פרו (מופיעות רק באתר הפרו)
+    [['🧬 ריצוף DNA', 'pairs'], ['🎵 רצף צלילים', 'simon'], ['🎯 כיול לייזר', 'timing'], ['🧲 איסוף שבבים', 'catch'], ['🔢 סידור מספרים', 'sortnum'], ['🧩 פענוח דפוס', 'pattern'], ['⚙️ כוונון מנועים', 'sliders'], ['🧠 חידון חלל', 'quiz']]
+      .forEach((q, i) => put(ids[(i * 3 + 1) % ids.length], q[0], q[1], 'pro'));
   })();
   // הגדרה ניתנת לעריכה של המפה (לעורך המודים): בלי משימות החנוכה, וקשרי הוינטים כרשתות
   const _nets = []; VENTS.forEach((v, i) => { if (_nets[i] !== undefined) return; const st = [i]; _nets[i] = i; while (st.length) { const c = st.pop(); (VENTS[c].links || []).forEach(j => { if (_nets[j] === undefined) { _nets[j] = i; st.push(j); } }); } });
