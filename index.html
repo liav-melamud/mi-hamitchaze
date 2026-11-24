@@ -3956,6 +3956,7 @@ function sendInput() {
   if (keys.has(KEYS.up) || keys.has('ArrowUp')) dy -= 1;
   if (keys.has(KEYS.down) || keys.has('ArrowDown')) dy += 1;
   if (joy.active) { dx = joy.dx; dy = joy.dy; }
+  if (PRO && window.MM_V3 && window.MM_3D && window.MM_3D.ok && window.MM_3D.yaw && (dx || dy)) { const cy = Math.cos(window.MM_3D.yaw), sy = Math.sin(window.MM_3D.yaw), ndx = dx * cy + dy * sy; dy = -dx * sy + dy * cy; dx = ndx; } // תלת מימד: קדימה = לאן שהמצלמה מסתכלת
   const kc = { up: dy < 0, down: dy > 0, left: dx < 0, right: dx > 0 };
   document.querySelectorAll('.keys b').forEach(b => b.classList.toggle('on', !!kc[b.dataset.k]));
   const sig = dx.toFixed(2) + ',' + dy.toFixed(2);
