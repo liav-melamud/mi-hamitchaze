@@ -4066,6 +4066,14 @@ function drawDrone(x, y, color, dir, opts = {}) {
   ctx.translate(0, bob);
   // צל
   if (!opts.ghost && !opts.noShadow) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, 20, 16, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+  if (PRO && !opts.ghost && !opts.vent) { // פרו: הילה זהובה ונצנוצים מסתובבים סביב כל שחקן
+    const tt = performance.now() / 1000, ga = ctx.globalAlpha;
+    const gl = ctx.createRadialGradient(0, 0, 14, 0, 0, 34); gl.addColorStop(0, 'rgba(255,200,80,.30)'); gl.addColorStop(1, 'rgba(255,200,80,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, 34, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffe08a';
+    for (let k = 0; k < 3; k++) { const a = tt * 1.6 + k * 2.094, rr = 27 + Math.sin(tt * 3 + k) * 2.5; ctx.globalAlpha = ga * (0.55 + 0.4 * Math.sin(tt * 5 + k * 2)); ctx.beginPath(); ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr * 0.8, 2.2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = ga;
+  }
   // אנטנות
   ctx.strokeStyle = '#cfd6e4'; ctx.lineWidth = 2.5;
   for (const s of [-1, 1]) {
