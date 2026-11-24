@@ -1,7 +1,7 @@
 // מפת "תחנת נוגה" – משותפת לשרת ולדפדפן
 (function (root) {
   // סוגי המשימות שאפשר לחלק למפה מותאמת (כולם מיני-משחקים שכבר קיימים במשחק)
-  const KINDS = [['wires', 'חיבור כבלים', 'wires'], ['code', 'הזנת קוד', 'matrix'], ['dial', 'כיול מחוג', 'radar'], ['switches', 'הפעלת מתגים', 'wires'], ['simon', 'רצף אורות', 'sparks'], ['sliders', 'איזון מחוונים', 'waves'], ['tapfill', 'מילוי מיכל', 'bubbles'], ['sortnum', 'מיון מספרים', 'pulse'], ['pairs', 'התאמת זוגות', 'matrix'], ['catch', 'לכידת פסולת', 'stars'], ['timing', 'סנכרון תזמון', 'gears'], ['pattern', 'שחזור תבנית', 'stars'], ['maze', 'מבוך כבלים', 'radar'], ['bins', 'מיון ארגזים', 'conveyor'], ['quiz', 'בחינת ידע', 'matrix'], ['balance', 'איזון מערכת', 'sparks'], ['track', 'מעקב מטרה', 'radar'], ['charge', 'טעינת מצבר', 'sparks'], ['valve', 'כיוון שסתומים', 'gears'], ['lights', 'החלפת נורות', 'pulse'], ['swipe', 'העברת כרטיס', 'matrix']];
+  const KINDS = [['reflex', 'בדיקת תגובה', 'pulse'], ['mathq', 'חישוב מהיר', 'matrix'], ['stroop', 'זיהוי צבעים', 'sparks'], ['wires', 'חיבור כבלים', 'wires'], ['code', 'הזנת קוד', 'matrix'], ['dial', 'כיול מחוג', 'radar'], ['switches', 'הפעלת מתגים', 'wires'], ['simon', 'רצף אורות', 'sparks'], ['sliders', 'איזון מחוונים', 'waves'], ['tapfill', 'מילוי מיכל', 'bubbles'], ['sortnum', 'מיון מספרים', 'pulse'], ['pairs', 'התאמת זוגות', 'matrix'], ['catch', 'לכידת פסולת', 'stars'], ['timing', 'סנכרון תזמון', 'gears'], ['pattern', 'שחזור תבנית', 'stars'], ['maze', 'מבוך כבלים', 'radar'], ['bins', 'מיון ארגזים', 'conveyor'], ['quiz', 'בחינת ידע', 'matrix'], ['balance', 'איזון מערכת', 'sparks'], ['track', 'מעקב מטרה', 'radar'], ['charge', 'טעינת מצבר', 'sparks'], ['valve', 'כיוון שסתומים', 'gears'], ['lights', 'החלפת נורות', 'pulse'], ['swipe', 'העברת כרטיס', 'matrix']];
   function ventsFromDef(list) { // וינטים עם net: כל אלה שבאותה רשת מחוברים זה לזה. בלי net משתמשים ב-links שניתנו
     return list.map((v, i) => ({ x: v.x, y: v.y, links: v.net !== undefined && v.net !== null ? list.map((w, j) => (j !== i && w.net === v.net ? j : -1)).filter(j => j >= 0) : (v.links || []).slice() }));
   }
@@ -45,7 +45,27 @@
     r.id = k; r.cx = r.x + r.w / 2; r.cy = r.y + r.h / 2;
   }
 
-  const CW = 90;
+  // סוג ריהוט לכל חדר (גם לתצוגה התלת ממדית) ו"מוצקים": פריטים שאי אפשר לעבור דרכם
+  const TYPE_OF = { U: 'engine', D: 'engine', R: 'reactor', M: 'med', F: 'cafe', W: 'weapons', O: 'oxygen', SE: 'sec', EL: 'elec', A: 'admin', N: 'nav', T: 'storage', C: 'comms', SH: 'shield', HB: 'beds', LB: 'lab', MH: 'round', GH: 'greenhouse', DR: 'drill', SC: 'sec2', HT: 'boiler', OB: 'obs', GR: 'garage', GN: 'gen', ST: 'icecrates', RD: 'radar' };
+  const CYCLE = ['cafe', 'sec', 'elec', 'med', 'admin', 'storage', 'shield', 'comms', 'reactor', 'weapons', 'oxygen', 'nav', 'lab', 'greenhouse', 'engine'];
+  const proMap = !!(D && String(D.id || '').indexOf('mod_pro') === 0);
+  let SOL = [];
+  if (!D || proMap) {
+    Object.keys(ROOMS).forEach((k, idx) => {
+      const r = ROOMS[k]; r.type = proMap ? CYCLE[idx % CYCLE.length] : TYPE_OF[k];
+      const w = r.w, h = r.h, cx = w / 2, cy = h / 2;
+      const R = {
+        engine: [[66, 84, 138, 98]], reactor: [[cx - 60, cy - 50, 120, 120]], med: [[130, 120, 50, 100], [200, 120, 50, 100], [20, 44, 60, 34]],
+        cafe: [[88, 78, 64, 64], [348, 78, 64, 64], [88, 228, 64, 64], [348, 228, 64, 64]], weapons: [[60, 120, 60, 60], [120, 140, 70, 20]], oxygen: [[30, 60, 132, 96], [60, 160, 34, 26], [120, 160, 34, 26]],
+        sec: [[30, 44, 200, 38], [30, 190, 40, 30]], sec2: [[30, 44, 200, 34]], elec: [[26, 42, 216, 16], [140, 150, 70, 60]], admin: [[cx - 20 - 70, cy + 10 - 34, 140, 68]],
+        nav: [[w - 98, 60, 56, h - 120]], storage: [[47, 57, 46, 46], [97, 57, 46, 46], [205, 175, 50, 50], [270, 200, 40, 40], [377, 137, 46, 46]], comms: [[30, 44, 200, 32]],
+        shield: [[cx - 55, cy + 14 - 55, 110, 110]], beds: [[30, 60, 280, 46]], lab: [[30, 70, w - 60, 40]], round: [[cx - 70, cy + 10 - 70, 140, 140]], greenhouse: [[30, 60, w - 60, 34], [30, 120, w - 60, 34], [30, 180, w - 60, 34]],
+        boiler: [[cx - 60, cy - 70, 120, 110]], obs: [[30, 40, w - 60, 14]], garage: [[cx - 80, cy - 20, 160, 50]], gen: [[40, 60, 120, 90]], icecrates: [[36, 56, 48, 48], [96, 56, 48, 48]],
+      }[r.type] || [];
+      R.forEach(a => { if (a[0] + a[2] < w - 6 && a[1] + a[3] < h - 6) SOL.push({ x: r.x + a[0], y: r.y + a[1], w: a[2], h: a[3] }); });
+    });
+  }
+  const CW = 120;
   const CORR = D ? D.corr.map(x => x.slice()) : ice ? [
     ['HB', 'LB', 'h', 200], ['LB', 'MH', 'h', 200], ['MH', 'GH', 'h', 220],
     ['HB', 'DR', 'v', 300], ['DR', 'GR', 'v', 300], ['LB', 'SC', 'v', 790], ['MH', 'HT', 'v', 1320], ['GH', 'OB', 'v', 1935],
@@ -186,8 +206,8 @@
     }
     for (const c of CORRIDORS) {
       if (c.o === 'v') {
-        if (x >= c.x + r && x <= c.x + c.w - r && y >= c.y && y <= c.y + c.h) return true;
-      } else if (x >= c.x && x <= c.x + c.w && y >= c.y + r && y <= c.y + c.h - r) return true;
+        if (x >= c.x + r * 0.6 && x <= c.x + c.w - r * 0.6 && y >= c.y && y <= c.y + c.h) return true;
+      } else if (x >= c.x && x <= c.x + c.w && y >= c.y + r * 0.6 && y <= c.y + c.h - r * 0.6) return true;
     }
     return false;
   }
@@ -413,6 +433,8 @@
     put(ids[5 % ids.length], '🫒 מילוי שמן בחנוכייה', 'oil', 'hanuk');
     put(ids[6 % ids.length], '🪙 גלידת חנוכה – זוגות', 'gelt', 'hanuk');
     put(ids[7 % ids.length], '🕎 זכור את הנרות', 'menorahmem', 'hanuk');
+    // משימות חדשות לכולם (שלושה מיני-משחקים חדשים), בכל המפות המובנות
+    if (!D) [['⚡ בדיקת תגובה', 'reflex'], ['🧮 חישוב מהיר', 'mathq'], ['🎨 זיהוי צבעים', 'stroop'], ['⚡ בדיקת תגובה', 'reflex'], ['🧮 חישוב מהיר', 'mathq'], ['🎨 זיהוי צבעים', 'stroop']].forEach((q, i) => put(ids[(i * 5 + 3) % ids.length], q[0] + (i > 2 ? ' 2' : ''), q[1]));
     // משימות פרו (מופיעות רק באתר הפרו)
     [['🧬 ריצוף DNA', 'pairs'], ['🎵 רצף צלילים', 'simon'], ['🎯 כיול לייזר', 'timing'], ['🧲 איסוף שבבים', 'catch'], ['🔢 סידור מספרים', 'sortnum'], ['🧩 פענוח דפוס', 'pattern'], ['⚙️ כוונון מנועים', 'sliders'], ['🧠 חידון חלל', 'quiz']]
       .forEach((q, i) => put(ids[(i * 3 + 1) % ids.length], q[0], q[1], 'pro'));
@@ -420,7 +442,16 @@
   // הגדרה ניתנת לעריכה של המפה (לעורך המודים): בלי משימות החנוכה, וקשרי הוינטים כרשתות
   const _nets = []; VENTS.forEach((v, i) => { if (_nets[i] !== undefined) return; const st = [i]; _nets[i] = i; while (st.length) { const c = st.pop(); (VENTS[c].links || []).forEach(j => { if (_nets[j] === undefined) { _nets[j] = i; st.push(j); } }); } });
   const def = JSON.parse(JSON.stringify({ id: variant || (D && D.id) || 'custom', theme: ice ? 'ice' : 'space', rooms: ROOMS, corr: CORR, tasks: TASKS.filter(t => !t.ev), perRoom: 0, vents: VENTS.map((v, i) => ({ x: v.x, y: v.y, net: _nets[i] })), button: BUTTON, world: WORLD, cams: CAMS, camConsole: CAM_CONSOLE, sab: SAB_POINTS }));
-  return { def, ROOMS, CORRIDORS, TASKS, TASK_TIME, VENTS, SPOTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant || (D && D.id) || 'custom', theme: ice ? 'ice' : 'space' };
+  // לא חוסמים משימות, פתחי אוורור, כפתור חירום וקונסולות
+  const _keep = [...TASKS, ...VENTS, BUTTON, CAM_CONSOLE, ...SAB_POINTS.lights, ...SAB_POINTS.oxygen, ...SAB_POINTS.reactor, ...SAB_POINTS.freeze];
+  SOL = SOL.filter(q => !_keep.some(k => k && k.x > q.x - 8 && k.x < q.x + q.w + 8 && k.y > q.y - 8 && k.y < q.y + q.h + 8));
+  { // לא חוסמים את הדרך בין מרכז החדר לדלתות שלו (כך שאף אחד, גם בוט, לא נתקע בפנים)
+    const lines = [];
+    for (const c of CORRIDORS) for (const [rid, d] of [[c.a, c.da], [c.b, c.db]]) { const r = ROOMS[rid]; if (r && d) lines.push([r.cx, r.cy, d.x, d.y]); }
+    SOL = SOL.filter(q => !lines.some(L => { const n = Math.ceil(Math.hypot(L[2] - L[0], L[3] - L[1]) / 12); for (let i = 0; i <= n; i++) { const x = L[0] + (L[2] - L[0]) * i / n, y = L[1] + (L[3] - L[1]) * i / n; if (x > q.x - 22 && x < q.x + q.w + 22 && y > q.y - 22 && y < q.y + q.h + 22) return true; } return false; }));
+  }
+  const solid = (x, y, rad) => { for (let i = 0; i < SOL.length; i++) { const q = SOL[i]; if (x > q.x - rad && x < q.x + q.w + rad && y > q.y - rad && y < q.y + q.h + rad) return true; } return false; };
+  return { def, ROOMS, CORRIDORS, SOL, solid, TASKS, TASK_TIME, VENTS, SPOTS, BUTTON, WORLD, R, CAMS, CAM_CONSOLE, SAB_POINTS, doorRects, walkable, roomAt, path, id: variant || (D && D.id) || 'custom', theme: ice ? 'ice' : 'space' };
   }
   const MAP = build('big'), SMALL = build('small'), ICE = build('ice');
   MAP.byId = { big: MAP, small: SMALL, ice: ICE };

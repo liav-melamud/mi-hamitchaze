@@ -105,7 +105,7 @@ const MOD = { // [שם, קבוצה, אייקון, כפתור, קירור, מספ
   martyr: ['קורבן', 'jester', '🕊️', '', 0, 0, 'אתה לא צוות ולא מתחזה: אתה מנצח לבד אם חיסלו אותך (על ידי מתחזה)! הצטרף לחשד, תסתובב ליד מתחזים… אבל אל תיתן להדיח אותך.'],
   vulture: ['נשר', 'jester', '🦅', 'אכול גופה', 5, 0, 'אתה לא צוות ולא מתחזה: אכול (O) 3 גופות ותנצח לבד! הגופה נעלמת, ואי אפשר לדווח עליה.'],
   survivor: ['ניצול', 'jester', '🛟', '', 0, 0, 'אתה לא צוות ולא מתחזה: אם אתה בחיים בסוף המשחק – אתה מנצח גם, בלי קשר למי שניצח! תישאר חי.'],
-  shamash: ['השמש', 'crew', '🕎', 'נס פח השמן', 0, 1, 'תפקיד חנוכה: פעם אחת במשחק, לחץ O כדי להדליק אור קסום במקום שבו אתה עומד. ל-15 שניות אף אחד בתוך האור לא יכול להיחסל – גם לא אתה. תדליק אותו כשהמתחזה קרוב!'],
+  shamash: ['השמש', 'crew', '🕎', 'נס פך השמן', 0, 1, 'תפקיד חנוכה: פעם אחת במשחק, לחץ O כדי להדליק אור קסום במקום שבו אתה עומד. ל-15 שניות אף אחד בתוך האור לא יכול להיחסל – גם לא אתה. תדליק אותו כשהמתחזה קרוב!'],
   instigator: ['מסית', 'jester', '🗣️', '', 0, 0, 'אתה לא צוות ולא מתחזה: אם תצליח לגרום להדחה של 2 אנשי צוות חפים מפשע – ואתה עדיין בחיים – אתה מנצח לבד!'],
 };
 const MOD_CREW = Object.keys(MOD).filter(k => MOD[k][1] === 'crew' && k !== 'shamash'), MOD_IMP = Object.keys(MOD).filter(k => MOD[k][1] === 'imp'), MOD_NEU = Object.keys(MOD).filter(k => MOD[k][1] === 'jester');
@@ -132,7 +132,7 @@ function addCustomRole(d) {
   return key;
 }
 let rewound = {}; // מי חזר לחיים בהחזרת זמן ומי הרג אותו (כולם יודעים שהוא חזר, ולכן אפשר להאמין לו)
-let miracles = [], candleLit = {}; // נס פח השמן של השמש, ונרות החנוכה במצב שמונה נרות
+let miracles = [], candleLit = {}; // נס פך השמן של השמש, ונרות החנוכה במצב שמונה נרות
 let traps = [], bombs = [], wrongEjects = 0, lastRoles = {};
   // רמת אורך משימות (1 קל, 2 רגיל, 3 ארוך): מאריכה משימות עם פס התקדמות, ומשימות של בוטים
   const taskTime = i => (MAP.TASK_TIME[MAP.TASKS[i].kind] || 3.5) * (0.5 + settings.taskLevel * 0.75);
@@ -163,7 +163,7 @@ let gusts = [], windT = 14;
 let sab = null, sabCd = 20, doorsUntil = {}, doorCool = {};
 // הרדוף: דלתות בודדות נעולות וחדרים חשוכים
 let hauntDoors = [], darkRooms = {};
-let events = [], gameStartT = 0, raceEndAt = 0, raceChaosAt = 0;
+let events = [], gameStartT = 0, endedAt = 0, raceEndAt = 0, raceChaosAt = 0;
 const ev = (type, text) => { events.push({ t: Math.max(0, Math.round(now() - gameStartT)), type, text }); if (events.length > 300) events.shift(); };
 const nm = p => String(p.name).replace(/^🤖\s*/, '');
 const SAB_TIME = 45, SAB_CD = 30, DOOR_TIME = 12, DOOR_COOL = 20;
@@ -186,7 +186,6 @@ function startSab(kind, force, strong) {
   const secs = strong ? SAB_TIME_STRONG : SAB_TIME;
   sab = { type: kind, t: kind === 'lights' || kind === 'freeze' ? 0 : secs, fixed: MAP.SAB_POINTS[kind].map(() => false) };
   ev('sab', { lights: '💡 החשמל הופל', oxygen: '💨 הופסק החמצן', reactor: '☢️ הכור התחמם', freeze: '❄️ ההסקה הושבתה' }[kind]);
-  toastAll(kind === 'freeze' ? '❄️ ההסקה הושבתה! כולם קופאים ונעים לאט – תקנו בשני המחממים' : kind === 'lights' ? '💡 החשמל נפל! תקנו בלוח החשמל' : kind === 'oxygen' ? `💨 הפסקת חמצן! יש ${secs} שניות לתקן בשתי נקודות` : `☢️ הכור מתחמם! יש ${secs} שניות לקרר בשתי נקודות`);
 }
 function fixSab(i) {
   if (!sab || sab.fixed[i]) return;
@@ -371,6 +370,7 @@ function startGame(by) {
   // השתול: אחד מהצוות שבעצם עובד בשביל המתחזים (רק כשיש מספיק שחקנים)
   if (settings.newRoles && roleOn('mole') && !race && !hide && nImp > 0 && all.length >= 6) { const c = shuffle(crew.filter(p => p.role !== 'jester'))[0]; if (c && crew.length >= 4) c.role = 'mole'; }
 
+  if (opts.demo && players[by]) players[by].role = 'crew'; // בהדרכה השחקן תמיד איש צוות רגיל
   // אף אחד לא מקבל את אותו תפקיד מיוחד פעמיים ברצף: מחליפים עם שחקן מאותה קבוצה, או מחליפים לתפקיד אחר שלא חולק
   if (!race && !hide) {
     const key = q => (q.isBot ? 'b:' + q.name : q.id), prev = q => lastRoles[key(q)];
@@ -386,7 +386,7 @@ function startGame(by) {
       }
     }
   }
-  events = []; gameStartT = now(); ev('start', '🚀 המשחק התחיל');
+  events = []; gameStartT = now(); endedAt = 0; ev('start', '🚀 המשחק התחיל');
   taskTotal = 0; taskDone = 0; candleLit = {}; miracles = []; rewound = {};
   // בקבוצה קטנה כל איש צוות מקבל יותר משימות, כדי שהצוות לא יסיים מהר מדי (לפחות 20 משימות בסך הכל)
   const tasksEach = Math.min(8, Math.max(settings.tasks, Math.ceil(20 / Math.max(1, crew.length))));
@@ -569,6 +569,7 @@ function callMeeting(by, body) {
     if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addS(o.bot.sawVent.id, jesterHint ? 1 : 1.8);
   });
   if (lastMistake) lastMistake.by.forEach(id => addS(id, 0.8));
+  if (settings.botLevel >= 2) list().forEach(o => { if (o.bot && o.alive && !o.spectator && team(o) === 'crew' && o.bot.sawWork) for (const id in o.bot.sawWork) if (players[id] && players[id].alive && o.bot.sawWork[id].n >= 2) addS(id, -Math.min(2, o.bot.sawWork[id].n * 0.5) * 0.6); });
   if (settings.botLevel >= 2 && Object.keys(rmem).length) { // מה הבוטים זוכרים מהסיבוב הקודם
     const pre = list().filter(o => o.bot && o.alive && !o.spectator && team(o) === 'crew');
     pre.forEach(o => list().forEach(x => { if (x.alive && !x.spectator && x.id !== o.id) { const g = grudgeOf(o, x); if (g > 0) addS(x.id, g * (settings.botLevel === 3 ? 1 : 0.7)); } }));
@@ -1122,7 +1123,7 @@ function modUse(p) {
   const body = nearest(p, bodies.filter(b => !b.fake), 110);
   let ok = false;
   switch (tplOf(p.role)) {
-    case 'shamash': miracles.push({ x: p.x, y: p.y, until: t + modDur(p.role, 15), by: p.id }); toast(p, '🕎 נס! אור קסום – אף אחד בתוכו לא ייפגע'); ev('miracle', `🕎 ${nm(p)} הדליק את נס פח השמן ב${room ? room.name : 'מסדרון'}`); ok = true; break;
+    case 'shamash': miracles.push({ x: p.x, y: p.y, until: t + modDur(p.role, 15), by: p.id }); toast(p, '🕎 נס! אור קסום – אף אחד בתוכו לא ייפגע'); ev('miracle', `🕎 ${nm(p)} הדליק את נס פך השמן ב${room ? room.name : 'מסדרון'}`); ok = true; break;
     case 'sprinter': p.sprintUntil = t + modDur(p.role, 5); toast(p, '🏃 רץ!'); ok = true; break;
     case 'medic': {
       const q = body && players[body.id];
@@ -1288,6 +1289,7 @@ function botTick(p, dt) {
       const T0 = now(); b.hist = (b.hist || []).filter(e => T0 - e.t < 30);
       list().forEach(o => { if (o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < sightR()) { const rr = MAP.roomAt(o.x, o.y); if (rr) {
         b.seen[o.id] = rr.name;
+        if (o.work) { b.sawWork = b.sawWork || {}; b.sawWork[o.id] = { n: (b.sawWork[o.id] ? b.sawWork[o.id].n : 0) + 1, room: rr.name }; } // ראיתי אותו עושה משימה = כנראה נקי
         // היסטוריה קצרה: איפה ומתי ראיתי כל אחד (me = היינו באותו חדר)
         const lastE = b.hist.filter(e => e.id === o.id).pop();
         if (!lastE || lastE.room !== rr.name || T0 - lastE.t > 4) b.hist.push({ id: o.id, room: rr.name, t: T0, me: !!r && r.id === rr.id });
@@ -1422,8 +1424,12 @@ function botTick(p, dt) {
     }
     if (p.role === 'detective' && p.investCd <= 0 && Math.random() < 0.012 && list().some(o => o.id !== p.id && o.alive && o.inVent === null && dist(o, p) < 150)) act(p, { type: 'investigate' });
     // צוות: דווח על גופה
-    if (team(p) === 'crew' && bodies.some(bd => dist(bd, p) < REPORT_RANGE - 10) && Math.random() < (b.sawKill ? 0.15 : 0.03)) {
-      act(p, { type: 'report' }); return;
+    if (team(p) === 'crew' && !p.drag) { // בוט צוות שרואה גופה: ניגש אליה ומדווח (לא הולך דרכה)
+      const bd = bodies.filter(x => !x.fake && dist(x, p) < 330 && (dist(x, p) < 140 || (MAP.roomAt(x.x, x.y) || {}).id === (MAP.roomAt(p.x, p.y) || {}).id)).sort((x, y) => dist(x, p) - dist(y, p))[0];
+      if (bd && settings.botLevel >= 1) {
+        if (dist(bd, p) < REPORT_RANGE - 15) { if (Math.random() < 0.35) { act(p, { type: 'report' }); return; } p.input = { dx: 0, dy: 0, bot: true }; return; }
+        const dx2 = bd.x - p.x, dy2 = bd.y - p.y, l2 = Math.hypot(dx2, dy2) || 1; p.input = { dx: dx2 / l2, dy: dy2 / l2, bot: true }; return;
+      }
     }
   }
 
@@ -1452,7 +1458,7 @@ function botTick(p, dt) {
       }
     }
   }
-  if (team(p) === 'imp' && p.alive && !p.inVent && settings.mode !== 3) {
+  if (team(p) === 'imp' && p.alive && !p.inVent && settings.mode !== 3 && !opts.demo) { // בהדרכה הבוטים לא מחבלים
     const sabF = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.6 : 1;
     const sabI = p.role === 'saboteur' ? 2.5 : 1, sabReady = p.role === 'saboteur' ? sabCd <= SAB_CD / 2 : sabCd <= 0;
     if (!sab && sabReady && Math.random() < 0.0005 * sabF * sabI) startSab(pick(['lights', 'lights', 'oxygen'].concat(MAP.SAB_POINTS.reactor.length ? ['reactor'] : [], MAP.SAB_POINTS.freeze && MAP.SAB_POINTS.freeze.length ? ['freeze', 'freeze'] : [])), p.role === 'saboteur', p.role === 'saboteur');
@@ -1517,7 +1523,7 @@ function botTick(p, dt) {
 }
 
 const bare = n => String(n).replace(/^🤖\s*/, '');
-const GENERIC = ['לא אני!', 'הייתי במשימות כל הזמן', 'מי ראה משהו?', 'אין לי מספיק מידע, אני מדלג', 'משהו פה חשוד…',
+const GENERIC = ['מי היה הכי קרוב לגופה כשהיא התגלתה?', 'בואו נספור: כמה נשארנו ומי חסר?', 'מי עשה משימות ארוכות? אלה בדרך כלל נקיים', 'מישהו ראה מי יצא מהפתח?', 'לא להסתמך על ניחושים, רק על מה שראינו', 'אם נתבלבל עכשיו – המתחזה ינצח', 'מי היה אחרון עם הקורבן?', 'אפשר לבדוק מי נעלם מהמשימות', 'לא מצביעים על מי שפשוט שקט', 'שימו לב מי משנה את הגרסה שלו', 'אני לא מאשים אף אחד בלי סיבה', 'מי רץ לכפתור חירום מהר מדי?', 'נראה לי שהמתחזה פה בינינו, בואו נחשוב', 'מה עם מי שהיה לבד ליד החשמל?', 'הרוב קובע, אבל רק אם יש סיבה', 'לא עשיתי כלום חשוד, אני רק ממלא משימות', 'לא אני!', 'הייתי במשימות כל הזמן', 'מי ראה משהו?', 'אין לי מספיק מידע, אני מדלג', 'משהו פה חשוד…',
   'בואו לא נמהר להדיח', 'אני מהצוות, באמת', 'מישהו היה ליד הגופה?', 'כדאי שנסתובב בזוגות', 'בואו נסיים משימות מהר',
   'שמעתי פתח אוורור נפתח…', 'מי עוד לא עשה משימות?', 'מי שעשה סריקה ביולוגית – נקי', 'שקט מדי פה', 'אם אין ראיות – מדלגים',
   'מי היה בחשמל?', 'תזכרו מי הסתובב לבד', 'יש לי תחושה רעה לגבי מישהו', 'שכל אחד יגיד איפה הוא היה', 'הייתי לבד, אבל עשיתי משימות',
@@ -1718,11 +1724,11 @@ function accusation(sp, text) {
 }
 
 const PERSONA_LINES = {
-  suspicious: ['משהו כאן מריח לי לא טוב', 'אני לא סומך על אף אחד כרגע', 'מי שלא עשה משימות – חשוד', 'שימו לב מי שותק יותר מדי'],
-  quiet: ['…', 'לא יודע', 'נראה לי'],
-  chatty: ['רגע רגע, תנו לי לספר מה ראיתי', 'יש לי כמה דברים להגיד', 'בואו נעבור על כולם אחד אחד', 'אני זוכר הכל מהסבב הזה'],
-  aggressive: ['תצביעו כבר!', 'בואו נסיים עם זה, מי שנתפס – החוצה', 'אין זמן, מצביעים!', 'אני לא מפחד להצביע'],
-  helpful: ['בואו נסדר: מי היה איפה?', 'אני אספר איפה הייתי ואתם תתקנו אותי', 'בואו נבדוק את האליבי של כל אחד', 'מי שראה משהו – עכשיו הזמן'],
+  suspicious: ['משהו כאן מריח לי לא טוב', 'למה אתם כל כך רגועים?', 'מי שמגן יותר מדי על מישהו – חשוד', 'אני זוכר מי ברח מהחדר', 'אני לא סומך על אף אחד כרגע', 'מי שלא עשה משימות – חשוד', 'שימו לב מי שותק יותר מדי'],
+  quiet: ['…', 'לא יודע', 'נראה לי', 'אני עוקב', 'חכו רגע', 'מממ'],
+  chatty: ['רגע רגע, תנו לי לספר מה ראיתי', 'אתם לא תאמינו מה קרה לי קודם', 'בקיצור, אני עברתי בשלושה חדרים ולא ראיתי אף אחד', 'וואו, איזה סבב, אה?', 'יש לי כמה דברים להגיד', 'בואו נעבור על כולם אחד אחד', 'אני זוכר הכל מהסבב הזה'],
+  aggressive: ['תצביעו כבר!', 'מי שמסתיר – מדיחים', 'אני כבר יודע מי, רק חכו', 'מספיק סיבובים בלי תוצאות', 'בואו נסיים עם זה, מי שנתפס – החוצה', 'אין זמן, מצביעים!', 'אני לא מפחד להצביע'],
+  helpful: ['בואו נסדר: מי היה איפה?', 'כל אחד בתורו: איפה היית ומה עשית?', 'נתחיל מהגופה: מי היה הכי קרוב?', 'אני רושם לעצמי מי אמר מה', 'אני אספר איפה הייתי ואתם תתקנו אותי', 'בואו נבדוק את האליבי של כל אחד', 'מי שראה משהו – עכשיו הזמן'],
 };
 function botLine(p) {
   // ראיה חשובה קודמת לאופי: גם בוט שקט מספר מה ראה
@@ -1773,6 +1779,17 @@ function botLine0(p) {
   if (evil(p) && Math.random() < 0.35) {
     const v = list().filter(o => o.alive && !o.spectator && team(o) === 'crew');
     if (v.length) { const o = pick(v); return fill(fresh(['ראיתי את {n} ליד פתח ב{r}', '{n} מתנהג מוזר', '{n} עקב אחריי כל הסבב']), { n: bare(o.name), r: pick(Object.values(MAP.ROOMS)).name }); }
+  }
+  // ראיתי מישהו עושה משימה: הוא נקי (ראיה חזקה)
+  if (!evil(p) && b.sawWork && !b.saidWork) {
+    const wid = Object.keys(b.sawWork).find(id => alive(id) && id !== p.id && b.sawWork[id].n >= 2);
+    if (wid && Math.random() < 0.6) { b.saidWork = true; return fill(fresh(['ראיתי את {n} עושה משימה ב{r}, הוא נקי', '{n} היה באמצע משימה ב{r} מול העיניים שלי, לא הוא', 'אל תחשדו ב{n}, ראיתי אותו עובד ב{r}']), { n: name(wid), r: b.sawWork[wid].room }); }
+  }
+  // מספר על משימה שסיים (או משקר על אחת, אם הוא מתחזה)
+  if (!b.saidTask && Math.random() < 0.3) {
+    const done = (p.tasks || []).filter(q => q.done && MAP.TASKS[q.i]);
+    if (!evil(p) && done.length) { b.saidTask = true; const T = MAP.TASKS[pick(done).i]; return fill(fresh(['סיימתי את {t} ב{r}', 'עשיתי {t} לפני רגע, מי עוד?', 'הספקתי את {t}, אני בדרך לעוד אחת']), { t: T.name, r: (MAP.ROOMS[T.room] || {}).name || myRoom }); }
+    if (evil(p)) { b.saidTask = true; const T = MAP.TASKS[Math.floor(Math.random() * MAP.TASKS.length)]; if (T && !T.ev) return fill(fresh(['הייתי עסוק ב{t}', 'עשיתי {t}, תשאלו אחרים', 'הייתי ב{r} עם {t}']), { t: T.name, r: (MAP.ROOMS[T.room] || {}).name || myRoom }); }
   }
   const seen = Object.keys(b.seen || {}).filter(id => alive(id) && id !== p.id);
   if (seen.length && Math.random() < 0.55) {
@@ -1825,7 +1842,9 @@ function botMeeting(p) {
       const nv = list().filter(o => o.alive && !o.spectator).length;
       for (const id in cnt) if (cnt[id] >= Math.max(2, Math.ceil(nv / 3)) && (score[id] || 0) > -1) score[id] = (score[id] || 0) + (evil(p) ? 3 : 1.5);
       const top = Object.entries(score).filter(([id]) => ok(id)).sort((x, y) => y[1] - x[1])[0];
-      if (top && top[1] >= 3) vote = top[0];
+      const nAlive = list().filter(o => o.alive && !o.spectator).length, critical = settings.botLevel >= 2 && nAlive <= 4 && team(p) === 'crew'; // מעט שורדים: דילוג = הפסד, חייבים להחליט
+      if (critical && top && top[1] > 0) vote = top[0];
+      else if (top && top[1] >= 3) vote = top[0];
       else if (top && top[1] >= 2 && Math.random() < 0.7) vote = top[0];
       else if (top && evil(p) && Math.random() < 0.6) vote = top[0];
       else if (meeting.skipTalk >= 2 || Math.random() < (b.persona === 'aggressive' ? 0.15 : b.persona === 'quiet' ? 0.7 : 0.5)) vote = 'skip';
@@ -1942,8 +1961,9 @@ function tick() {
           p.y = Math.max(0, Math.min(MAP.WORLD.h, p.y + dy * step));
         } else {
           const rr = p.assist ? 10 : 18;
-          if (MAP.walkable(p.x + dx * step, p.y, rr) && !doorBlocked(p.x + dx * step, p.y)) p.x += dx * step;
-          if (MAP.walkable(p.x, p.y + dy * step, rr) && !doorBlocked(p.x, p.y + dy * step)) p.y += dy * step;
+          const sr = p.assist ? 6 : 12, inSol = p.isBot || !MAP.solid || MAP.solid(p.x, p.y, sr); // פריטים מוצקים: שחקנים לא עוברים דרכם (בוטים לא נתקעים)
+          if (MAP.walkable(p.x + dx * step, p.y, rr) && !doorBlocked(p.x + dx * step, p.y) && (inSol || !MAP.solid(p.x + dx * step, p.y, sr))) p.x += dx * step;
+          if (MAP.walkable(p.x, p.y + dy * step, rr) && !doorBlocked(p.x, p.y + dy * step) && (inSol || !MAP.solid(p.x, p.y + dy * step, sr))) p.y += dy * step;
         }
         if (Math.abs(dx) > 0.1) p.dir = dx > 0 ? 1 : -1;
         p.work = null; p.cam = false; p.sabWork = null;
@@ -2008,7 +2028,7 @@ function tick() {
     if (eject.t <= 0) endEject();
   }
 
-  if (phase === 'end' && !endAwarded) { endAwarded = true; awardTour(); rememberGame(); }
+  if (phase === 'end' && !endAwarded) { endAwarded = true; endedAt = now(); awardTour(); rememberGame(); }
   // הליכה בלובי
   if (phase === 'lobby') for (const p of humans()) {
     let { dx, dy } = p.input || { dx: 0, dy: 0 };
@@ -2155,7 +2175,7 @@ function viewFor(v) {
     const a3 = best('goodVotes', 1); if (a3) awards.push({ icon: '🎯', title: 'הצביע נכון הכי הרבה', ...a3 });
     const a4 = best('badVotes', 1); if (a4) awards.push({ icon: '🤦', title: 'הצביע נגד חפים מפשע', ...a4 });
     const a5 = best('reports', 1); if (a5) awards.push({ icon: '📢', title: 'הכי הרבה דיווחים', ...a5 });
-    out.summary = { duration: Math.round(t - gameStartT), awards, events: events.slice(-60) };
+    out.summary = { duration: Math.round((endedAt || t) - gameStartT), awards, events: events.slice(-60) };
     // הסטטיסטיקה האישית של המשחק הזה (הדפדפן שומר את הסיכום המצטבר)
     if (v.stats && !v.spectator && winner) {
       const w = winner, tm = team(v);

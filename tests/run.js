@@ -48,9 +48,14 @@ const me = (g, a) => g.view(a).players.find(p => p.id === a);
 function walkTo(g, a, target, assist = false) {
   const here = MAP.roomAt(me(g, a).x, me(g, a).y);
   const pts = [...MAP.path(here ? here.id : 'F', MAP.roomAt(target.x, target.y).id), target];
-  for (const q of pts) for (let k = 0; k < 600; k++) {
+  let lx = -1, ly = -1, still = 0, side = 1;
+  for (const q of pts) for (let k = 0; k < 900; k++) {
     const p = me(g, a), dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy);
     if (l < (q === target ? 18 : 10)) break;
+    still = Math.abs(p.x - lx) + Math.abs(p.y - ly) < 0.4 ? still + 1 : 0; lx = p.x; ly = p.y;
+    if (still > 4) { // נתקע בפריט מוצק: עוקף בצעד צדדי
+      const sx = -dy / l * side, sy = dx / l * side; for (let z = 0; z < 25; z++) { g.act(a, { type: 'input', dx: sx, dy: sy, assist }); tick(g, 1); } side = -side; still = 0; continue;
+    }
     g.act(a, { type: 'input', dx: dx / l, dy: dy / l, assist }); tick(g, 1);
   }
   g.act(a, { type: 'input', dx: 0, dy: 0 }); tick(g, 3);
@@ -390,7 +395,8 @@ test('סיוע למגע: אצבע לא מדויקת מגיעה לכל חדר', (
   for (const room of Object.keys(MAP.ROOMS)) {
     const { g, a } = newGame({ bots: 0, humans: 3 }); // בלי בוטים: אף אחד לא מחסל או נועל דלתות באמצע ההליכה
     const here = MAP.roomAt(me(g, a).x, me(g, a).y);
-    const pts = [...MAP.path(here.id, room), { x: MAP.ROOMS[room].cx, y: MAP.ROOMS[room].cy }];
+    const R0 = MAP.ROOMS[room], fin = [[0, 0], [70, 0], [-70, 0], [0, 70], [0, -70], [110, 40], [-110, 40]].map(d => ({ x: R0.cx + d[0], y: R0.cy + d[1] })).find(q => MAP.walkable(q.x, q.y) && !(MAP.solid && MAP.solid(q.x, q.y, 14)));
+    const pts = [...MAP.path(here.id, room), fin];
     for (const q of pts) { let reached = false; for (let k = 0; k < 500; k++) { const p = me(g, a), dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy); if (l < 14) { reached = true; break; } const e = 0.35 * Math.sin(k / 7); g.act(a, { type: 'input', dx: dx / l - dy / l * e, dy: dy / l + dx / l * e, assist: true }); tick(g, 1); } ok(reached, 'נתקע בדרך אל ' + room); }
   }
 });
@@ -1061,7 +1067,7 @@ test('חנוכה: השמש מגן ל-15 שניות, ובלי אירוע אין �
   }
   ok(found, 'השמש לא הופיע באירוע');
   const { g, a } = found; const v = g.view(a);
-  ok(v.me.mod && v.me.mod.label === 'נס פח השמן', 'אין כפתור נס');
+  ok(v.me.mod && v.me.mod.label === 'נס פך השמן', 'אין כפתור נס');
   g.act(a, { type: 'mod' });
   ok(g.view(a).miracles.length === 1, 'הנס לא נדלק');
   sec(g, 16); ok(g.view(a).miracles.length === 0, 'הנס לא נגמר אחרי 15 שניות');
