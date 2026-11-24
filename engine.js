@@ -251,6 +251,18 @@ function freeColor() {
   return cnt.indexOf(Math.min(...cnt));
 }
 
+// ---------- זיכרון בין סיבובים: הבוטים זוכרים מי היה מתחזה, מי חיסל הרבה, ומי חיסל אותם ----------
+const rmem = {}; let prevBotNames = null;
+const mkey = p => p.isBot ? p.name : p.id;
+const rm = k => rmem[k] || (rmem[k] = { imp: 0, kills: 0, diedBy: {} });
+function noteKill(killer, tgt) { if (!killer || !tgt) return; rm(mkey(killer)).kills++; const d = rm(mkey(tgt)).diedBy; d[mkey(killer)] = (d[mkey(killer)] || 0) + 1; }
+function rememberGame() { list().forEach(q => { if (!q.spectator && q.role && team(q) === 'imp') rm(mkey(q)).imp++; }); }
+function grudgeOf(o, x) { // כמה הבוט o לא סומך על x, לפי הסיבובים הקודמים
+  const a = rmem[mkey(x)]; if (!a) return 0;
+  const mine = rmem[mkey(o)];
+  return Math.min(2.5, a.imp * 1) + Math.min(2, a.kills * 0.5) + (mine && mine.diedBy[mkey(x)] ? 2.5 : 0);
+}
+
 function newPlayer(name, color, isBot) {
   const id = rid();
   const p = {
@@ -330,8 +342,9 @@ function startGame(by) {
   // טורניר: סיבוב חדש או טורניר חדש. הבוטים שומרים על אותם שמות לאורך כל הטורניר
   if (settings.rounds > 1) { if (!tour || tour.done || tour.total !== settings.rounds) tour = { round: 1, total: settings.rounds, scores: {}, bots: null, done: false }; else tour.round++; }
   else tour = null;
-  const names = tour && tour.bots && tour.bots.length >= settings.bots ? tour.bots.slice() : shuffle(BOT_NAMES.slice());
+  const names = tour && tour.bots && tour.bots.length >= settings.bots ? tour.bots.slice() : prevBotNames && prevBotNames.length >= settings.bots ? prevBotNames.slice() : shuffle(BOT_NAMES.slice());
   if (tour) tour.bots = names.slice();
+  prevBotNames = names.slice(); // אותם בוטים באותו חדר, כדי שיזכרו
   for (let i = 0; i < settings.bots && i < MAX_BOTS; i++) newPlayer('🤖 ' + names[i], freeColor(), true);
   endAwarded = false;
   const all = shuffle(list());
@@ -556,6 +569,19 @@ function callMeeting(by, body) {
     if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addS(o.bot.sawVent.id, jesterHint ? 1 : 1.8);
   });
   if (lastMistake) lastMistake.by.forEach(id => addS(id, 0.8));
+  if (settings.botLevel >= 2 && Object.keys(rmem).length) { // מה הבוטים זוכרים מהסיבוב הקודם
+    const pre = list().filter(o => o.bot && o.alive && !o.spectator && team(o) === 'crew');
+    pre.forEach(o => list().forEach(x => { if (x.alive && !x.spectator && x.id !== o.id) { const g = grudgeOf(o, x); if (g > 0) addS(x.id, g * (settings.botLevel === 3 ? 1 : 0.7)); } }));
+    let best = null; // בוט אחד אומר בקול את מה שהוא זוכר
+    pre.forEach(o => list().forEach(x => { if (x.alive && !x.spectator && x.id !== o.id) { const g = grudgeOf(o, x); if (g >= 1 && (!best || g > best.g)) best = { o, x, g }; } }));
+    if (best && Math.random() < 0.85) {
+      const xn = bare(best.x.name), a = rmem[mkey(best.x)], mine = rmem[mkey(best.o)];
+      const line = mine && mine.diedBy[mkey(best.x)] ? fresh([`${xn} חיסל אותי בסיבוב הקודם, אני לא שוכח`, `בסיבוב הקודם ${xn} הרג אותי. לא סומך עליו`, `${xn}, זוכר מה עשית לי בפעם שעברה? 😒`])
+        : a && a.imp ? fresh([`${xn} היה המתחזה בסיבוב הקודם, אני לא סומך עליו`, `שימו לב ל${xn}, בפעם שעברה הוא היה המתחזה`, `${xn} כבר היה מתחזה, תיזהרו ממנו`])
+        : fresh([`${xn} חיסל כמה אנשים בסיבוב הקודם, הוא יודע להרוג טוב, פחות תסמכו עליו`, `${xn} מחסל טוב מדי, אני חושד בו`]);
+      meeting.queue.push({ id: best.o.id, at: meeting.t - (6 + Math.random() * 6), silent: false, text: line });
+    }
+  }
   meetingNo++;
   // הבוטים זוכרים מי שיקר בישיבות קודמות
   for (const id in liars) if (players[id] && players[id].alive) addS(id, settings.botLevel === 1 ? 0.4 : settings.botLevel === 3 ? 1.6 : 1);
@@ -842,7 +868,7 @@ function act(p, a) {
       tgt.alive = false; tgt.work = null; tgt.cam = false;
       bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + settings.rotTime : 0, t, killer: p.id });
       p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor() * (tplOf(p.role) === 'vampire' ? 0.6 : tplOf(p.role) === 'sniper' ? 1.4 : 1);
-      p.stats.kills++; ev('kill', `🔪 ${nm(p)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
+      p.stats.kills++; noteKill(p, tgt); ev('kill', `🔪 ${nm(p)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
       // לבלש: מי שהיה ליד הזירה נרשם כחשוד קל
       list().forEach(q => { if (q.alive && !q.spectator && dist(q, tgt) < 700) q.nearKill = (q.nearKill || 0) + 1; });
       // בוטים שראו את החיסול זוכרים מי עשה את זה
@@ -1077,6 +1103,7 @@ function slay(tgt, killer) {
   tgt.alive = false; tgt.work = null; tgt.cam = false; tgt.poisonAt = 0; tgt.inVent = null;
   bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: 0, t, killer: killer.id });
   if (killer.stats) killer.stats.kills++;
+  noteKill(killer, tgt);
   ev('kill', `🔪 ${nm(killer)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
   killLog.push({ id: tgt.id, t, killer: killer.id });
   list().forEach(q => { if (q.alive && !q.spectator && dist(q, tgt) < 700) q.nearKill = (q.nearKill || 0) + 1; });
@@ -1981,7 +2008,7 @@ function tick() {
     if (eject.t <= 0) endEject();
   }
 
-  if (phase === 'end' && !endAwarded) { endAwarded = true; awardTour(); }
+  if (phase === 'end' && !endAwarded) { endAwarded = true; awardTour(); rememberGame(); }
   // הליכה בלובי
   if (phase === 'lobby') for (const p of humans()) {
     let { dx, dy } = p.input || { dx: 0, dy: 0 };

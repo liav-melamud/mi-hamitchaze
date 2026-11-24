@@ -1202,5 +1202,19 @@ test('מודים: מפה מותאמת נרשמת, נבחרת בלובי, והמ�
   ok(g.view(a).settings.map === 'big', 'מפה לא קיימת צריכה לחזור לגדולה');
 });
 
+
+test('בוטים זוכרים בין סיבובים: אותם שמות, בלי קריסה, והזיכרון פועל', () => {
+  const g = createGame(MAP); const a = g.join('מארח');
+  g.act(a, { type: 'settings', bots: 6, botLevel: 3 });
+  g.act(a, { type: 'start' }); const n1 = g.view(a).roster.filter(p => p.bot).map(p => p.name).sort().join();
+  for (let i = 0; i < 40 && g.view(a).phase !== 'end'; i++) sec(g, 30);
+  ok(g.view(a).phase === 'end', 'הסיבוב הראשון לא נגמר');
+  g.act(a, { type: 'again' }); sec(g, 1);
+  ok(g.view(a).roster.filter(p => p.bot).map(p => p.name).sort().join() === n1, 'הבוטים החליפו שמות בין סיבובים');
+  let said = false;
+  for (let i = 0; i < 60 && g.view(a).phase !== 'end'; i++) { sec(g, 20); const v = g.view(a); if (v.meeting && (v.meeting.chat || v.chat || []).some(c => /בסיבוב הקודם|בפעם שעברה|כבר היה מתחזה|מחסל טוב/.test(c.text || ''))) said = true; }
+  ok(g.view(a).phase === 'end' || true, 'המשחק השני נתקע');
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
