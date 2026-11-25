@@ -4009,9 +4009,9 @@ const keys = new Set();
 let lastIn = '';
 function sendInput() {
   let dx = 0, dy = 0;
-  const turn3d = !!(PRO && window.MM_V3 && window.MM_3D && window.MM_3D.ok && window.MM_TURN !== false && S && S.phase === 'play'); // בתלת מימד ימינה/שמאלה מסובבים את המבט (ב-threed.js) ולא הולכים הצידה
-  if (!turn3d && (keys.has(KEYS.left) || keys.has('ArrowLeft'))) dx -= 1;
-  if (!turn3d && (keys.has(KEYS.right) || keys.has('ArrowRight'))) dx += 1;
+  const turn3d = !!(PRO && window.MM_V3 && window.MM_3D && window.MM_3D.ok && window.MM_TURN !== false && S && S.phase === 'play'); // בתלת מימד חצים ימינה/שמאלה מסובבים את המבט (ב-threed.js); A ו-D תמיד הולכים הצידה
+  if (keys.has(KEYS.left) || (!turn3d && keys.has('ArrowLeft'))) dx -= 1;
+  if (keys.has(KEYS.right) || (!turn3d && keys.has('ArrowRight'))) dx += 1;
   if (keys.has(KEYS.up) || keys.has('ArrowUp')) dy -= 1;
   if (keys.has(KEYS.down) || keys.has('ArrowDown')) dy += 1;
   if (joy.active) { dx = joy.dx; dy = joy.dy; }
