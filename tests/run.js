@@ -228,7 +228,8 @@ test('בוט זוכר מי היה איתו בזמן החיסול (נקי) ומי
   ok(b1.alibi.includes(w2), 'בוט לא זכר שהחבר שלו היה איתו בזמן החיסול');
   ok(!b1.nearBody.includes(w2), 'חבר עם אליבי נחשב "ליד הגופה"');
   if (b3) ok(b3.nearBody.includes(a), 'בוט שהיה בחדר לא זכר שהמתחזה היה ליד הגופה');
-  ok((sn.meeting.suspect[w2] || 0) < 0, 'אליבי לא מוריד חשד');
+  ok((b1.priv[w2] || 0) < 0, 'אליבי לא מוריד חשד');
+  ok(!sn.meeting.suspect[w2], 'מה שבוט ראה לבדו לא אמור להיות ידוע לכולם לפני שאמר');
 });
 test('מתחזה בוט (רמה חכמה) הולך אחרי שחקן שמסתובב לבד', () => {
   let tried = 0;
@@ -1209,6 +1210,34 @@ test('מודים: מפה מותאמת נרשמת, נבחרת בלובי, והמ�
   ok(g.view(a).settings.map === 'big', 'מפה לא קיימת צריכה לחזור לגדולה');
 });
 
+
+test('בלי טלפתיה: בוט מצביע על שחקן רק אחרי שאמר למה, ובלי שום ראיה לא כולם מתאחדים', () => {
+  let ganged = 0;
+  for (let round = 0; round < 6; round++) {
+    const { g, a } = newGame({ bots: 6, role: 'איש צוות', cfg: { botLevel: 3, newRoles: false, jester: false } });
+    place(g, sn => { const p = sn.players[a]; p.x = MAP.BUTTON.x; p.y = MAP.BUTTON.y; for (const q of Object.values(sn.players)) { q.killCd = 999; if (q.bot) q.bot.seen = {}; } });
+    g.act(a, { type: 'use' });
+    sec(g, 4);
+    ok(g.view(a).phase === 'meeting', 'הישיבה לא נפתחה');
+    const said = {};
+    let last = null;
+    for (let i = 0; i < 30 * 80; i++) {
+      tick(g, 1);
+      const sn = JSON.parse(g.snapshot());
+      if (!sn.meeting || sn.meeting.reveal) break;
+      last = sn.meeting;
+      g.view(a).chat.forEach(c => { said[c.name + '|' + c.text] = c; });
+      for (const [id, to] of Object.entries(sn.meeting.votes)) {
+        const nm = sn.players[id].name;
+        ok(Object.values(said).some(c => c.name === nm && /מדלג|מצביע/.test(c.text)), nm + ' הצביע (' + to + ') בלי לומר כלום');
+      }
+    }
+    const cnt = {};
+    for (const to of Object.values(last.votes)) if (to !== 'skip') cnt[to] = (cnt[to] || 0) + 1;
+    if (Math.max(0, ...Object.values(cnt)) >= 4) ganged++;
+  }
+  ok(ganged <= 1, 'בוטים התאחדו על שחקן בלי ראיות ב-' + ganged + ' מתוך 6 ישיבות');
+});
 
 test('בוטים זוכרים בין סיבובים: אותם שמות, בלי קריסה, והזיכרון פועל', () => {
   const g = createGame(MAP); const a = g.join('מארח');

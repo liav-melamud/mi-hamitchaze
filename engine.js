@@ -255,8 +255,9 @@ function freeColor() {
 const rmem = {}; let prevBotNames = null;
 const mkey = p => p.isBot ? p.name : p.id;
 const rm = k => rmem[k] || (rmem[k] = { imp: 0, kills: 0, diedBy: {} });
-function noteKill(killer, tgt) { if (!killer || !tgt) return; rm(mkey(killer)).kills++; const d = rm(mkey(tgt)).diedBy; d[mkey(killer)] = (d[mkey(killer)] || 0) + 1; }
-function rememberGame() { list().forEach(q => { if (!q.spectator && q.role && team(q) === 'imp') rm(mkey(q)).imp++; }); }
+let roundKills = []; // מי הרג את מי בסיבוב הנוכחי: נכנס לזיכרון רק כשהסיבוב נגמר, אחרת הבוטים "יודעים" מי הרוצח
+function noteKill(killer, tgt) { if (killer && tgt) roundKills.push([mkey(killer), mkey(tgt)]); }
+function rememberGame() { roundKills.forEach(([k, v]) => { rm(k).kills++; const d = rm(v).diedBy; d[k] = (d[k] || 0) + 1; }); roundKills = []; list().forEach(q => { if (!q.spectator && q.role && team(q) === 'imp') rm(mkey(q)).imp++; }); }
 function grudgeOf(o, x) { // כמה הבוט o לא סומך על x, לפי הסיבובים הקודמים
   const a = rmem[mkey(x)]; if (!a) return 0;
   const mine = rmem[mkey(o)];
@@ -411,7 +412,7 @@ function startGame(by) {
   if (settings.mode === 5) taskTotal = candleIdx().length; // שמונה נרות: היעד הוא שמונה, לא סכום המשימות של כולם
   // המגן האישי מקבל שחקן לשמור עליו
   all.filter(p => p.role === 'guardian').forEach(p => { const w = pick(all.filter(o => o.id !== p.id)); if (w) { p.ward = w.id; toast(p, '🫂 אתה שומר על ' + nm(w) + '. אם יקרה לו משהו – תדע מיד'); } });
-  traps = []; bombs = []; wrongEjects = 0; pings = []; hideFinalSaid = false; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0;
+  traps = []; bombs = []; wrongEjects = 0; pings = []; hideFinalSaid = false; noises = []; posHist = []; killLog = []; histT = 0; liars = {}; meetingNo = 0; roundKills = [];
   if (hide) { imps.forEach(p => { p.frozenUntil = now() + 10; p.killCd = 10; toast(p, '🙈 אתה המחפש! עיניים עצומות 10 שניות, ואז מחפשים…'); }); all.filter(q => team(q) !== 'imp').forEach(q => toast(q, '🔍 המחפש הוא ' + imps.map(nm).join(', ') + ' – מתחבאים! (הסתתר במסתור: M)')); }
   else all.forEach(p => { p.frozenUntil = 0; });
   if (hide) crew.forEach(p => toast(p, '🙈 מחבואים! ' + nm(imps[0]) + ' הוא המחפש – יש לך 10 שניות להתחבא'));
@@ -554,27 +555,28 @@ function callMeeting(by, body) {
   }
   by.stats.reports++; ev('meeting', fake ? `🎈 ${nm(by)} דיווח על גופה – אבל היא הייתה מזויפת!` : body ? `📢 ${nm(by)} דיווח על הגופה של ${players[body.id] ? nm(players[body.id]) : 'שחקן'} (${room})` : `🚨 ${nm(by)} כינס ישיבת חירום`);
   if (fake && players[body.by]) toast(players[body.by], '🎈 נפלו בפח! ' + by.name + ' דיווח על הגופה המזויפת שלך');
-  meeting = { by: by.id, body: body && !fake ? body.id : null, fake, fakeColor: fake ? body.color : null, deduce: false, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, accused: {}, floor: Infinity };
+  meeting = { by: by.id, body: body && !fake ? body.id : null, fake, fakeColor: fake ? body.color : null, deduce: false, room, votes: {}, t: settings.meetingTime, mentions: {}, skipTalk: 0, bodyRoom, queue: [], suspect: {}, why: {}, accused: {}, floor: Infinity };
   // זיכרון של הבוטים: מי היה ליד הגופה, מי היה איתם (נקי), מי נראה בפתח אוורור, ומי טעה בסבב הקודם
-  const addS = (id, n) => { if (players[id]) meeting.suspect[id] = (meeting.suspect[id] || 0) + n; };
+  // אין טלפתיה: מה שבוט ראה נשאר אצלו (bot.priv). החשד המשותף (meeting.suspect) עולה רק ממה שנאמר בקול
+  const addP = (o, id, n) => { if (players[id]) o.bot.priv[id] = (o.bot.priv[id] || 0) + n; };
   list().forEach(o => {
     if (!o.bot) return;
-    o.bot.nearBody = []; o.bot.alibi = [];
+    o.bot.nearBody = []; o.bot.alibi = []; o.bot.priv = {}; o.bot.pending = null;
     if (!o.alive || o.spectator) return;
     if (body) recallKill(o, body, bodyRoom);
     if (team(o) !== 'crew') return;
-    o.bot.nearBody.forEach(id => addS(id, 1.2));
+    o.bot.nearBody.forEach(id => addP(o, id, 1.2));
     // רק הליצן זורק בננות: מי שהחליק יודע שיש ליצן, ואם ראה מי זרק – יודע שאסור להדיח אותו
-    if (o.bot.knowsJester) jesterHint = true;
-    if (o.bot.jesterId && players[o.bot.jesterId] && players[o.bot.jesterId].alive) addS(o.bot.jesterId, -6);
-    o.bot.alibi.forEach(id => addS(id, -2));
-    if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addS(o.bot.sawVent.id, jesterHint ? 1 : 1.8);
+    if (o.bot.jesterId && players[o.bot.jesterId] && players[o.bot.jesterId].alive) addP(o, o.bot.jesterId, -6);
+    o.bot.alibi.forEach(id => addP(o, id, -2));
+    if (o.bot.sawVent && players[o.bot.sawVent.id] && players[o.bot.sawVent.id].alive) addP(o, o.bot.sawVent.id, 1.8);
+    if (settings.botLevel >= 2 && o.bot.sawWork) for (const id in o.bot.sawWork) if (players[id] && players[id].alive && o.bot.sawWork[id].n >= 2) addP(o, id, -Math.min(2, o.bot.sawWork[id].n * 0.5) * 0.6);
   });
-  if (lastMistake) lastMistake.by.forEach(id => addS(id, 0.8));
-  if (settings.botLevel >= 2) list().forEach(o => { if (o.bot && o.alive && !o.spectator && team(o) === 'crew' && o.bot.sawWork) for (const id in o.bot.sawWork) if (players[id] && players[id].alive && o.bot.sawWork[id].n >= 2) addS(id, -Math.min(2, o.bot.sawWork[id].n * 0.5) * 0.6); });
+  // את תוצאות ההצבעה הקודמת כולם ראו על המסך
+  if (lastMistake) lastMistake.by.forEach(id => list().forEach(o => { if (o.bot && o.alive && !o.spectator) addP(o, id, 0.8); }));
   if (settings.botLevel >= 2 && Object.keys(rmem).length) { // מה הבוטים זוכרים מהסיבוב הקודם
     const pre = list().filter(o => o.bot && o.alive && !o.spectator && team(o) === 'crew');
-    pre.forEach(o => list().forEach(x => { if (x.alive && !x.spectator && x.id !== o.id) { const g = grudgeOf(o, x); if (g > 0) addS(x.id, g * (settings.botLevel === 3 ? 1 : 0.7)); } }));
+    pre.forEach(o => list().forEach(x => { if (x.alive && !x.spectator && x.id !== o.id) { const g = grudgeOf(o, x); if (g > 0) addP(o, x.id, g * (settings.botLevel === 3 ? 1 : 0.7)); } }));
     let best = null; // בוט אחד אומר בקול את מה שהוא זוכר
     pre.forEach(o => list().forEach(x => { if (x.alive && !x.spectator && x.id !== o.id) { const g = grudgeOf(o, x); if (g >= 1 && (!best || g > best.g)) best = { o, x, g }; } }));
     if (best && Math.random() < 0.85) {
@@ -582,12 +584,13 @@ function callMeeting(by, body) {
       const line = mine && mine.diedBy[mkey(best.x)] ? fresh([`${xn} חיסל אותי בסיבוב הקודם, אני לא שוכח`, `בסיבוב הקודם ${xn} הרג אותי. לא סומך עליו`, `${xn}, זוכר מה עשית לי בפעם שעברה? 😒`])
         : a && a.imp ? fresh([`${xn} היה המתחזה בסיבוב הקודם, אני לא סומך עליו`, `שימו לב ל${xn}, בפעם שעברה הוא היה המתחזה`, `${xn} כבר היה מתחזה, תיזהרו ממנו`])
         : fresh([`${xn} חיסל כמה אנשים בסיבוב הקודם, הוא יודע להרוג טוב, פחות תסמכו עליו`, `${xn} מחסל טוב מדי, אני חושד בו`]);
-      meeting.queue.push({ id: best.o.id, at: meeting.t - (6 + Math.random() * 6), silent: false, text: line });
+      meeting.queue.push({ id: best.o.id, at: meeting.t - (6 + Math.random() * 6), silent: false, text: line, sus: [[best.x.id, 1]] });
     }
   }
   meetingNo++;
   // הבוטים זוכרים מי שיקר בישיבות קודמות
-  for (const id in liars) if (players[id] && players[id].alive) addS(id, settings.botLevel === 1 ? 0.4 : settings.botLevel === 3 ? 1.6 : 1);
+  // השקרים נחשפו בקול בישיבה קודמת, ולכן כולם יודעים עליהם
+  for (const id in liars) if (players[id] && players[id].alive) meeting.suspect[id] = (meeting.suspect[id] || 0) + (settings.botLevel === 1 ? 0.4 : settings.botLevel === 3 ? 1.6 : 1);
   // גופה מזויפת: אף אחד לא מקבל הודעה. בוטים חכמים עשויים לשים לב באמצע הישיבה שאף אחד לא מת
   if (fake && Math.random() < (settings.botLevel === 3 ? 0.8 : settings.botLevel === 1 ? 0.25 : 0.55)) {
     const w = shuffle(list().filter(o => o.isBot && o.alive && !o.spectator && team(o) === 'crew'))[0];
@@ -1580,7 +1583,11 @@ function roomIn(text) {
   const names = Object.values(MAP.ROOMS).map(r => r.name).sort((a, b) => b.length - a.length);
   return names.find(n => text.includes(n)) || null;
 }
-function queueSay(bot, text, delay) { meeting.queue.push({ id: bot.id, text, at: meeting.t - delay, silent: true }); }
+function queueSay(bot, text, delay, sus) { meeting.queue.push({ id: bot.id, text, at: meeting.t - delay, silent: true, sus }); }
+// מישהו אמר בקול סיבה לחשוד (או לנקות): רק עכשיו שאר השחקנים יודעים על זה
+function heard(sus, who) {
+  for (const [id, n] of sus) { if (!players[id]) continue; meeting.suspect[id] = (meeting.suspect[id] || 0) + n; if (n > 0 && who) meeting.why[id] = who.id; }
+}
 // משפט חשוב נכתב גם בצ'אט; שאר הדברים של הבוטים נשמעים בקול בלבד
 const IMPORTANT = /בננה|פתח אוורור|נקי|הצביע נגד|ראיתי|משנה צורה|מחסל|הרג|תצביעו|משקר|המתחזה|נמצא|לא נכון|נכון,|סותר|חשוד מאוד|מצאתי|הגופה/;
 const speechDur = text => 0.9 + String(text).length * 0.075;
@@ -1627,7 +1634,7 @@ function analyze(sp, text) {
   const killWord = /רצח|הרג|חיסל|חוסל|נרצח|גופה|מת /.test(text + ' ');
   const maxResp = settings.botLevel === 1 ? 1 : settings.botLevel === 3 ? 3 : 2;
   let d = 1.5;
-  const S = (n) => (meeting.suspect[sp.id] = (meeting.suspect[sp.id] || 0) + n);
+  const S = (n) => { const q = meeting.queue[meeting.queue.length - 1]; if (q) (q.sus = q.sus || []).push([sp.id, n]); }; // נכנס לחשד רק כשהמשפט נאמר
 
   if (killWord && named.length) {
     const victim = named[0], vN = bare(victim.name);
@@ -1664,7 +1671,8 @@ function analyze(sp, text) {
     }
   }
   // מסקנה: מי ששיקר שוב ושוב נחשד כמתחזה
-  if ((meeting.suspect[sp.id] || 0) >= 3 && !meeting.accused[sp.id]) {
+  const coming = meeting.queue.reduce((t, q) => t + (q.sus || []).reduce((u, [id, n]) => u + (id === sp.id ? n : 0), 0), meeting.suspect[sp.id] || 0);
+  if (coming >= 3 && !meeting.accused[sp.id]) {
     meeting.accused[sp.id] = true;
     const c = bots[2] || bots[0];
     if (c) queueSay(c, pick([`אז ${spN} משקר… זה אומר ש${spN} הוא המתחזה! תצביעו עליו!`, `ההסבר של ${spN} לא מסתדר. אני מצביע עליו`, `${spN} סותר את עצמו, חשוד מאוד`]), d + 0.5);
@@ -1687,6 +1695,7 @@ function killClaim(sp, text) {
   let d = 1.3, n = 0;
   for (const b of bots) {
     const evilB = evil(b);
+    meeting.why[x.id] = sp.id;
     if (!evilB) { // איש צוות מאמין למי שחזר לחיים: הוא ראה את הרוצח
       if (Math.random() < 0.92) { b.bot.sawKill = x.id; b.bot.sawVictim = sp.id; }
       if (n < 2) { queueSay(b, fill(fresh(['{s} חזר מהמתים, אז הוא ראה את הרוצח. {x} הוא המתחזה – מצביעים עליו!', 'אם {s} אומר שזה {x}, אני מאמין לו. הוא היה שם', '{x}?! {s} חזר לחיים והוא יודע מה הוא אומר']), { s: spN, x: xN }), d); d += 1.6; n++; }
@@ -1715,18 +1724,21 @@ function accusation(sp, text) {
     if (n >= maxResp) break;
     const k = b.bot, evilB = evil(b);
     let line = null;
+    const push0 = push, sus = [];
     if (!evilB && (k.sawKill === x.id || k.sawShift === x.id)) { line = `נכון! ראיתי את ${xN} בעצמי. מצביעים עליו`; push += 2; }
     else if (!evilB && k.sawVent && k.sawVent.id === x.id) { line = `מסכים, ראיתי את ${xN} ליד פתח אוורור ב${k.sawVent.room}`; push += 1.2; }
     else if (!evilB && liars[x.id]) { line = `זה מסתדר: ${xN} כבר שיקר בישיבה קודמת – אמר ${liars[x.id].said} ובכלל היה ב${liars[x.id].seen}`; push += 1; }
-    else if (!evilB && (k.alibi || []).includes(x.id)) { line = `לא נכון, ${xN} היה איתי כל הזמן. אולי דווקא ${spN} מנסה לבלבל אותנו?`; push -= 1.5; meeting.suspect[sp.id] = (meeting.suspect[sp.id] || 0) + 0.6; }
+    else if (!evilB && (k.alibi || []).includes(x.id)) { line = `לא נכון, ${xN} היה איתי כל הזמן. אולי דווקא ${spN} מנסה לבלבל אותנו?`; push -= 1.5; sus.push([sp.id, 0.6]); }
     else if (!evilB && meeting.cleared && meeting.cleared[x.id]) { line = fill('רגע, {x} הציג הערה אמיתית מהמערכת – הוא לא המתחזה', { x: xN }); push -= 3.5; }
     else if (!evilB && x.id === k.jesterId) { line = `רגע! ${xN} הוא הליצן, הוא רוצה שנצביע עליו. לא להדיח!`; push -= 3; }
     else if (evilB && team(x) === 'imp') { line = pick([`יש לך הוכחה נגד ${xN}? נראה לי שאתה ממהר`, `${xN} היה במשימות, אני לא קונה את זה`]); push -= 0.6; }
     else if (evilB && team(x) !== 'imp') { line = pick([`גם לי ${xN} נראה חשוד!`, `כן, ${xN} מתנהג מוזר כל המשחק`]); push += 0.6; }
     else if (Math.random() < 0.5) line = pick([`למה ${xN}? מה ראית?`, `יש לך הוכחה נגד ${xN}?`, `אני לא בטוח לגבי ${xN}, תסביר`]);
-    if (line) { queueSay(b, line, d); d += 1.7; n++; }
+    if (push !== push0) sus.push([x.id, push - push0]);
+    push = push0;
+    if (line) { queueSay(b, line, d, sus.length ? sus : undefined); d += 1.7; n++; }
   }
-  meeting.suspect[x.id] = (meeting.suspect[x.id] || 0) + push;
+  heard([[x.id, push]], sp);
   if (x.bot && x.bot.replies < 2) x.bot.replyAt = meeting.t - (1 + Math.random() * 1.5); // המואשם מתגונן
   return true;
 }
@@ -1752,27 +1764,28 @@ function botLine0(p) {
   if (p.role === 'jester' && Math.random() < 0.7) return fresh(['אולי זה אני, אולי לא 😏', 'אני לא חייב להגיד לכם איפה הייתי', 'נו, תצביעו עליי אם אתם כל כך בטוחים', 'הייתי ליד הגופה… במקרה', 'אני לא מתכוון להסביר את עצמי', 'למה כולם מסתכלים עליי? 🤭']);
   const alive = id => players[id] && players[id].alive;
   const myRoom = b.lastRoom || 'חדר האוכל';
-  if (team(p) === 'crew' && b.sawShift && alive(b.sawShift)) return fill(fresh(['ראיתי את {n} משנה צורה! הוא מתחזה!', '{n} התחפש למישהו אחר מול העיניים שלי! תצביעו עליו', 'אני בטוח ב-100%: {n} הוא משנה צורה']), { n: name(b.sawShift) });
+  const sus = (id, n) => { b.said = [[id, n]]; };
+  if (team(p) === 'crew' && b.sawShift && alive(b.sawShift)) return sus(b.sawShift, 5), fill(fresh(['ראיתי את {n} משנה צורה! הוא מתחזה!', '{n} התחפש למישהו אחר מול העיניים שלי! תצביעו עליו', 'אני בטוח ב-100%: {n} הוא משנה צורה']), { n: name(b.sawShift) });
   if (b.sawVictim === p.id && b.sawKill && alive(b.sawKill)) { // הרגו אותי, הזמן חזר – ואני זוכר
-    if (!b.saidKiller && meeting) { b.saidKiller = true; meeting.suspect[b.sawKill] = (meeting.suspect[b.sawKill] || 0) + 3.5; }
+    sus(b.sawKill, 5);
     return fill(fresh(['{n} הרג אותי! הזמן חזר אחורה אבל אני זוכר הכל', 'זה {n}! הוא חיסל אותי לפני שהזמן חזר – אני זוכר את הפנים שלו', 'תצביעו על {n}! הוא הרוצח, הוא הרג אותי ממש עכשיו']), { n: name(b.sawKill) });
   }
-  if (team(p) === 'crew' && b.sawKill && alive(b.sawKill)) return fill(fresh(['ראיתי את {n} מחסל את {b}! תצביעו עליו!', '{n} הרג את {b} מולי!', 'זה {n}! ראיתי הכל']), { n: name(b.sawKill), b: name(b.sawVictim) });
-  if (team(p) === 'crew' && b.sawVent && alive(b.sawVent.id) && !b.saidVent) { b.saidVent = true; return fill(fresh(['ראיתי את {n} ליד פתח אוורור ב{r}! רק מתחזים משתמשים בפתחים', '{n} יצא לי מפתח אוורור ב{r}, אני בטוח', 'ראיתי את {n} נכנס לפתח ב{r}. {n}, אתה מהנדס?']), { n: name(b.sawVent.id), r: b.sawVent.room }); }
-  if (b.jesterId && alive(b.jesterId) && !b.saidBanana) { b.saidBanana = true; return fill(fresh(['החלקתי על בננה ו{n} היה שם. רק הליצן זורק בננות! אל תצביעו עליו, זה בדיוק מה שהוא רוצה', '{n} הוא הליצן! הוא זרק עליי בננה ב{r}. לא מדיחים אותו', 'שימו לב: {n} זרק בננה, אז הוא הליצן. מי שמצביע עליו עוזר לו לנצח']), { n: name(b.jesterId), r: myRoom }); }
-  if (b.knowsJester && !b.saidBanana) { b.saidBanana = true; return fill(fresh(['החלקתי על קליפת בננה ב{r}! יש פה ליצן, תיזהרו במי מצביעים', 'מישהו זרק בננה ב{r}. מתחזים לא עושים את זה, זה הליצן. לא מצביעים סתם', 'יש ליצן במשחק, החלקתי על הבננה שלו. רק מי שבטוחים בו']), { r: myRoom }); }
+  if (team(p) === 'crew' && b.sawKill && alive(b.sawKill)) return sus(b.sawKill, 4.5), fill(fresh(['ראיתי את {n} מחסל את {b}! תצביעו עליו!', '{n} הרג את {b} מולי!', 'זה {n}! ראיתי הכל']), { n: name(b.sawKill), b: name(b.sawVictim) });
+  if (team(p) === 'crew' && b.sawVent && alive(b.sawVent.id) && !b.saidVent) { b.saidVent = true; sus(b.sawVent.id, 2.5); return fill(fresh(['ראיתי את {n} ליד פתח אוורור ב{r}! רק מתחזים משתמשים בפתחים', '{n} יצא לי מפתח אוורור ב{r}, אני בטוח', 'ראיתי את {n} נכנס לפתח ב{r}. {n}, אתה מהנדס?']), { n: name(b.sawVent.id), r: b.sawVent.room }); }
+  if (b.jesterId && alive(b.jesterId) && !b.saidBanana) { b.saidBanana = true; sus(b.jesterId, -6); jesterHint = true; return fill(fresh(['החלקתי על בננה ו{n} היה שם. רק הליצן זורק בננות! אל תצביעו עליו, זה בדיוק מה שהוא רוצה', '{n} הוא הליצן! הוא זרק עליי בננה ב{r}. לא מדיחים אותו', 'שימו לב: {n} זרק בננה, אז הוא הליצן. מי שמצביע עליו עוזר לו לנצח']), { n: name(b.jesterId), r: myRoom }); }
+  if (b.knowsJester && !b.saidBanana) { b.saidBanana = true; jesterHint = true; return fill(fresh(['החלקתי על קליפת בננה ב{r}! יש פה ליצן, תיזהרו במי מצביעים', 'מישהו זרק בננה ב{r}. מתחזים לא עושים את זה, זה הליצן. לא מצביעים סתם', 'יש ליצן במשחק, החלקתי על הבננה שלו. רק מי שבטוחים בו']), { r: myRoom }); }
   if (!b.saidLiar && !evil(p) && settings.botLevel > 1 || (!b.saidLiar && !evil(p) && Math.random() < 0.3)) {
     const lid = Object.keys(liars).find(id => alive(id) && id !== p.id && liars[id].mtg < meetingNo);
-    if (lid && Math.random() < 0.6) { b.saidLiar = true; const L = liars[lid]; return fill(fresh(['בישיבה הקודמת {n} אמר שהיה ב{a}, אבל ראו אותו ב{s}. אני לא שוכח', 'תזכרו: {n} כבר שיקר לנו פעם – אמר {a} ובכלל היה ב{s}', '{n}, בפעם שעברה אמרת שהיית ב{a}. ראו אותך ב{s}! למה שנאמין לך עכשיו?']), { n: name(lid), a: L.said, s: L.seen }); }
+    if (lid && Math.random() < 0.6) { b.saidLiar = true; const L = liars[lid]; sus(lid, 1.2); return fill(fresh(['בישיבה הקודמת {n} אמר שהיה ב{a}, אבל ראו אותו ב{s}. אני לא שוכח', 'תזכרו: {n} כבר שיקר לנו פעם – אמר {a} ובכלל היה ב{s}', '{n}, בפעם שעברה אמרת שהיית ב{a}. ראו אותך ב{s}! למה שנאמין לך עכשיו?']), { n: name(lid), a: L.said, s: L.seen }); }
   }
   if ((meeting.body || meeting.fake) && b.nearBody && b.nearBody.length && !b.saidNear) {
     const id = pick(b.nearBody.filter(x => !(evil(p) && team(players[x]) === 'imp')));
-    if (id) { b.saidNear = true; return fill(fresh(['ראיתי את {n} ב{r} ממש לפני שמצאו את הגופה', '{n} היה ב{r} בדיוק בזמן הזה. {n}, מה עשית שם?', 'רגע, {n} יצא מ{r} לא מזמן']), { n: name(id), r: meeting.bodyRoom }); }
+    if (id) { b.saidNear = true; sus(id, 1.5); return fill(fresh(['ראיתי את {n} ב{r} ממש לפני שמצאו את הגופה', '{n} היה ב{r} בדיוק בזמן הזה. {n}, מה עשית שם?', 'רגע, {n} יצא מ{r} לא מזמן']), { n: name(id), r: meeting.bodyRoom }); }
   }
-  if (team(p) === 'crew' && meeting.body && b.alibi && b.alibi.length && !b.saidAlibi && Math.random() < 0.7) { b.saidAlibi = true; return fill(fresh(['{n} היה איתי ב{m} כשזה קרה, הוא נקי', 'אני יכול לאשר את {n}, היינו ביחד ב{m}', '{n} לא יכול להיות, הוא היה לידי']), { n: name(pick(b.alibi)), m: myRoom }); }
+  if (team(p) === 'crew' && meeting.body && b.alibi && b.alibi.length && !b.saidAlibi && Math.random() < 0.7) { b.saidAlibi = true; const w = pick(b.alibi); sus(w, -2); return fill(fresh(['{n} היה איתי ב{m} כשזה קרה, הוא נקי', 'אני יכול לאשר את {n}, היינו ביחד ב{m}', '{n} לא יכול להיות, הוא היה לידי']), { n: name(w), m: myRoom }); }
   if (lastMistake && lastMistake.by.length && !b.saidMistake && Math.random() < 0.4) {
     const id = pick(lastMistake.by.filter(x => alive(x) && x !== p.id && !(evil(p) && team(players[x]) === 'imp')));
-    if (id) { b.saidMistake = true; return fill(fresh(['בסבב הקודם {n} דחף להדיח את {e}, ו{e} היה מהצוות. חשוד', 'תזכרו ש{n} הצביע נגד {e} שהיה נקי']), { n: name(id), e: lastMistake.name }); }
+    if (id) { b.saidMistake = true; sus(id, 0.8); return fill(fresh(['בסבב הקודם {n} דחף להדיח את {e}, ו{e} היה מהצוות. חשוד', 'תזכרו ש{n} הצביע נגד {e} שהיה נקי']), { n: name(id), e: lastMistake.name }); }
   }
   if (meeting.by === p.id && meeting.fake) return fill(fresh(['מצאתי גופה ב{r}!', 'יש גופה ב{r}, מי היה שם?']), { r: meeting.room });
   if (meeting.by === p.id && meeting.body) return fill(fresh(['מצאתי את {b} ב{r}!', 'הגופה של {b} הייתה ב{r}', 'מישהו היה ב{r} לפני רגע?']), { b: name(meeting.body), r: meeting.room });
@@ -1782,16 +1795,16 @@ function botLine0(p) {
   // השתול מגן על המתחזים
   if (p.role === 'mole' && Math.random() < 0.4) {
     const imp = list().find(o => o.alive && team(o) === 'imp' && (meeting.suspect[o.id] || 0) > 0);
-    if (imp) return fill(fresh(['{n} היה איתי כל הזמן, הוא נקי', 'אני יכול לאשר את {n}, ראיתי אותו עושה משימה', 'לא {n}, הייתי לידו']), { n: bare(imp.name) });
+    if (imp) return sus(imp.id, -1.5), fill(fresh(['{n} היה איתי כל הזמן, הוא נקי', 'אני יכול לאשר את {n}, ראיתי אותו עושה משימה', 'לא {n}, הייתי לידו']), { n: bare(imp.name) });
   }
   if (evil(p) && Math.random() < 0.35) {
     const v = list().filter(o => o.alive && !o.spectator && team(o) === 'crew');
-    if (v.length) { const o = pick(v); return fill(fresh(['ראיתי את {n} ליד פתח ב{r}', '{n} מתנהג מוזר', '{n} עקב אחריי כל הסבב']), { n: bare(o.name), r: pick(Object.values(MAP.ROOMS)).name }); }
+    if (v.length) { const o = pick(v); sus(o.id, 0.8); return fill(fresh(['ראיתי את {n} ליד פתח ב{r}', '{n} מתנהג מוזר', '{n} עקב אחריי כל הסבב']), { n: bare(o.name), r: pick(Object.values(MAP.ROOMS)).name }); }
   }
   // ראיתי מישהו עושה משימה: הוא נקי (ראיה חזקה)
   if (!evil(p) && b.sawWork && !b.saidWork) {
     const wid = Object.keys(b.sawWork).find(id => alive(id) && id !== p.id && b.sawWork[id].n >= 2);
-    if (wid && Math.random() < 0.6) { b.saidWork = true; return fill(fresh(['ראיתי את {n} עושה משימה ב{r}, הוא נקי', '{n} היה באמצע משימה ב{r} מול העיניים שלי, לא הוא', 'אל תחשדו ב{n}, ראיתי אותו עובד ב{r}']), { n: name(wid), r: b.sawWork[wid].room }); }
+    if (wid && Math.random() < 0.6) { b.saidWork = true; sus(wid, -1.5); return fill(fresh(['ראיתי את {n} עושה משימה ב{r}, הוא נקי', '{n} היה באמצע משימה ב{r} מול העיניים שלי, לא הוא', 'אל תחשדו ב{n}, ראיתי אותו עובד ב{r}']), { n: name(wid), r: b.sawWork[wid].room }); }
   }
   // מספר על משימה שסיים (או משקר על אחת, אם הוא מתחזה)
   if (!b.saidTask && Math.random() < 0.3) {
@@ -1811,9 +1824,9 @@ function botMeeting(p) {
   const b = p.bot;
   if (!p.alive || p.spectator || !meeting) return; // בוט קודם יכול היה לסיים את הדיון (הצבעה אחרונה)
   const T = meeting.t;
-  if (T < b.chatAt) { b.chatAt = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
-  if (T < b.chat2At) { b.chat2At = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
-  if (T < (b.chat3At || -999)) { b.chat3At = -999; meeting.queue.push({ id: p.id, text: botLine(p), at: T, silent: false }); }
+  if (T < b.chatAt) { b.chatAt = -999; botTalk(p, T); }
+  if (T < b.chat2At) { b.chat2At = -999; botTalk(p, T); }
+  if (T < (b.chat3At || -999)) { b.chat3At = -999; botTalk(p, T); }
   // בוט צלם או בלש מציג את הראיות שלו
   if (!b.shared && T < settings.meetingTime - 6 && Math.random() < 0.02) {
     if (p.role === 'photographer' && p.photos && p.photos.length) {
@@ -1821,8 +1834,7 @@ function botMeeting(p) {
       meeting.queue.push({ id: p.id, silent: true, at: T, text: `📸 צילמתי ב${ph.room}: ${ph.names.join(', ') || 'גופה'}` });
     } else if (p.role === 'detective' && p.noteMeta && p.noteMeta.length) {
       const hit = p.noteMeta.slice().reverse().find(m => m.hit) || p.noteMeta[p.noteMeta.length - 1]; b.shared = true;
-      meeting.queue.push({ id: p.id, silent: true, at: T, text: p.notes[p.noteMeta.indexOf(hit)] || p.notes[p.notes.length - 1] });
-      if (hit.hit && players[hit.id]) meeting.suspect[hit.id] = (meeting.suspect[hit.id] || 0) + 2;
+      meeting.queue.push({ id: p.id, silent: true, at: T, text: p.notes[p.noteMeta.indexOf(hit)] || p.notes[p.notes.length - 1], sus: hit.hit ? [[hit.id, 2]] : undefined });
     }
   }
   if (b.replyAt > -1 && T < b.replyAt) {
@@ -1831,38 +1843,75 @@ function botMeeting(p) {
     const m = others.length ? bare(pick(others).name) : '';
     meeting.queue.push({ id: p.id, silent: true, at: T, text: fill(fresh(['למה אני? הייתי ב{r}', 'זה לא אני! תבדקו את {m}', 'עשיתי משימות, תשאלו את {m}', 'אני? באמת? הייתי ב{r} כל הזמן', 'אם תדיחו אותי תפסידו 😤']), { r: b.lastRoom || 'חדר האוכל', m }) });
   }
-  if (T < b.voteAt && !meeting.votes[p.id]) {
-    const ok = id => players[id] && players[id].alive && id !== p.id && !(evil(p) && team(players[id]) === 'imp') && !(!evil(p) && meeting.cleared && meeting.cleared[id]) && !(team(p) === 'crew' && id === b.jesterId);
-    let vote = null;
-    if (team(p) === 'crew' && b.sawShift && ok(b.sawShift)) vote = b.sawShift;
-    else if (team(p) === 'crew' && b.sawKill && ok(b.sawKill)) vote = b.sawKill;
-    else if (team(p) === 'crew' && b.sawVent && ok(b.sawVent.id) && Math.random() < (jesterHint ? 0.2 : 0.4)) vote = b.sawVent.id;
-    else {
-      const score = {};
-      const lf = settings.botLevel === 1 ? 0.5 : settings.botLevel === 3 ? 1.4 : 1, pe = b.persona;
-      const pf = pe === 'suspicious' ? 1.4 : pe === 'quiet' ? 0.8 : 1;
-      for (const id in meeting.mentions) score[id] = (score[id] || 0) + meeting.mentions[id] * pf;
-      for (const id in meeting.suspect) score[id] = (score[id] || 0) + meeting.suspect[id] * 1.5 * lf * pf;
-      // מי שהיה איתי בזמן החיסול – לא מצביעים עליו
-      if (team(p) === 'crew') (b.alibi || []).forEach(id => { score[id] = (score[id] || 0) - 4; });
-      // הולכים עם הרוב כשיש לו בסיס (וגם מתחזה מצטרף כדי להיראות כמו כולם)
-      const cnt = {}; for (const v of Object.values(meeting.votes)) if (v !== 'skip') cnt[v] = (cnt[v] || 0) + 1;
-      const nv = list().filter(o => o.alive && !o.spectator).length;
-      for (const id in cnt) if (cnt[id] >= Math.max(2, Math.ceil(nv / 3)) && (score[id] || 0) > -1) score[id] = (score[id] || 0) + (evil(p) ? 3 : 1.5);
-      const top = Object.entries(score).filter(([id]) => ok(id)).sort((x, y) => y[1] - x[1])[0];
-      const nAlive = list().filter(o => o.alive && !o.spectator).length, critical = settings.botLevel >= 2 && nAlive <= 4 && team(p) === 'crew'; // מעט שורדים: דילוג = הפסד, חייבים להחליט
-      if (critical && top && top[1] > 0) vote = top[0];
-      else if (top && top[1] >= 3) vote = top[0];
-      else if (top && top[1] >= 2 && Math.random() < 0.7) vote = top[0];
-      else if (top && evil(p) && Math.random() < 0.6) vote = top[0];
-      else if (meeting.skipTalk >= 2 || Math.random() < (b.persona === 'aggressive' ? 0.15 : b.persona === 'quiet' ? 0.7 : 0.5)) vote = 'skip';
-      else if (jesterHint && team(p) === 'crew') vote = 'skip'; // יש ליצן – לא מצביעים בניחוש
-      else { const opts = list().filter(o => ok(o.id) && !o.spectator); vote = opts.length ? pick(opts).id : 'skip'; }
-    }
-    meeting.votes[p.id] = vote || 'skip';
-    // שופט בוט פוסק רק כשהוא בטוח (ראה בעצמו חיסול או שינוי צורה)
-    if (p.role === 'judge' && !p.verdictUsed && judgeReady(p) && vote && vote !== 'skip' && (b.sawKill === vote || b.sawShift === vote) && Math.random() < 0.8) act(p, { type: 'verdict', target: vote });
+  // מצביעים רק אחרי ששמעו את מה שאחרים אמרו (או כשנגמרת הסבלנות)
+  if (T < b.voteAt && !meeting.votes[p.id] && !b.pending && (T < b.voteAt - 8 || !meeting.queue.some(q => !q.vote))) {
+    const d = botDecide(p);
+    b.pending = { id: p.id, text: d.text, at: T + 100, silent: true, show: true, vote: d.vote }; // הכרזת הצבעה עוקפת פטפוטים שבתור
+    meeting.queue.push(b.pending);
   }
+  // נגמר הזמן והתור עוד ארוך: אומרים ומצביעים מיד
+  if (b.pending && !meeting.votes[p.id] && T < 5) {
+    const i = meeting.queue.indexOf(b.pending);
+    if (i >= 0) meeting.queue.splice(i, 1);
+    sayQueued(b.pending);
+  }
+}
+function botTalk(p, at) {
+  p.bot.said = null;
+  const text = botLine(p);
+  meeting.queue.push({ id: p.id, text, at, silent: false, sus: p.bot.said || undefined });
+}
+// בוט מחליט על סמך מה שנאמר בישיבה ומה שהוא עצמו ראה – ואומר למה
+function botDecide(p) {
+  const b = p.bot, nameOf = id => bare(players[id].name);
+  const ok = id => players[id] && players[id].alive && !players[id].spectator && id !== p.id && !(evil(p) && team(players[id]) === 'imp') && !(!evil(p) && meeting.cleared && meeting.cleared[id]) && !(team(p) === 'crew' && id === b.jesterId);
+  const lf = settings.botLevel === 1 ? 0.7 : settings.botLevel === 3 ? 1.3 : 1, pf = b.persona === 'suspicious' ? 1.25 : b.persona === 'quiet' ? 0.85 : 1;
+  const score = {}, priv = evil(p) ? {} : (b.priv || {});
+  for (const id in meeting.suspect) score[id] = meeting.suspect[id] * lf * pf;
+  for (const id in priv) score[id] = (score[id] || 0) + priv[id] * lf * pf;
+  const top = Object.entries(score).filter(([id]) => ok(id) && score[id] > 0).sort((x, y) => y[1] - x[1])[0];
+  const tid = top && top[0], sc = top ? top[1] : 0;
+  const nAlive = list().filter(o => o.alive && !o.spectator).length;
+  const critical = settings.botLevel >= 2 && nAlive <= 4 && team(p) === 'crew'; // מעט שורדים: דילוג = הפסד
+  let vote = null;
+  if (team(p) === 'crew' && b.sawShift && ok(b.sawShift)) vote = b.sawShift;
+  else if (team(p) === 'crew' && b.sawKill && ok(b.sawKill)) vote = b.sawKill;
+  else if (tid && (sc >= 2.4 || (sc >= 1.8 && Math.random() < 0.6) || (critical && sc > 0) || (evil(p) && sc >= 0.8))) vote = tid;
+  if (!vote) {
+    const text = tid ? fill(fresh(['יש לי חשד קטן ב{n}, אבל זה לא מספיק. אני מדלג', 'אולי {n}, אבל אין לי הוכחה, אז אני מדלג']), { n: nameOf(tid) })
+      : fresh(['לא ראיתי כלום ואף אחד לא הביא הוכחה, אני מדלג', 'אין לי שום ראיה נגד אף אחד, אני מדלג', 'לא שמעתי משהו שמשכנע אותי, אני מדלג']);
+    return { vote: 'skip', text };
+  }
+  const n = nameOf(vote), who = meeting.why[vote];
+  let text;
+  if (b.sawShift === vote && !evil(p)) text = fill('אני מצביע על {n} כי ראיתי אותו משנה צורה', { n });
+  else if (b.sawKill === vote && !evil(p)) text = fill('אני מצביע על {n} כי ראיתי אותו מחסל', { n });
+  else if (!evil(p) && b.sawVent && b.sawVent.id === vote) text = fill('אני מצביע על {n} כי ראיתי אותו ליד פתח אוורור ב{r}', { n, r: b.sawVent.room });
+  else if (!evil(p) && (b.nearBody || []).includes(vote)) text = fill('אני מצביע על {n} כי ראיתי אותו ליד המקום לפני שמצאו את הגופה', { n });
+  else if (liars[vote] && liars[vote].mtg < meetingNo) text = fill('אני מצביע על {n} כי הוא כבר שיקר לנו בישיבה קודמת', { n });
+  else if (who && who !== p.id && players[who] && who !== vote) text = fill('אני מצביע על {n}, מה שאמר {s} נשמע לי הגיוני', { n, s: nameOf(who) });
+  else if (who === p.id) text = fill('אני מצביע על {n} בגלל מה שאמרתי קודם', { n });
+  else if (lastMistake && lastMistake.by.includes(vote)) text = fill('אני מצביע על {n} כי בסבב הקודם הוא הצביע על מישהו נקי', { n });
+  else if ((priv[vote] || 0) > 0) text = fill('אני מצביע על {n} כי אני זוכר איך הוא התנהג בסיבוב הקודם', { n });
+  else text = fill('אני מצביע על {n} בגלל מה שנאמר עליו בישיבה', { n });
+  return { vote, text };
+}
+// משפט מהתור נאמר: מוסיף לצ'אט, מעדכן את מה שכולם שמעו, ואם זו הכרזת הצבעה – מצביע
+function sayQueued(q) {
+  const o = players[q.id];
+  if (!o || !o.alive) return false;
+  say(o, q.text, q.silent);
+  if (q.show) delete chat[chat.length - 1].hide;
+  if (q.sus) heard(q.sus, o);
+  if (q.deduce) { jesterHint = true; meeting.skipTalk += 2; for (const id in meeting.suspect) if (meeting.suspect[id] > 0) meeting.suspect[id] *= 0.4; }
+  if (q.vote && !meeting.votes[o.id]) {
+    const tg = q.vote !== 'skip' && players[q.vote];
+    meeting.votes[o.id] = q.vote === 'skip' || (tg && tg.alive) ? q.vote : 'skip';
+    if (tg) heard([[tg.id, 0.15]]); // הצבעה של מישהו אחר היא לא ראיה
+    const b = o.bot; // שופט בוט פוסק רק כשהוא בטוח (ראה בעצמו חיסול או שינוי צורה)
+    if (b && o.role === 'judge' && !o.verdictUsed && judgeReady(o) && tg && (b.sawKill === q.vote || b.sawShift === q.vote) && Math.random() < 0.8) act(o, { type: 'verdict', target: q.vote });
+  }
+  return true;
 }
 
 // ---------- לולאת משחק ----------
@@ -2023,11 +2072,9 @@ function tick() {
     const talking = humanTalking();
     if (talking) meeting.floor = Math.min(meeting.floor, meeting.t - 0.9);
     if (!talking && meeting.queue.length && meeting.t <= meeting.queue[0].at && meeting.t <= meeting.floor) {
-      const q = meeting.queue.shift(), o = players[q.id];
-      if (o && o.alive) {
-        say(o, q.text, q.silent); meeting.floor = meeting.t - speechDur(q.text);
-        if (q.deduce) { jesterHint = true; meeting.skipTalk += 2; for (const id in meeting.suspect) if (meeting.suspect[id] > 0) meeting.suspect[id] *= 0.4; }
-      }
+      const q = meeting.queue.shift(), at = meeting.t;
+      if (sayQueued(q) && meeting) meeting.floor = at - speechDur(q.text);
+      if (!meeting || phase !== 'meeting') return;
     }
     const voters = list().filter(p => p.alive && !p.spectator);
     if (meeting.t <= 0 || voters.every(v => meeting.votes[v.id])) { meeting.t = Math.max(0, meeting.t); meeting.reveal = settings.openVotes ? 5 : 1.2; }
