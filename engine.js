@@ -396,6 +396,7 @@ function startGame(by) {
   if (settings.mode === 5) { crew.forEach(p => toast(p, '🕎 שמונה נרות! הדליקו את כל 8 הנרות שבמפה (E ליד נר). מתחזים יכבו אותם – תחזרו להדליק!')); imps.forEach(p => toast(p, '💨 שמונה נרות: עמוד ליד נר דולק ולחץ E כדי לכבות אותו (אחת ל-12 שניות)')); ev('start', '🕎 שמונה נרות: הצוות מדליק, המתחזים מכבים'); }
   if (race) { raceEndAt = now() + 8 * 60; ev('start', '🏁 מרוץ משימות: ראשון שמגיע ל-' + settings.raceGoal + ' משימות מנצח'); }
   all.forEach(p => {
+    p.kd = null;
     p.alive = true; p.ejected = false; p.spectator = false; p.killCd = opts.demo ? 45 : 12; p.shiftCd = 10; p.shapeAs = null; p.gaCd = 0;
     p.shieldUntil = 0; p.emergencyUsed = false; p.toast = [];
     p.verdictUsed = false;
@@ -426,7 +427,7 @@ function startGame(by) {
 function backToLobby(by) {
   if (by !== hostId) return;
   Object.values(players).filter(p => p.isBot).forEach(p => delete players[p.id]);
-  list().forEach(p => { p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
+  list().forEach(p => { p.kd = null; p.role = null; p.alive = true; p.spectator = false; p.tasks = []; p.shapeAs = null; });
   lobbySpawn(list());
   phase = 'lobby'; bodies = []; bananas = []; meeting = null; eject = null; winner = null; chat = []; settings.reveal = false;
   sab = null; sabCd = 20; doorsUntil = {}; doorCool = {}; hauntDoors = []; darkRooms = {}; miracles = []; candleLit = {}; rewound = {};
@@ -867,7 +868,7 @@ function act(p, a) {
       }
       if (tplOf(tgt.role) === 'lucky' && !tgt.luckUsed) { tgt.luckUsed = true; p.killCd = 10; toast(p, '🍀 למטרה יש מזל – החיסול נכשל!'); toast(tgt, '🍀 מזל! שרדת ניסיון חיסול. תיזהר, זה לא יקרה שוב'); return; }
       if (tplOf(p.role) === 'poisoner') { tgt.poisonAt = t + 12; tgt.poisonBy = p.id; p.killCd = killCdFor(); toast(p, '☠️ הרעלת את ' + nm(tgt) + ' – הוא ימות בעוד 12 שניות'); toast(tgt, '🤢 הורעלת! נשארו לך 12 שניות לחיות – תספר למישהו מי היה לידך!'); return; }
-      tgt.alive = false; tgt.work = null; tgt.cam = false;
+      tgt.alive = false; tgt.work = null; tgt.cam = false; tgt.kd = { by: p.id, at: now() };
       bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: p.role === 'viper' ? t + settings.rotTime : 0, t, killer: p.id });
       p.x = tgt.x; p.y = tgt.y; p.killCd = killCdFor() * (tplOf(p.role) === 'vampire' ? 0.6 : tplOf(p.role) === 'sniper' ? 1.4 : 1);
       p.stats.kills++; noteKill(p, tgt); ev('kill', `🔪 ${nm(p)} חיסל את ${nm(tgt)} ב${(MAP.roomAt(tgt.x, tgt.y) || {}).name || 'מסדרון'}`);
@@ -1108,7 +1109,7 @@ function martyrWin(m) {
 function slay(tgt, killer) {
   if (!tgt.alive || phase !== 'play') return;
   const t = now();
-  tgt.alive = false; tgt.work = null; tgt.cam = false; tgt.poisonAt = 0; tgt.inVent = null;
+  tgt.alive = false; tgt.work = null; tgt.cam = false; tgt.poisonAt = 0; tgt.inVent = null; tgt.kd = { by: killer.id, at: now() };
   bodies.push({ id: tgt.id, x: tgt.x, y: tgt.y, color: tgt.color, decayAt: 0, t, killer: killer.id });
   if (killer.stats) killer.stats.kills++;
   noteKill(killer, tgt);
@@ -2127,6 +2128,7 @@ function viewFor(v) {
   };
   const out = {
     phase, me, players: ps, settings, hostId, music: musicRef,
+    kd: v.kd && !v.alive && players[v.kd.by] ? { at: Math.round(v.kd.at * 1000), ago: Math.round((now() - v.kd.at) * 10) / 10, by: { name: nm(players[v.kd.by]), color: COLORS[players[v.kd.by].color].c, hat: players[v.kd.by].hat | 0 }, me: { color: COLORS[v.color].c, hat: v.hat | 0 } } : null, // למי שחוסל: מי הרג אותו (לאנימציית החיסול בפרו)
     bombs: bombs.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), left: Math.max(0, Math.ceil(b.at - t)) })),
     traps: tplOf(v.role) === 'trapper' ? traps.filter(tr => tr.by === v.id).map(tr => ({ x: tr.x, y: tr.y })) : [],
     radar: v.radarUntil > t && v.alive ? list().filter(o => o.id !== v.id && o.alive && !o.spectator).map(o => ({ x: Math.round(o.x), y: Math.round(o.y) })) : [],

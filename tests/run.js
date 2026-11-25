@@ -221,6 +221,7 @@ test('בוט זוכר מי היה איתו בזמן החיסול (נקי) ומי
   });
   sec(g, 2.5); g.act(a, { type: 'kill' }); tick(g, 1);
   { const q = JSON.parse(g.snapshot()); ok(q.bodies.length === 1 || (q.meeting && q.meeting.body === v), 'החיסול לא קרה'); }
+  { const kv = g.view(v); ok(kv && kv.kd && kv.kd.by && kv.kd.by.color && kv.kd.me && kv.kd.ago < 3, 'לקורבן אין מידע על ההורג (kd)'); }
   sec(g, 1.5); if (!JSON.parse(g.snapshot()).meeting) g.act(a, { type: 'report' }); tick(g, 2); // העד הקרוב אולי כבר דיווח בעצמו
   const sn = JSON.parse(g.snapshot()), b1 = sn.players[w1].bot, b3 = sn.players[w3] && sn.players[w3].alive ? sn.players[w3].bot : null;
   ok(sn.meeting, 'אין ישיבה');
