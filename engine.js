@@ -152,6 +152,7 @@ let players = {};
 let phase = 'lobby';
 let lobbyCache = null;
 let hostId = null;
+let musicRef = ''; // פרו: מוזיקת רקע בספוטיפי שהמארח בחר ("track/ID" וכו'), נשלחת לכל השחקנים
 let settings = { rounds: 1, hideTime: 180, impostors: 1, bots: 4, reveal: false, killCd: 25, speed: 1, vision: 1, tasks: 4, meetingTime: 60, confirm: true, openVotes: true, taskLevel: 2, newRoles: true, botLevel: 2, map: 'big', mode: 1, code: '', raceGoal: 10, locked: false, jester: true };
 for (const k in ROLE_SET) settings[k] = ROLE_SET[k][0];
 settings.roleOff = [];
@@ -1009,6 +1010,12 @@ function act(p, a) {
       if (phase === 'meeting' && !p.alive) return;
       if (phase !== 'meeting' && phase !== 'lobby') return;
       say(p, a.voice ? '🎙️ ' + text : text);
+      break;
+    }
+    case 'music': { // פרו בלבד, המארח בלבד: קישור ספוטיפי (או ריק לעצירה)
+      if (p.id !== hostId || !(opts && opts.pro)) return;
+      const m = /^https:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(track|playlist|album|artist|show|episode)\/([A-Za-z0-9]{10,30})/.exec(String(a.url || '').trim());
+      musicRef = m ? m[1] + '/' + m[2] : '';
       break;
     }
     case 'settings':
@@ -2119,7 +2126,7 @@ function viewFor(v) {
     eaten: v.eaten || 0, wrong: wrongEjects,
   };
   const out = {
-    phase, me, players: ps, settings, hostId,
+    phase, me, players: ps, settings, hostId, music: musicRef,
     bombs: bombs.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), left: Math.max(0, Math.ceil(b.at - t)) })),
     traps: tplOf(v.role) === 'trapper' ? traps.filter(tr => tr.by === v.id).map(tr => ({ x: tr.x, y: tr.y })) : [],
     radar: v.radarUntil > t && v.alive ? list().filter(o => o.id !== v.id && o.alive && !o.spectator).map(o => ({ x: Math.round(o.x), y: Math.round(o.y) })) : [],
