@@ -487,7 +487,7 @@ function checkWin() {
 
 const candleIdx = () => MAP.TASKS.map((T, i) => T.ev === 'candle' ? i : -1).filter(i => i >= 0);
 // מאגר המשימות: משימות הסביבון רק באירוע חנוכה, והנרות רק במצב שמונה נרות
-const taskPool = () => MAP.TASKS.map((_, i) => i).filter(i => { const k = MAP.TASKS[i].ev; return !k || ((k === 'dreidel' || k === 'hanuk') && hanukOn() && settings.mode !== 5) || (k === 'pro' && !!opts.pro && settings.mode !== 5); });
+const taskPool = () => MAP.TASKS.map((_, i) => i).filter(i => { const k = MAP.TASKS[i].ev; return !k || ((k === 'dreidel' || k === 'hanuk') && hanukOn() && settings.mode !== 5) || (k === 'pro' && !!opts.pro && settings.mode !== 5) || (k === 'phanuk' && !!opts.pro && hanukOn() && settings.mode !== 5); });
 function addPro(p) { // באתר הפרו: שתי משימות פרו לכל שחקן (במקום משימות רגילות)
   if (!opts.pro || settings.mode === 2 || settings.mode === 5 || p.tasks.length < 3) return;
   const have = () => p.tasks.filter(x => MAP.TASKS[x.i].ev === 'pro').length;
@@ -499,8 +499,8 @@ function addDreidel(p) {
   const d = p.tasks.some(x => MAP.TASKS[x.i].ev === 'dreidel') || Math.random() > 0.6 ? undefined : taskPool().filter(i => MAP.TASKS[i].ev === 'dreidel' && !p.tasks.some(x => x.i === i))[0];
   if (d !== undefined && p.tasks.length) p.tasks[p.tasks.length - 1] = { i: d, done: false };
   // משימת חנוכה נוספת (סופגניות / שמן / זוגות / זכור את הנרות) – תמיד אחת לכל שחקן
-  if (!p.tasks.some(x => MAP.TASKS[x.i].ev === 'hanuk') && p.tasks.length > 1) {
-    const h = shuffle(taskPool().filter(i => MAP.TASKS[i].ev === 'hanuk' && !p.tasks.some(x => x.i === i)))[0];
+  if (!p.tasks.some(x => /hanuk$/.test(MAP.TASKS[x.i].ev)) && p.tasks.length > 1) {
+    const h = shuffle(taskPool().filter(i => /hanuk$/.test(MAP.TASKS[i].ev) && !p.tasks.some(x => x.i === i)))[0];
     if (h !== undefined) p.tasks[0] = { i: h, done: false };
   }
 }
