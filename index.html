@@ -4063,7 +4063,7 @@ const joy = { active: false, dx: 0, dy: 0 };
   document.addEventListener('touchstart', e => {
     if (!S || (S.phase !== 'play' && S.phase !== 'lobby') || (S.phase === 'lobby' && lobOpen) || id !== null || S.me.cam || miniOpen !== null || sabOpen || tmOpen) return;
     for (const t of e.changedTouches) {
-      if (S.phase === 'lobby' ? (t.target !== $('#shipCv') || stationAtPoint(t.clientX, t.clientY)) : (t.target !== cv || t.clientX > innerWidth * 0.55)) continue;
+      if (S.phase === 'lobby' ? (t.target !== $('#shipCv') || stationAtPoint(t.clientX, t.clientY)) : ((t.target !== cv && t.target.id !== 'cv3') || t.clientX > innerWidth * 0.55)) continue; // cv3 = קנבס התלת מימד בפרו
       id = t.identifier; cx = t.clientX; cy = t.clientY; joy.active = true;
       el.style.left = (cx - 65) + 'px'; el.style.top = (cy - 65) + 'px'; el.classList.remove('hidden');
       move(t); e.preventDefault(); break;
