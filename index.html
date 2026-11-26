@@ -390,6 +390,7 @@
   .stGrid b { display: block; font-size: 22px; color: var(--text); }
   .badge { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 10px; margin-bottom: 4px; background: #10152290; }
   .badge.off { opacity: .45; }
+  .badge .wear { font-size: 12px; padding: 4px 8px; white-space: nowrap; align-self: center; } .badge .wear.sel { background: var(--accent); color: #1a1205; }
   .badge .bi { font-size: 26px; } .badge small { color: var(--muted); display: block; }
   .badge .bar { height: 5px; background: #2a3550; border-radius: 4px; margin-top: 3px; } .badge .bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
   #newBadges .badge { background: #3a3110; border: 1px solid #ffd166; }
@@ -509,6 +510,7 @@
     <div class="row" style="margin:6px 0 12px;background:#151b2c;border-radius:10px;padding:8px 10px"><span>🔍 זום תצוגה</span><input type="range" id="zoomRange" min="60" max="180" step="5" value="100" style="flex:1;min-width:120px"><b id="zoomVal">100%</b></div>
     <div class="setrow"><label><input type="checkbox" id="cbMode"> 🎨 מצב עיוורון צבעים (סמל על כל צבע)</label></div>
     <div class="setrow"><label><input type="checkbox" id="saverMode"> 🔋 חיסכון בסוללה (פחות אפקטים)</label></div>
+    <div class="setrow"><label><input type="checkbox" id="vibMode"> 📳 רטט בטלפון (גופה, פגישה, חבלה)</label></div>
     <div class="setrow"><label><input type="checkbox" id="notifMode"> 🔔 התראה כשהמשחק או ישיבה מתחילים</label></div>
     <div class="row" style="margin:6px 0 12px;background:#151b2c;border-radius:10px;padding:8px 10px"><span>🔤 גודל טקסט</span><input type="range" id="uiScale" min="90" max="160" step="5" value="100" style="flex:1;min-width:120px"><b id="uiVal">100%</b></div>
     <p class="sub" style="margin:0 0 8px;font-size:13px">בטלפון: אם רואים יותר מדי רחוק, הגדל את הזום. מקשים (במחשב):</p>
@@ -1438,6 +1440,8 @@ function onState(s) {
     const d = disp[p.id];
     if (!d || Math.hypot(d.x - p.x, d.y - p.y) > 300) disp[p.id] = { x: p.x, y: p.y };
   }
+  buzzState(s);
+  keepAwake();
   if (s.phase !== lastPhase) {
     if (s.phase === 'play') { $('#chatIn').blur(); for (const p of s.players) disp[p.id] = { x: p.x, y: p.y }; vitalsOpen = false; }
     notifyPhase(s.phase);
@@ -1492,6 +1496,7 @@ function renderLobby(s) {
       if (l.pet !== undefined && unlocked(PET_REQ[l.pet], loadStats())) api({ type: 'pet', pet: l.pet });
       if (l.color !== undefined && !s.roster.some(p => p.id !== s.me.id && p.colorIdx === l.color)) api({ type: 'color', color: l.color });
     } catch (e) {}
+    if (titleIcon(myTitle())) api({ type: 'title', title: titleIcon(myTitle()) });
   }
   const sig = JSON.stringify([s.roster, s.hostId, s.settings, s.me.color]);
   renderHats(s); renderPets(s); syncMapOptions(s);
@@ -1500,7 +1505,7 @@ function renderLobby(s) {
   lobbySig = sig;
   $('#pcount').textContent = s.roster.length;
   $('#plist').innerHTML = s.roster.map(p =>
-    `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span>${esc(cs(p.color) + p.name)}</span>${p.id === s.hostId ? ' 👑' : ''}${p.id === s.me.id ? ' <span class="tag">אתה</span>' : ''}${s.me.host && p.id !== s.me.id && !p.bot ? `<button class="kick" data-kick="${esc(p.id)}" data-n="${esc(p.name)}" aria-label="הוצא את ${esc(p.name)} מהחדר">🚫 הוצא</button>` : ''}</div>`).join('');
+    `<div class="pl"><span class="dot" style="background:${esc(p.color)}"></span><span>${esc(cs(p.color) + p.name)}</span>${p.title ? ` <span title="תג">${esc(p.title)}</span>` : ''}${p.id === s.hostId ? ' 👑' : ''}${p.id === s.me.id ? ' <span class="tag">אתה</span>' : ''}${s.me.host && p.id !== s.me.id && !p.bot ? `<button class="kick" data-kick="${esc(p.id)}" data-n="${esc(p.name)}" aria-label="הוצא את ${esc(p.name)} מהחדר">🚫 הוצא</button>` : ''}</div>`).join('');
   { const lb = $('#lockBtn'), on = !!s.settings.locked; show('#lockBtn', s.me.host && !DEMO); lb.classList.toggle('on', on); lb.setAttribute('aria-pressed', String(on)); lb.textContent = on ? '🔒 החדר נעול' : '🔓 נעל חדר'; }
   const taken = new Set(s.roster.filter(p => p.id !== s.me.id).map(p => p.colorIdx));
   $('#colors').innerHTML = (s.colors || []).map((c, i) =>
@@ -3385,6 +3390,14 @@ const BADGES = [
   { id: 'survivor', ic: '🧊', name: 'שורד', d: 'שרדת עד סוף המשחק', k: 'survived', n: 10 },
   { id: 'reporter', ic: '📢', name: 'עיתונאי', d: 'דיווחים על גופות', k: 'reports', n: 10 },
   { id: 'vet', ic: '🎮', name: 'ותיק', d: 'משחקים', k: 'games', n: 25 },
+  { id: 'first', ic: '🥇', name: 'ניצחון ראשון', d: 'ניצחונות', k: 'wins', n: 1 },
+  { id: 'catch', ic: '🎯', name: 'תפסתי מתחזה', d: 'הצבעות נכונות נגד מתחזה', k: 'goodVotes', n: 1 },
+  { id: 'alldone', ic: '✅', name: 'הכל גמור', d: 'משחקים שבהם סיימת את כל המשימות שלך', k: 'allDone', n: 1 },
+  { id: 'sharp', ic: '🧠', name: 'חוש שישי', d: 'משחקים עם שתי הצבעות נכונות לפחות', k: 'sharpGames', n: 1 },
+  { id: 'ghostimp', ic: '🥷', name: 'מתחזה צללים', d: 'ניצחון כמתחזה בלי למות', k: 'cleanImp', n: 1 },
+  { id: 'rampage', ic: '⚡', name: 'שלושה במשחק', d: 'משחקים עם 3 חיסולים לפחות', k: 'rampage', n: 1 },
+  { id: 'streak5', ic: '🌋', name: 'בלתי ניתן לעצירה', d: 'ניצחונות ברצף', k: 'best', n: 5 },
+  { id: 'legend', ic: '👑', name: 'אגדה', d: 'ניצחונות', k: 'wins', n: 50 },
   { id: 'wrong', ic: '🤦', name: 'יד קלה על ההדק', d: 'הצבעות נגד חפים מפשע', k: 'badVotes', n: 10 },
   ...Array.from({ length: 8 }, (_, i) => ({ id: 'han' + (i + 1), han: 1, ic: '🕯️', name: 'נר חנוכה ' + (i + 1), d: 'שיחקת משחק ביום החנוכה ' + (i + 1), k: 'hanuk' + (i + 1), n: 1 })),
   { id: 'daily5', ic: '🎯', name: 'אלוף האתגרים', d: 'אתגרים יומיים שהושלמו', k: 'dailyCount', n: 5 },
@@ -3400,6 +3413,9 @@ const DAILY = [
   { txt: 'הצבע נכון פעמיים', ok: m => (m.goodVotes || 0) >= 2 },
   { txt: 'חסל לפחות שחקן אחד', ok: m => (m.kills || 0) >= 1 },
 ];
+// התג שמוצג ליד השם בלובי (בחירה אישית, נשמרת במכשיר)
+const myTitle = () => { try { return localStorage.getItem('mm_title') || ''; } catch (e) { return ''; } };
+const titleIcon = id => { const b = BADGES.find(x => x.id === id); return b && loadStats().badges.includes(b.id) ? b.ic : ''; };
 const dayKey = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 const dailyToday = () => { const d = new Date(); return DAILY[(d.getFullYear() * 366 + d.getMonth() * 31 + d.getDate()) % DAILY.length]; };
 // סוף משחק: מעדכנים את הסטטיסטיקה פעם אחת לכל משחק, ומחזירים תגים חדשים שהושגו
@@ -3416,6 +3432,11 @@ function recordGame(m) {
   for (const k of ['kills', 'tasks', 'goodVotes', 'badVotes', 'reports']) st[k] += m[k] || 0;
   if (m.ejected) st.ejected++;
   if (m.alive) st.survived++;
+  const bump = (k, ok) => { if (ok) st[k] = (st[k] || 0) + 1; };
+  bump('allDone', m.allDone);
+  bump('sharpGames', (m.goodVotes || 0) >= 2);
+  bump('cleanImp', m.won && m.team === 'imp' && m.alive);
+  bump('rampage', (m.kills || 0) >= 3);
   if (hanukActive()) { // אירוע חנוכה: יום משחק חדש, והנר של היום
     const d = new Date(), key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
     if (!st.hanukSeen.includes(key)) { st.hanukSeen.push(key); st.hanukDays++; }
@@ -3431,17 +3452,26 @@ function recordGame(m) {
 }
 function openStats() {
   const st = loadStats(), pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+  const earned = BADGES.filter(b => !st.badges.includes(b.id) && (st[b.k] || 0) >= b.n);
+  if (earned.length) { earned.forEach(b => st.badges.push(b.id)); try { localStorage.setItem('mm_stats', JSON.stringify(st)); } catch (e) {} }
   const cell = (n, l) => `<div><b>${n}</b>${l}</div>`;
   let h = '<div class="stGrid">' + cell(st.games, 'משחקים') + cell(st.wins, 'ניצחונות') + cell(pct(st.wins, st.games), 'אחוז ניצחון') + cell(st.impWins + '/' + st.impGames, 'ניצחונות כמתחזה') +
     cell(st.kills, 'חיסולים') + cell(st.tasks, 'משימות') + cell(st.goodVotes, 'הדחות נכונות') + cell(st.badVotes, 'הצבעות שגויות') + cell(st.ejected, 'פעמים שהודחת') + cell(st.best, 'רצף ניצחונות שיא') + '</div>';
   h = `<div class="badge ${st.dailyDay === dayKey() ? '' : 'off'}"><span class="bi">🎯</span><span style="flex:1"><b>אתגר היום</b><small>${dailyToday().txt}</small></span>${st.dailyDay === dayKey() ? '✅' : ''}</div>` + h;
   h += '<h3 style="margin:6px 0">🏅 תגים</h3>' + BADGES.filter(b => !b.han || hanukActive() || st.hanukDays).map(b => { const v = Math.min(st[b.k] || 0, b.n), on = st.badges.includes(b.id) || v >= b.n;
-    return `<div class="badge ${on ? '' : 'off'}"><span class="bi">${b.ic}</span><span style="flex:1"><b>${b.name}</b><small>${b.d}: ${v}/${b.n}</small>${on ? '' : `<div class="bar"><i style="width:${100 * v / b.n}%"></i></div>`}</span>${on ? '✅' : ''}</div>`; }).join('');
+    return `<div class="badge ${on ? '' : 'off'}"><span class="bi">${b.ic}</span><span style="flex:1"><b>${b.name}</b><small>${b.d}: ${v}/${b.n}</small>${on ? '' : `<div class="bar"><i style="width:${100 * v / b.n}%"></i></div>`}</span>${on ? `<button class="wear${myTitle() === b.id ? ' sel' : ''}" data-wear="${b.id}">${myTitle() === b.id ? 'מוצג ✔' : 'הצג ליד השם'}</button>` : ''}</div>`; }).join('');
   h += '<h3 style="margin:10px 0 6px">🎁 פריטים שנפתחים</h3>' + [...Object.entries(HAT_REQ).map(([i, r]) => ['🎩 כובע ' + HATS[i], r]), ...Object.entries(PET_REQ).filter(([, r]) => r).map(([i, r]) => [petHtml(i) + ' ' + PET_NAMES[i], r])]
     .map(([n, r]) => `<div class="badge ${unlocked(r, st) ? '' : 'off'}"><span style="flex:1">${n}</span><small>${unlocked(r, st) ? '✅ פתוח' : `${Math.min(st[r[0]] || 0, r[1])}/${r[1]} ${r[2]}`}</small></div>`).join('');
   $('#statsBody').innerHTML = h; show('#statsModal', true);
 }
 document.querySelectorAll('.statsBtn').forEach(b => b.onclick = openStats);
+$('#statsBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-wear]'); if (!b) return;
+  const id = myTitle() === b.dataset.wear ? '' : b.dataset.wear, box = $('#statsModal .smBox'), top = box.scrollTop;
+  try { localStorage.setItem('mm_title', id); } catch (er) {}
+  if (S && S.phase === 'lobby') api({ type: 'title', title: titleIcon(id) });
+  openStats(); box.scrollTop = top;
+});
 $('#statsClose').onclick = () => show('#statsModal', false);
 $('#statsModal').onclick = e => { if (e.target.id === 'statsModal') show('#statsModal', false); };
 const PET_BASE = 9, HAT_BASE = 12;
@@ -3926,19 +3956,40 @@ setInterval(updateLinkInfo, 4000);
 
 // ---------- נגישות והעדפות (נשמרות במכשיר) ----------
 const COLOR_SYMS = { '#e53935': '★', '#1e63d6': '●', '#22a34a': '▲', '#ec5fb5': '♥', '#f08c1e': '■', '#f2d22e': '☀', '#3b3f46': '◆', '#e8edf2': '○', '#7b3fc9': '✚', '#8a5a33': '☾', '#36d1d6': '⬟', '#9be03a': '✿' };
-const pref = { cb: false, saver: false, notif: false, ui: 1 };
+const pref = { cb: false, saver: false, notif: false, vib: true, ui: 1 };
 try { Object.assign(pref, JSON.parse(localStorage.getItem('mm_pref') || '{}')); } catch (e) {}
 const savePref = () => { try { localStorage.setItem('mm_pref', JSON.stringify(pref)); } catch (e) {} applyPref(); };
 const cs = c => (pref.cb && COLOR_SYMS[c]) ? COLOR_SYMS[c] + ' ' : '';
 function applyPref() {
   document.body.classList.toggle('cb', pref.cb);
   document.documentElement.style.setProperty('--ui', pref.ui);
-  $('#cbMode').checked = pref.cb; $('#saverMode').checked = pref.saver; $('#notifMode').checked = pref.notif;
+  $('#cbMode').checked = pref.cb; $('#saverMode').checked = pref.saver; $('#notifMode').checked = pref.notif; $('#vibMode').checked = pref.vib;
   $('#uiScale').value = Math.round(pref.ui * 100); $('#uiVal').textContent = Math.round(pref.ui * 100) + '%';
   try { resize(); } catch (e) {}
 }
 $('#cbMode').onchange = e => { pref.cb = e.target.checked; savePref(); };
 $('#saverMode').onchange = e => { pref.saver = e.target.checked; savePref(); };
+$('#vibMode').onchange = e => { pref.vib = e.target.checked; savePref(); buzz(60); };
+// ---------- רטט ומסך דלוק בטלפון ----------
+function buzz(pattern) { if (pref.vib && navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} } }
+let buzzPrev = null;
+function buzzState(s) {
+  const now = { phase: s.phase, sab: s.sab ? s.sab.type : '', alive: !!(s.me && s.me.alive) }, was = buzzPrev;
+  buzzPrev = now;
+  if (!was) return;
+  if (was.alive && !now.alive && (now.phase === 'play' || now.phase === 'alert')) buzz([400, 100, 400]); // חוסלתי
+  else if (now.phase !== was.phase && (now.phase === 'alert' || (now.phase === 'meeting' && was.phase !== 'alert'))) buzz([200, 100, 200, 100, 200]); // גופה / ישיבת חירום
+  else if (now.phase === 'play' && now.sab && now.sab !== was.sab) buzz([120, 80, 120]); // חבלה
+  else if (now.phase === 'end' && was.phase !== 'end') buzz(300);
+}
+let wakeLockObj = null, wakeAsking = false;
+async function keepAwake() {
+  if (wakeLockObj || wakeAsking || !S || document.hidden || !('wakeLock' in navigator)) return;
+  wakeAsking = true;
+  try { wakeLockObj = await navigator.wakeLock.request('screen'); wakeLockObj.addEventListener('release', () => { wakeLockObj = null; }); } catch (e) {}
+  wakeAsking = false;
+}
+document.addEventListener('visibilitychange', keepAwake);
 $('#notifMode').onchange = async e => {
   pref.notif = e.target.checked;
   if (pref.notif && 'Notification' in window && Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (er) {} }

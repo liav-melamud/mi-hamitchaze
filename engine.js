@@ -57,6 +57,7 @@ const BOT_LINES = ['לא אני!', 'הייתי במשימות כל הזמן', '�
 
 const SPEED = 220, KILL_RANGE = 90, REPORT_RANGE = 110, USE_RANGE = 60;
 const KILL_CD = 25, SHIFT_CD = 30, SHIFT_TIME = 20, GA_CD = 30, SHIELD_TIME = 15, TASK_TIME = 2.5;
+const TITLES = ['🕵️', '🤥', '👀', '🛠️', '🔪', '🏆', '🔥', '🤡', '🧊', '📢', '🎮', '🤦', '🕯️', '🎯', '🕎', '🥇', '✅', '🧠', '🥷', '⚡', '🌋', '👑'];
 const MEETING_TIME = 60, EJECT_TIME = 6, HAT_BASE = 12, HAT_COUNT = 14, PRO_HAT_COUNT = 22, PET_BASE = 9, PET_COUNT = 11; // כובעים וחיות מחמד: הבסיס, ועם פריטי חנוכה
 // הגדרות תפקידים (כמו במשחק האמיתי): [ברירת מחדל, מינימום, מקסימום]
 const ROLE_SET = {
@@ -962,6 +963,11 @@ function act(p, a) {
       if (phase !== 'lobby') return;
       const n = Number(a.pet);
       if (n >= 0 && n < PET_COUNT) p.pet = n;
+      break;
+    }
+    case 'title': { // תג שהשחקן בחר להציג ליד השם
+      if (phase !== 'lobby') return;
+      p.title = TITLES.includes(a.title) ? a.title : '';
       break;
     }
     case 'hat': {
@@ -2200,7 +2206,7 @@ function viewFor(v) {
     darkRooms: Object.keys(darkRooms).filter(r => darkRooms[r] > t),
     doorCool: Object.fromEntries(Object.keys(doorCool).filter(r => doorCool[r] > now() && !(doorsUntil[r] > now())).map(r => [r, Math.ceil(doorCool[r] - now())])),
     toast: v.toast.splice(0),
-    roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat, pet: p.pet || 0 })),
+    roster: list().map(p => ({ id: p.id, name: p.name, color: COLORS[p.color].c, alive: p.alive, spec: !!p.spectator, bot: p.isBot, colorIdx: p.color, hat: p.hat, pet: p.pet || 0, title: p.title || '' })),
     chat,
     near: phase === 'play' ? nearTalk.filter(e => now() - e.t < 6 && e.from !== v.id && Math.hypot(e.x - v.x, e.y - v.y) < HEAR_R).map(e => ({ id: e.id, from: e.from, name: e.name, text: e.text })) : [],
   };
@@ -2236,7 +2242,7 @@ function viewFor(v) {
     if (v.stats && !v.spectator && winner) {
       const w = winner, tm = team(v);
       const won = w.team === 'race' ? !!(w.ranking && w.ranking[0] && w.ranking[0].name === nm(v)) : (w.team === 'jester' ? v.id === w.jester : w.team !== 'nobody' && (tm === w.team || (w.team === 'imp' && tm === 'mole'))) || !!(w.also && w.also.includes(v.id));
-      out.myStats = { game: Math.round(gameStartT), won, team: tm, role: v.role, mode: settings.mode, kills: v.stats.kills, tasks: v.stats.tasks, goodVotes: v.stats.goodVotes, badVotes: v.stats.badVotes, reports: v.stats.reports, ejected: !!v.ejected, alive: v.alive };
+      out.myStats = { game: Math.round(gameStartT), won, team: tm, role: v.role, mode: settings.mode, kills: v.stats.kills, tasks: v.stats.tasks, goodVotes: v.stats.goodVotes, badVotes: v.stats.badVotes, reports: v.stats.reports, ejected: !!v.ejected, alive: v.alive, allDone: tm === 'crew' && settings.mode !== 2 && settings.mode !== 5 && v.tasks.length > 0 && v.tasks.every(x => x.done) };
     }
   }
   if (customMapDefs[settings.map] && v.sentMap !== settings.map) { v.sentMap = settings.map; out.modMap = { id: settings.map, def: customMapDefs[settings.map] }; }

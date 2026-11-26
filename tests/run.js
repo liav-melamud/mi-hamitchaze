@@ -1252,5 +1252,15 @@ test('בוטים זוכרים בין סיבובים: אותם שמות, בלי �
   ok(g.view(a).phase === 'end' || true, 'המשחק השני נתקע');
 });
 
+test('תג ליד השם: נשמר רק תג מהרשימה ומופיע ברשימת השחקנים', () => {
+  const g = createGame(MAP); const a = g.join('מארח');
+  const mine = () => g.view(a).roster.find(p => p.id === a).title;
+  g.act(a, { type: 'title', title: '👑' }); ok(mine() === '👑', 'התג לא נשמר');
+  g.act(a, { type: 'title', title: '<img>' }); ok(mine() === '', 'התקבל תג שלא ברשימה');
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  const icons = [...html.slice(html.indexOf('const BADGES'), html.indexOf('const DAILY')).matchAll(/ic: '([^']+)'/g)].map(m => m[1]);
+  for (const ic of icons) { g.act(a, { type: 'title', title: ic }); ok(mine() === ic, 'תג שהמנוע לא מכיר: ' + ic); }
+});
+
 console.log(`\nסה"כ: ${pass} עברו, ${fail} נכשלו` + (fail ? ' – ' + failures.join(', ') : ''));
 process.exit(fail ? 1 : 0);
